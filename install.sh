@@ -438,7 +438,7 @@ install_pkgs() {
         run_spin "Обновление индексов пакетов APK" apk update
 
         local ALP_PKGS=(bash python3 py3-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g \
-                        util-linux util-linux-misc lsblk curl openssl ca-certificates jq iptables apache2-utils \
+                        util-linux util-linux-misc lsblk curl openssl ca-certificates jq iptables nftables apache2-utils \
                         unzip tar sqlite argon2 iputils shadow procps e2fsprogs \
                         docker docker-cli-compose chrony openrc)
         run_spin "Установка системных пакетов Alpine" \
@@ -447,7 +447,7 @@ install_pkgs() {
 
     elif [ "${DISTRO_FAMILY}" = "arch" ]; then
         local ARCH_PKGS=(python python-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g util-linux \
-                         curl openssl ca-certificates jq iptables unzip tar sqlite \
+                         curl openssl ca-certificates jq iptables nftables unzip tar sqlite \
                          docker docker-compose argon2 iputils acl zram-generator)
         local MISSING_PKGS=()
         for p in "${ARCH_PKGS[@]}"; do
@@ -466,7 +466,7 @@ install_pkgs() {
         run_spin "Установка системных пакетов и утилит" \
             apt-get install -y --no-install-recommends \
                 systemd-timesyncd systemd-zram-generator python3 python3-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g \
-                util-linux curl openssl ca-certificates jq iptables apache2-utils \
+                util-linux curl openssl ca-certificates jq iptables nftables apache2-utils \
                 unzip tar sqlite3 argon2 iputils-ping
 
         if ! command -v docker >/dev/null 2>&1; then
@@ -1075,7 +1075,12 @@ prompt_configuration() {
         USER_HOME=$(eval echo ~"${TARGET_USER}" 2>/dev/null || echo "/home/${TARGET_USER}")
         rm -f "${USER_HOME}/diagnostic_report.log" 2>/dev/null || true
 
-        log_info "Очистка правил межсетевого экрана (iptables)..."
+        log_info "Очистка правил межсетевого экрана (nftables / iptables)..."
+        if command -v nft >/dev/null 2>&1; then
+            nft delete table inet homelab 2>/dev/null || true
+            rm -f /etc/nftables.d/homelab.nft 2>/dev/null || true
+            sed -i '/include.*homelab\.nft/d' /etc/nftables.conf /etc/nftables.nft 2>/dev/null || true
+        fi
         if [ -n "${DEFAULT_IFACE:-}" ]; then
             iptables -D INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 8083 -j DROP 2>/dev/null || true
             iptables -D INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 9090 -j DROP 2>/dev/null || true
@@ -1622,7 +1627,7 @@ sys.exit(1)
 }
 
 setup_gateway_networking() {
-    print_step_header "05/11" "МАРШРУТИЗАЦИЯ, IPTABLES И ЗАЩИТА ОТ ПЕТЕЛЬ"
+    print_step_header "05/11" "МАРШРУТИЗАЦИЯ, NFTABLES И ЗАЩИТА ОТ ПЕТЕЛЬ"
 
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
         log_info "Освобождение порта 53 (отключение DNSStubListener при наличии)..."
@@ -1686,14 +1691,58 @@ EOF_SYSCTL
         if command -v nmcli >/dev/null 2>&1 && [ -n "${DEFAULT_IFACE}" ]; then
             nmcli connection modify "${DEFAULT_IFACE}" ipv6.method disabled 2>/dev/null || true
         fi
-        iptables -P FORWARD ACCEPT 2>/dev/null || true
-        if [ -n "${DEFAULT_IFACE}" ]; then
-            iptables -t nat -C POSTROUTING -o "${DEFAULT_IFACE}" -j MASQUERADE 2>/dev/null || \
-            iptables -t nat -A POSTROUTING -o "${DEFAULT_IFACE}" -j MASQUERADE 2>/dev/null || true
-            iptables -C INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 8083 -j DROP 2>/dev/null || \
-            iptables -A INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 8083 -j DROP 2>/dev/null || true
-            iptables -C INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 9090 -j DROP 2>/dev/null || \
-            iptables -A INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 9090 -j DROP 2>/dev/null || true
+        log_info "Настройка декларативного фаервола nftables (таблица inet homelab)..."
+        mkdir -p /etc/nftables.d
+        cat <<EOF_NFT > /etc/nftables.d/homelab.nft
+table inet homelab {
+    chain forward {
+        type filter hook forward priority 0; policy accept;
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname "${DEFAULT_IFACE}" masquerade
+    }
+
+    chain input {
+        type filter hook input priority filter; policy accept;
+        iifname "${DEFAULT_IFACE}" tcp dport { 8083, 9090 } drop
+    }
+}
+EOF_NFT
+
+        local NFT_APPLIED=0
+        if command -v nft >/dev/null 2>&1; then
+            nft delete table inet homelab 2>/dev/null || true
+            if nft -f /etc/nftables.d/homelab.nft 2>/dev/null; then
+                NFT_APPLIED=1
+                log_ok "Декларативные правила nftables успешно применены (таблица inet homelab)"
+            fi
+        fi
+
+        for nft_conf in /etc/nftables.conf /etc/nftables.nft; do
+            if [ -f "$nft_conf" ] && ! grep -q 'homelab.nft' "$nft_conf" 2>/dev/null; then
+                echo 'include "/etc/nftables.d/homelab.nft"' >> "$nft_conf" 2>/dev/null || true
+            fi
+        done
+
+        if [ "${INIT_SYSTEM}" = "systemd" ]; then
+            systemctl enable nftables >/dev/null 2>&1 || true
+        elif [ "${INIT_SYSTEM}" = "openrc" ]; then
+            rc-update add nftables default >/dev/null 2>&1 || true
+        fi
+
+        if [ "$NFT_APPLIED" -eq 0 ]; then
+            log_warn "nftables не применился или отсутствует, применен режим обратной совместимости с iptables"
+            iptables -P FORWARD ACCEPT 2>/dev/null || true
+            if [ -n "${DEFAULT_IFACE}" ]; then
+                iptables -t nat -C POSTROUTING -o "${DEFAULT_IFACE}" -j MASQUERADE 2>/dev/null || \
+                iptables -t nat -A POSTROUTING -o "${DEFAULT_IFACE}" -j MASQUERADE 2>/dev/null || true
+                iptables -C INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 8083 -j DROP 2>/dev/null || \
+                iptables -A INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 8083 -j DROP 2>/dev/null || true
+                iptables -C INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 9090 -j DROP 2>/dev/null || \
+                iptables -A INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 9090 -j DROP 2>/dev/null || true
+            fi
         fi
 
         log_info "Установка интеллектуального сторожевого таймера защиты от петель маршрутизации..."
@@ -1757,15 +1806,43 @@ EOF_RESOLV_FIX
 fi
 
 sysctl -w net.ipv4.ip_forward=1 net.ipv6.conf.all.disable_ipv6=1 net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1 || true
-iptables -P FORWARD ACCEPT 2>/dev/null || true
-if [ -n "$IFACE" ]; then
-    iptables -t nat -C POSTROUTING -o "$IFACE" -j MASQUERADE 2>/dev/null || \
-    iptables -t nat -A POSTROUTING -o "$IFACE" -j MASQUERADE 2>/dev/null || true
+APPLIED_NFT=0
+if command -v nft >/dev/null 2>&1 && [ -n "$IFACE" ]; then
+    mkdir -p /etc/nftables.d
+    cat << EOF_NFT_WD > /etc/nftables.d/homelab.nft
+table inet homelab {
+    chain forward {
+        type filter hook forward priority 0; policy accept;
+    }
 
-    iptables -C INPUT -i "$IFACE" -p tcp --dport 8083 -j DROP 2>/dev/null || \
-    iptables -A INPUT -i "$IFACE" -p tcp --dport 8083 -j DROP 2>/dev/null || true
-    iptables -C INPUT -i "$IFACE" -p tcp --dport 9090 -j DROP 2>/dev/null || \
-    iptables -A INPUT -i "$IFACE" -p tcp --dport 9090 -j DROP 2>/dev/null || true
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname "$IFACE" masquerade
+    }
+
+    chain input {
+        type filter hook input priority filter; policy accept;
+        iifname "$IFACE" tcp dport { 8083, 9090 } drop
+    }
+}
+EOF_NFT_WD
+    nft delete table inet homelab 2>/dev/null || true
+    if nft -f /etc/nftables.d/homelab.nft 2>/dev/null; then
+        APPLIED_NFT=1
+    fi
+fi
+
+if [ "$APPLIED_NFT" -eq 0 ]; then
+    iptables -P FORWARD ACCEPT 2>/dev/null || true
+    if [ -n "$IFACE" ]; then
+        iptables -t nat -C POSTROUTING -o "$IFACE" -j MASQUERADE 2>/dev/null || \
+        iptables -t nat -A POSTROUTING -o "$IFACE" -j MASQUERADE 2>/dev/null || true
+
+        iptables -C INPUT -i "$IFACE" -p tcp --dport 8083 -j DROP 2>/dev/null || \
+        iptables -A INPUT -i "$IFACE" -p tcp --dport 8083 -j DROP 2>/dev/null || true
+        iptables -C INPUT -i "$IFACE" -p tcp --dport 9090 -j DROP 2>/dev/null || \
+        iptables -A INPUT -i "$IFACE" -p tcp --dport 9090 -j DROP 2>/dev/null || true
+    fi
 fi
 EOF_WATCHDOG
         chmod 750 /usr/local/bin/gateway-watchdog.sh
@@ -3404,9 +3481,7 @@ EOF_COMPOSE
     if [ "${INIT_SYSTEM}" = "systemd" ]; then
         local WATCHDOG_EXEC_LINE=""
         if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
-            WATCHDOG_EXEC_LINE="ExecStartPre=/usr/local/bin/gateway-watchdog.sh
-ExecStartPre=/bin/sh -c 'iptables -P FORWARD ACCEPT'
-ExecStartPre=/bin/sh -c 'iptables -t nat -C POSTROUTING -o \"${DEFAULT_IFACE}\" -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o \"${DEFAULT_IFACE}\" -j MASQUERADE'"
+            WATCHDOG_EXEC_LINE="ExecStartPre=/usr/local/bin/gateway-watchdog.sh"
         fi
 
         cat <<EOF_HOMELAB_SVC > /etc/systemd/system/homelab.service
@@ -3444,11 +3519,6 @@ depend() {
 start() {
     ebegin "Starting Homelab Docker Compose Stack"
     /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
-    iptables -P FORWARD ACCEPT 2>/dev/null || true
-    if [ -n "${DEFAULT_IFACE:-}" ]; then
-        iptables -t nat -C POSTROUTING -o "${DEFAULT_IFACE}" -j MASQUERADE 2>/dev/null || \
-        iptables -t nat -A POSTROUTING -o "${DEFAULT_IFACE}" -j MASQUERADE 2>/dev/null || true
-    fi
     cd "${APP_DIR}" && /usr/local/bin/dc up -d
     eend $?
 }
@@ -3779,6 +3849,17 @@ EOF_DIAG
         echo -e "    ${TAG_ERR} IPv4 Forwarding:          ${CLR_RED}[ОТКЛЮЧЕН]${CLR_RESET}"
         echo "IPv4 Forwarding: DISABLED (0)" >> "${DIAG_LOG}"
         HAS_ISSUES=1
+    fi
+
+    if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
+        local FW_STATUS="НЕ АКТИВЕН"
+        if command -v nft >/dev/null 2>&1 && nft list table inet homelab >/dev/null 2>&1; then
+            FW_STATUS="nftables (inet homelab)"
+        elif iptables -t nat -C POSTROUTING -o "${DEFAULT_IFACE}" -j MASQUERADE 2>/dev/null; then
+            FW_STATUS="iptables (legacy)"
+        fi
+        echo -e "    ${TAG_OK} Фаервол и NAT:            ${CLR_GREEN}[${FW_STATUS}]${CLR_RESET}"
+        echo "Firewall status: ${FW_STATUS}" >> "${DIAG_LOG}"
     fi
 
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
