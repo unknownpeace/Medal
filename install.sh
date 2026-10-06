@@ -364,6 +364,7 @@ load_previous_config() {
         [ -n "${SAVED_SELECTED_DOT_2:-}" ] && SELECTED_DOT_2="${SAVED_SELECTED_DOT_2}"
         [ -n "${SAVED_SELECTED_BOOTSTRAP_IPS:-}" ] && SELECTED_BOOTSTRAP_IPS="${SAVED_SELECTED_BOOTSTRAP_IPS}"
         [ -n "${SAVED_SELECTED_BOOTSTRAP_IP_1:-}" ] && SELECTED_BOOTSTRAP_IP_1="${SAVED_SELECTED_BOOTSTRAP_IP_1}"
+        [ -n "${SAVED_LOGS_DOMAIN:-}" ] && LOGS_DOMAIN="${SAVED_LOGS_DOMAIN}"
     fi
 }
 
@@ -1049,8 +1050,8 @@ prompt_configuration() {
         if [ -d "${APP_DIR}" ]; then
             (cd "${APP_DIR}" && dc down --remove-orphans 2>/dev/null || true)
         fi
-        docker stop adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba watchtower 2>/dev/null || true
-        docker rm -f adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba watchtower 2>/dev/null || true
+        docker stop adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle watchtower autoheal 2>/dev/null || true
+        docker rm -f adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle watchtower autoheal 2>/dev/null || true
 
         log_info "Очистка служебных файлов и конфигураций..."
         local BACKUP_CERTS="/tmp/caddy_certificates_backup_$$"
@@ -1069,7 +1070,7 @@ prompt_configuration() {
             log_ok "SSL-сертификаты успешно сохранены для последующего использования"
         fi
 
-        rm -f /usr/local/bin/gateway-watchdog.sh /usr/local/bin/homelab-unlock
+        rm -f /usr/local/bin/gateway-watchdog.sh /usr/local/bin/homelab-unlock /usr/local/bin/homelab
         rm -f /opt/homelab/diagnostic_report.log
         local USER_HOME
         USER_HOME=$(eval echo ~"${TARGET_USER}" 2>/dev/null || echo "/home/${TARGET_USER}")
@@ -1157,6 +1158,7 @@ prompt_configuration() {
         TORRENT_DOMAIN="torrent.lan"
         METUBE_DOMAIN="metube.lan"
         PROXY_DOMAIN="proxy.lan"
+        LOGS_DOMAIN="logs.lan"
     else
         echo -e "  ${CLR_CYAN}--- Настройка дискового хранилища ---${CLR_RESET}"
         echo "    1) Системный диск [Enter]"
@@ -1434,6 +1436,7 @@ EOF_UNLOCK
             TORRENT_DOMAIN="torrent.${BASE_DOMAIN}"
             METUBE_DOMAIN="metube.${BASE_DOMAIN}"
             PROXY_DOMAIN="proxy.${BASE_DOMAIN}"
+            LOGS_DOMAIN="logs.${BASE_DOMAIN}"
 
             log_info "Синхронизация DuckDNS DNS-записи (${BASE_DOMAIN} -> ${LOCAL_IP})..."
             curl -fsSL -m 10 "https://www.duckdns.org/update?domains=${DUCKDNS_NAME}&token=${DUCKDNS_TOKEN}&ip=${LOCAL_IP}" >/dev/null 2>&1 || true
@@ -1448,6 +1451,7 @@ EOF_UNLOCK
             TORRENT_DOMAIN="torrent.lan"
             METUBE_DOMAIN="metube.lan"
             PROXY_DOMAIN="proxy.lan"
+            LOGS_DOMAIN="logs.lan"
         fi
 
         SUB_URL="${SAVED_SUB_URL:-none}"
@@ -1547,6 +1551,7 @@ EOF_UNLOCK
         printf "SAVED_SELECTED_DOT_2=%q\n" "${SELECTED_DOT_2}"
         printf "SAVED_SELECTED_BOOTSTRAP_IPS=%q\n" "${SELECTED_BOOTSTRAP_IPS}"
         printf "SAVED_SELECTED_BOOTSTRAP_IP_1=%q\n" "${SELECTED_BOOTSTRAP_IP_1}"
+        printf "SAVED_LOGS_DOMAIN=%q\n" "${LOGS_DOMAIN}"
     } > "${ENV_FILE}"
     chmod 600 "${ENV_FILE}"
     chown root:root "${ENV_FILE}" 2>/dev/null || true
@@ -1885,7 +1890,7 @@ EOF_WD_TMR
     fi
 
     log_info "Регистрация локальных доменов в /etc/hosts..."
-    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${METUBE_DOMAIN}" "${PROXY_DOMAIN}"; do
+    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${METUBE_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}"; do
         if [ -n "${DOMAIN}" ]; then
             local ESCAPED_DOMAIN
             ESCAPED_DOMAIN=$(printf '%s\n' "${DOMAIN}" | sed -e 's/[]\/$*.^[]/\\&/g')
@@ -2519,6 +2524,8 @@ configure_gateway_services() {
     - domain: ${ADGUARD_DOMAIN}
       answer: ${LOCAL_IP}
     - domain: ${PROXY_DOMAIN}
+      answer: ${LOCAL_IP}
+    - domain: ${LOGS_DOMAIN}
       answer: ${LOCAL_IP}"
         [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${TORRENT_DOMAIN}
@@ -3207,6 +3214,13 @@ EOF_CADDY
     }
 EOF_CADDY
         fi
+
+        cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
+    @logs host ${LOGS_DOMAIN}
+    handle @logs {
+        reverse_proxy dozzle:8080
+    }
+EOF_CADDY
         echo "}" >> "${APP_DIR}/caddy/Caddyfile"
 
     else
@@ -3282,6 +3296,15 @@ ${PROXY_DOMAIN} {
 }
 EOF_CADDY
         fi
+
+        cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
+${LOGS_DOMAIN} {
+    tls internal
+    import security_headers
+    encode zstd gzip
+    reverse_proxy dozzle:8080
+}
+EOF_CADDY
     fi
 
     local CADDY_IMAGE="serfriz/caddy-duckdns:latest"
@@ -3315,6 +3338,14 @@ EOF_COMPOSE
       - "SAMBA_VOLUME_CONFIG_${SHARE_NAME}=[${SHARE_NAME}]; path=/shares/${SHARE_NAME}; valid users=${ADMIN_USER_SAFE}; force user=${ADMIN_USER_SAFE}; guest ok=no; read only=no; browseable=yes; create mask=0664; directory mask=0775"
     volumes:
       - ${SAVE_DIR}:/shares/${SHARE_NAME}
+    healthcheck:
+      test: ["CMD-SHELL", "smbcontrol smbd ping >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "autoheal=true"
 
 EOF_COMPOSE
     fi
@@ -3329,6 +3360,14 @@ EOF_COMPOSE
     volumes:
       - ${ADGUARD_WORK_DIR}:/opt/adguardhome/work
       - ./adguard/conf:/opt/adguardhome/conf
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8083 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "autoheal=true"
 
   mihomo:
     image: metacubex/mihomo:latest
@@ -3341,6 +3380,14 @@ EOF_COMPOSE
       - /dev/net/tun
     volumes:
       - ./mihomo:/root/.config/mihomo
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/version >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "autoheal=true"
 
 EOF_COMPOSE
     fi
@@ -3356,6 +3403,14 @@ EOF_COMPOSE
       - "ADMIN_TOKEN=${VAULT_ADMIN_HASH_ESCAPED}"
     volumes:
       - ${VAULT_DATA_DIR}:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://127.0.0.1:80/alive >/dev/null 2>&1 || wget -q --spider http://127.0.0.1:80/alive || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "autoheal=true"
 
 EOF_COMPOSE
     fi
@@ -3387,6 +3442,14 @@ EOF_COMPOSE
       - ${SAVE_DIR}/backups/gitea:/backup
       - /etc/localtime:/etc/localtime:ro
       ${GITEA_TZ_MOUNT}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:3000/api/v1/version >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "autoheal=true"
 
 EOF_COMPOSE
     fi
@@ -3411,6 +3474,14 @@ EOF_COMPOSE
       - ./qbittorrent/config:/config
       - ./qbittorrent/vuetorrent:/vuetorrent:ro
       - ${SAVE_DIR}:/downloads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "autoheal=true"
 
 EOF_COMPOSE
     fi
@@ -3439,6 +3510,14 @@ EOF_COMPOSE
       - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["android","web"]}}}'
     volumes:
       - ${SAVE_DIR}/metube:/downloads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/ 2>/dev/null || curl -fs http://localhost:8081/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "autoheal=true"
 
 EOF_COMPOSE
     fi
@@ -3463,6 +3542,14 @@ EOF_COMPOSE
       - ./caddy/data:/data
       - ./caddy/config:/config
       ${CADDY_UI_VOLUME}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80 2>/dev/null || pgrep caddy >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "autoheal=true"
 
   watchtower:
     image: containrrr/watchtower:latest
@@ -3476,6 +3563,35 @@ EOF_COMPOSE
       - "WATCHTOWER_POLL_INTERVAL=86400"
       - "WATCHTOWER_INCLUDE_RESTARTING=true"
       - "WATCHTOWER_TIMEOUT=30s"
+
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: autoheal
+    restart: unless-stopped
+    environment:
+      - "AUTOHEAL_CONTAINER_LABEL=autoheal"
+      - "AUTOHEAL_INTERVAL=15"
+      - "AUTOHEAL_START_PERIOD=30"
+      - "AUTOHEAL_DEFAULT_STOP_TIMEOUT=10"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - "DOZZLE_NO_ANALYTICS=true"
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "autoheal=true"
 EOF_COMPOSE
 
     if [ "${INIT_SYSTEM}" = "systemd" ]; then
@@ -3757,6 +3873,237 @@ for p in set(db_paths):
         done
     fi
 
+    log_info "Установка консольной утилиты управления комплексом (/usr/local/bin/homelab)..."
+    cat << 'EOF_HOMELAB_CLI' > /usr/local/bin/homelab
+#!/usr/bin/env bash
+# =============================================================================
+# Homelab Management CLI (Day-2 Operations & SRE Toolkit)
+# =============================================================================
+set -euo pipefail
+
+APP_DIR="/opt/homelab"
+if [ -f "${APP_DIR}/.env" ]; then
+    # shellcheck disable=SC1091
+    source "${APP_DIR}/.env"
+fi
+
+CLR_RESET="\033[0m"
+CLR_BOLD="\033[1m"
+CLR_DIM="\033[2m"
+CLR_GREEN="\033[1;32m"
+CLR_RED="\033[1;31m"
+CLR_YELLOW="\033[1;33m"
+CLR_CYAN="\033[1;36m"
+CLR_WHITE="\033[1;37m"
+
+TAG_OK="${CLR_GREEN}✔${CLR_RESET}"
+TAG_ERR="${CLR_RED}✖${CLR_RESET}"
+TAG_WARN="${CLR_YELLOW}▲${CLR_RESET}"
+TAG_INFO="${CLR_CYAN}✦${CLR_RESET}"
+
+dc_cmd() {
+    if command -v dc >/dev/null 2>&1; then
+        dc "$@"
+    elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    else
+        docker-compose "$@"
+    fi
+}
+
+cmd_status() {
+    echo -e "${CLR_CYAN}${CLR_BOLD}╭── HOMELAB APPLIANCE: СТАТУС СИСТЕМЫ И СЕРВИСОВ ───────────────${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Ядро / ОС:${CLR_RESET}         $(uname -srm) [$(grep -E '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '\"' || echo 'Linux')]"
+    echo -e "  ${CLR_WHITE}• Аптайм хоста:${CLR_RESET}      $(uptime -p 2>/dev/null || uptime | awk '{print $3,$4}' | tr -d ',')"
+    echo -e "  ${CLR_WHITE}• Использование ОЗУ:${CLR_RESET} $(free -h 2>/dev/null | awk '/^Mem:/{print $3 \" / \" $2}')"
+    echo -e "  ${CLR_WHITE}• Хранилище:${CLR_RESET}         $(df -h "${SAVED_SAVE_DIR:-/opt/homelab/save}" 2>/dev/null | awk 'NR==2{print $3 \" / \" $2 \" (свободно \" $4 \")\"}')"
+    
+    local FW_STATUS="не активен"
+    if command -v nft >/dev/null 2>&1 && nft list table inet homelab >/dev/null 2>&1; then
+        FW_STATUS="${CLR_GREEN}nftables (inet homelab)${CLR_RESET}"
+    elif command -v iptables >/dev/null 2>&1 && iptables -t nat -C POSTROUTING -o "${SAVED_PHYS_IFACE:-eth0}" -j MASQUERADE 2>/dev/null; then
+        FW_STATUS="${CLR_YELLOW}iptables (legacy)${CLR_RESET}"
+    fi
+    echo -e "  ${CLR_WHITE}• Фаервол / NAT:${CLR_RESET}     ${FW_STATUS}"
+    echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+    echo ""
+
+    echo -e "${CLR_CYAN}${CLR_BOLD}╭── СТАТУС КОНТЕЙНЕРОВ DOCKER ─────────────────────────────────${CLR_RESET}"
+    printf "  %-18s %-12s %-14s %-10s\n" "СЕРВИС" "СТАТУС" "ЗДОРОВЬЕ" "ПАМЯТЬ"
+    echo -e "  ─────────────────────────────────────────────────────────────"
+    
+    local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "metube" "samba" "dozzle" "watchtower" "autoheal")
+    for c in "${CONTAINERS[@]}"; do
+        if docker inspect "$c" >/dev/null 2>&1; then
+            local state
+            state=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo "stopped")
+            local health
+            health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null || echo "none")
+            local mem
+            mem=$(docker stats --no-stream --format "{{.MemUsage}}" "$c" 2>/dev/null | cut -d/ -f1 | tr -d ' ' || echo "N/A")
+            
+            local state_str="${CLR_GREEN}Running${CLR_RESET}"
+            [ "$state" != "running" ] && state_str="${CLR_RED}${state}${CLR_RESET}"
+            
+            local health_str="${CLR_DIM}—${CLR_RESET}"
+            [ "$health" = "healthy" ] && health_str="${CLR_GREEN}Healthy${CLR_RESET}"
+            [ "$health" = "starting" ] && health_str="${CLR_YELLOW}Starting${CLR_RESET}"
+            [ "$health" = "unhealthy" ] && health_str="${CLR_RED}UNHEALTHY${CLR_RESET}"
+            
+            printf "  %-18s %-22b %-24b %-10s\n" "$c" "$state_str" "$health_str" "${mem:-N/A}"
+        fi
+    done
+    echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+}
+
+cmd_restart() {
+    local target="${1:-}"
+    if [ -n "$target" ]; then
+        echo -e "  ${TAG_INFO} Перезапуск сервиса ${CLR_WHITE}${target}${CLR_RESET}..."
+        (cd "$APP_DIR" && dc_cmd restart "$target")
+        echo -e "  ${TAG_OK} Сервис ${target} перезапущен"
+    else
+        echo -e "  ${TAG_INFO} Перезапуск всего комплекса Homelab..."
+        /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
+        (cd "$APP_DIR" && dc_cmd restart)
+        echo -e "  ${TAG_OK} Все сервисы успешно перезапущены"
+    fi
+}
+
+cmd_logs() {
+    local target="${1:-}"
+    if [ -n "$target" ]; then
+        shift || true
+        (cd "$APP_DIR" && dc_cmd logs "$@" "$target")
+    else
+        (cd "$APP_DIR" && dc_cmd logs --tail=50 "$@")
+    fi
+}
+
+cmd_backup() {
+    echo -e "  ${TAG_INFO} Запуск резервного копирования баз данных..."
+    if [ -x "${APP_DIR}/backup_vaultwarden.sh" ]; then
+        echo -e "  ${TAG_INFO} Бэкап Vaultwarden..."
+        "${APP_DIR}/backup_vaultwarden.sh"
+        echo -e "  ${TAG_OK} Бэкап Vaultwarden завершен"
+    fi
+    if [ -x "${APP_DIR}/backup_gitea.sh" ]; then
+        echo -e "  ${TAG_INFO} Бэкап Gitea..."
+        "${APP_DIR}/backup_gitea.sh"
+        echo -e "  ${TAG_OK} Бэкап Gitea завершен"
+    fi
+    echo ""
+    echo -e "  ${CLR_CYAN}Файлы бэкапов в хранилище (${SAVED_SAVE_DIR:-/opt/homelab/save}/backups):${CLR_RESET}"
+    find "${SAVED_SAVE_DIR:-/opt/homelab/save}/backups" -type f \( -name "*.tar.gz" -o -name "*.zip" \) 2>/dev/null | while read -r f; do
+        printf "    ${CLR_GREEN}•${CLR_RESET} %-45s ${CLR_YELLOW}[%s]${CLR_RESET}\n" "$(basename "$f")" "$(du -h "$f" 2>/dev/null | awk '{print $1}')"
+    done
+}
+
+cmd_doctor() {
+    echo -e "${CLR_CYAN}${CLR_BOLD}╭── HOMELAB DOCTOR: ГЛУБОКАЯ САМОДИАГНОСТИКА ──────────────────${CLR_RESET}"
+    
+    local ip_fwd
+    ip_fwd=$(sysctl -n net.ipv4.ip_forward 2>/dev/null || echo 0)
+    if [ "$ip_fwd" = "1" ]; then
+        echo -e "  ${TAG_OK} IPv4 Forwarding ядра:                   ${CLR_GREEN}[АКТИВЕН]${CLR_RESET}"
+    else
+        echo -e "  ${TAG_ERR} IPv4 Forwarding ядра:                   ${CLR_RED}[ОТКЛЮЧЕН]${CLR_RESET}"
+    fi
+
+    if command -v nft >/dev/null 2>&1 && nft list table inet homelab >/dev/null 2>&1; then
+        echo -e "  ${TAG_OK} nftables (таблица inet homelab):        ${CLR_GREEN}[АКТИВНА И ПРИМЕНЕНА]${CLR_RESET}"
+    elif command -v iptables >/dev/null 2>&1 && iptables -t nat -C POSTROUTING -o "${SAVED_PHYS_IFACE:-eth0}" -j MASQUERADE 2>/dev/null; then
+        echo -e "  ${TAG_WARN} Фаервол iptables:                       ${CLR_YELLOW}[РЕЖИМ СОВМЕСТИМОСТИ]${CLR_RESET}"
+    else
+        echo -e "  ${TAG_ERR} Фаервол и NAT маскарадинг:              ${CLR_RED}[НЕ НАЙДЕН]${CLR_RESET}"
+    fi
+
+    if python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 53)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
+        echo -e "  ${TAG_OK} DNS Резолвер AdGuard Home (порт 53):    ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+    else
+        echo -e "  ${TAG_ERR} DNS Резолвер AdGuard Home (порт 53):    ${CLR_RED}[НЕ ОТВЕЧАЕТ]${CLR_RESET}"
+    fi
+
+    if python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 1053)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
+        echo -e "  ${TAG_OK} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+    else
+        echo -e "  ${TAG_WARN} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
+    fi
+
+    if [ -c /dev/net/tun ]; then
+        echo -e "  ${TAG_OK} Виртуальное устройство TUN (/dev/net/tun): ${CLR_GREEN}[ДОСТУПНО]${CLR_RESET}"
+    else
+        echo -e "  ${TAG_ERR} Виртуальное устройство TUN (/dev/net/tun): ${CLR_RED}[ОТСУТСТВУЕТ]${CLR_RESET}"
+    fi
+
+    if [ -w "${SAVED_SAVE_DIR:-/opt/homelab/save}" ]; then
+        echo -e "  ${TAG_OK} Каталог данных хранилища:               ${CLR_GREEN}[ДОСТУПЕН ДЛЯ ЗАПИСИ]${CLR_RESET}"
+    else
+        echo -e "  ${TAG_ERR} Каталог данных хранилища:               ${CLR_RED}[ОШИБКА ПРАВ ДОСТУПА]${CLR_RESET}"
+    fi
+
+    if command -v curl >/dev/null 2>&1; then
+        if curl -sk -m 2 http://127.0.0.1:80/ >/dev/null 2>&1 || curl -sk -m 2 https://127.0.0.1:443/ >/dev/null 2>&1; then
+            echo -e "  ${TAG_OK} Caddy Reverse Proxy (HTTP 80/443):      ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+        else
+            echo -e "  ${TAG_WARN} Caddy Reverse Proxy (HTTP 80/443):      ${CLR_YELLOW}[ОЖИДАНИЕ ТРАФИКА]${CLR_RESET}"
+        fi
+    fi
+
+    echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+}
+
+cmd_update() {
+    echo -e "  ${TAG_INFO} Проверка и загрузка свежих версий Docker-образов..."
+    (cd "$APP_DIR" && dc_cmd pull)
+    echo -e "  ${TAG_INFO} Пересоздание контейнеров с новыми образами..."
+    (cd "$APP_DIR" && dc_cmd up -d --remove-orphans)
+    echo -e "  ${TAG_INFO} Очистка неиспользуемых устаревших слоёв..."
+    docker image prune -f >/dev/null 2>&1 || true
+    echo -e "  ${TAG_OK} Стек Homelab успешно обновлен до последних версий!"
+}
+
+cmd_help() {
+    echo -e "${CLR_CYAN}${CLR_BOLD}Утилита управления комплексом Homelab & Transparent Gateway${CLR_RESET}"
+    echo ""
+    echo -e "Использование: ${CLR_GREEN}homelab [КОМАНДА] [ОПЦИИ]${CLR_RESET}"
+    echo ""
+    echo -e "Команды:"
+    echo -e "  ${CLR_WHITE}status${CLR_RESET}              Вывести дашборд состояния системы и контейнеров"
+    echo -e "  ${CLR_WHITE}restart [сервис]${CLR_RESET}    Перезапустить весь стек или отдельный сервис"
+    echo -e "  ${CLR_WHITE}stop [сервис]${CLR_RESET}       Остановить весь стек или сервис"
+    echo -e "  ${CLR_WHITE}start [сервис]${CLR_RESET}      Запустить сервисы стека"
+    echo -e "  ${CLR_WHITE}logs [сервис] [-f]${CLR_RESET}  Просмотр журналов логов (с ключом -f для реалтайма)"
+    echo -e "  ${CLR_WHITE}doctor${CLR_RESET}              Комплексная самодиагностика DNS, TUN, NAT и прав"
+    echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
+    echo -e "  ${CLR_WHITE}update${CLR_RESET}              Обновление всех Docker-образов стека"
+    echo -e "  ${CLR_WHITE}unlock${CLR_RESET}              Ручная разблокировка шифрованного диска LUKS"
+    echo -e "  ${CLR_WHITE}help${CLR_RESET}                Показать эту справку"
+    echo ""
+}
+
+case "${1:-status}" in
+    status) cmd_status ;;
+    restart) shift; cmd_restart "$@" ;;
+    stop) shift; (cd "$APP_DIR" && dc_cmd stop "$@") ;;
+    start) shift; (cd "$APP_DIR" && dc_cmd up -d "$@") ;;
+    logs) shift; cmd_logs "$@" ;;
+    backup) cmd_backup ;;
+    doctor|check) cmd_doctor ;;
+    update) cmd_update ;;
+    unlock)
+        if [ -x /usr/local/bin/homelab-unlock ]; then
+            /usr/local/bin/homelab-unlock
+        else
+            echo "[-] Шифрование LUKS2 не настроено в данной конфигурации."
+        fi
+        ;;
+    help|--help|-h) cmd_help ;;
+    *) cmd_help ;;
+esac
+EOF_HOMELAB_CLI
+    chmod 755 /usr/local/bin/homelab
+
     log_ok "Сервисы комплекса успешно запущены и готовы к работе"
     log_ok "Службы автозапуска и горячего резервного копирования активированы"
 }
@@ -3808,7 +4155,9 @@ EOF_DIAG
     [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]    && EXPECTED_SERVICES["qbittorrent"]="qBittorrent (VueTorrent)"
     [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]  && EXPECTED_SERVICES["metube"]="MeTube (yt-dlp)"
     EXPECTED_SERVICES["caddy"]="Caddy Reverse Proxy"
+    EXPECTED_SERVICES["dozzle"]="Dozzle (Web Log Viewer)"
     EXPECTED_SERVICES["watchtower"]="Watchtower (Автообновления)"
+    EXPECTED_SERVICES["autoheal"]="Autoheal (Самовосстановление)"
 
     echo "" >> "${DIAG_LOG}"
     echo "--- СТАТУС КОНТЕЙНЕРОВ DOCKER ---" >> "${DIAG_LOG}"
@@ -3823,12 +4172,24 @@ EOF_DIAG
             sleep 1
         done
 
-        if [ "${c_status}" = "running" ]; then
-            printf "    ${TAG_OK} %-32s ${CLR_GREEN}[ОНЛАЙН]${CLR_RESET}\n" "${c_desc}"
-            echo "[OK] Container ${c_name} (${c_desc}): RUNNING" >> "${DIAG_LOG}"
+        local c_health
+        c_health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "${c_name}" 2>/dev/null || true)
+        local health_tag=""
+        if [ "$c_health" = "healthy" ]; then
+            health_tag=" / HEALTHY"
+        elif [ "$c_health" = "starting" ]; then
+            health_tag=" / ЗАПУСК"
+        elif [ "$c_health" = "unhealthy" ]; then
+            health_tag=" / СБОЙ"
+            HAS_ISSUES=1
+        fi
+
+        if [ "${c_status}" = "running" ] && [ "$c_health" != "unhealthy" ]; then
+            printf "    ${TAG_OK} %-32s ${CLR_GREEN}[ОНЛАЙН%s]${CLR_RESET}\n" "${c_desc}" "${health_tag}"
+            echo "[OK] Container ${c_name} (${c_desc}): RUNNING (Health: ${c_health:-none})" >> "${DIAG_LOG}"
         else
-            printf "    ${TAG_ERR} %-32s ${CLR_RED}[ОШИБКА: %s]${CLR_RESET}\n" "${c_desc}" "${c_status}"
-            echo "[FAIL] Container ${c_name} (${c_desc}): STATUS=${c_status}" >> "${DIAG_LOG}"
+            printf "    ${TAG_ERR} %-32s ${CLR_RED}[ОШИБКА: %s%s]${CLR_RESET}\n" "${c_desc}" "${c_status}" "${health_tag}"
+            echo "[FAIL] Container ${c_name} (${c_desc}): STATUS=${c_status} (Health: ${c_health:-none})" >> "${DIAG_LOG}"
             HAS_ISSUES=1
 
             echo "--- Логи контейнера ${c_name} (последние 40 строк): ---" >> "${DIAG_LOG}"
@@ -3964,6 +4325,7 @@ show_summary_dashboard() {
     if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_WHITE}• MeTube (Медиа-загрузчик):${CLR_RESET}     ${CLR_CYAN}https://${METUBE_DOMAIN}${CLR_RESET}"
     fi
+    echo -e "  ${CLR_WHITE}• Dozzle (Журналы логов WebUI):${CLR_RESET}   ${CLR_CYAN}https://${LOGS_DOMAIN}${CLR_RESET}"
     echo -e "  ${CLR_CYAN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
     echo ""
 
@@ -4018,11 +4380,13 @@ show_summary_dashboard() {
     local RESTART_CMD="sudo systemctl restart homelab.service"
     [ "${INIT_SYSTEM}" = "openrc" ] && RESTART_CMD="sudo rc-service homelab restart"
 
-    echo -e "  ${CLR_CYAN}${CLR_BOLD}╭── БЫСТРЫЕ КОМАНДЫ УПРАВЛЕНИЯ ───────────────────────────────${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Статус контейнеров:${CLR_RESET}           ${CLR_CYAN}dc ps${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Просмотр логов в реалтайме:${CLR_RESET}   ${CLR_CYAN}dc logs -f [сервис]${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Перезапуск всего комплекса:${CLR_RESET}   ${CLR_CYAN}${RESTART_CMD}${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Отчет диагностики:${CLR_RESET}            ${CLR_CYAN}cat /opt/homelab/diagnostic_report.log${CLR_RESET}"
+    echo -e "  ${CLR_CYAN}${CLR_BOLD}╭── ЕДИНАЯ КОНСОЛЬНАЯ УТИЛИТА УПРАВЛЕНИЯ (HOMELAB CLI) ────────${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Дашборд и статус сервисов:${CLR_RESET}   ${CLR_GREEN}homelab status${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Самодиагностика DNS/TUN/NAT:${CLR_RESET} ${CLR_GREEN}homelab doctor${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Просмотр логов контейнеров:${CLR_RESET}  ${CLR_GREEN}homelab logs [сервис] -f${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Перезапуск стека/сервиса:${CLR_RESET}    ${CLR_GREEN}homelab restart [сервис]${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Создание горячего бэкапа:${CLR_RESET}    ${CLR_GREEN}homelab backup${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Безопасное обновление стека:${CLR_RESET} ${CLR_GREEN}homelab update${CLR_RESET}"
     echo -e "  ${CLR_CYAN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
     echo ""
 }
