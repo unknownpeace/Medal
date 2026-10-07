@@ -421,7 +421,6 @@ load_previous_config() {
         [ -n "${SAVED_SELECTED_BOOTSTRAP_IPS:-}" ] && SELECTED_BOOTSTRAP_IPS="${SAVED_SELECTED_BOOTSTRAP_IPS}"
         [ -n "${SAVED_SELECTED_BOOTSTRAP_IP_1:-}" ] && SELECTED_BOOTSTRAP_IP_1="${SAVED_SELECTED_BOOTSTRAP_IP_1}"
         [ -n "${SAVED_LOGS_DOMAIN:-}" ] && LOGS_DOMAIN="${SAVED_LOGS_DOMAIN}"
-        [ -n "${SAVED_STATUS_DOMAIN:-}" ] && STATUS_DOMAIN="${SAVED_STATUS_DOMAIN}"
         [ -n "${SAVED_ENABLE_TELEGRAM:-}" ] && ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM}"
         [ -n "${SAVED_TELEGRAM_BOT_TOKEN:-}" ] && TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN}"
         [ -n "${SAVED_TELEGRAM_CHAT_ID:-}" ] && TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID}"
@@ -807,14 +806,18 @@ EOF_ZRAM_RC
 detect_network() {
     print_step_header "02/11" "ИНТЕЛЛЕКТУАЛЬНЫЙ АНАЛИЗ СЕТЕВОГО ОКРУЖЕНИЯ"
 
-    PHYS_IFACE=$( (ip -o -4 route show default 2>/dev/null | awk '{print $5}' | grep -vE '^(Meta|tun|tap|docker|br-|veth|wg|tailscale|zt|dummy|bond|lo)' | head -n1) || true )
-    if [ -z "${PHYS_IFACE}" ]; then
-        PHYS_IFACE=$( (ip -o -4 addr show scope global 2>/dev/null | awk '{print $2}' | grep -vE '^(Meta|tun|tap|docker|br-|veth|wg|tailscale|zt|dummy|bond|lo)' | head -n1) || true )
+    if [ -n "${SAVED_PHYS_IFACE:-}" ] && ip link show dev "${SAVED_PHYS_IFACE}" >/dev/null 2>&1; then
+        DEFAULT_IFACE="${SAVED_PHYS_IFACE}"
+    else
+        PHYS_IFACE=$( (ip -o -4 route show default 2>/dev/null | awk '{print $5}' | grep -vE '^(Meta|tun|tap|docker|br-|veth|wg|tailscale|zt|dummy|bond|lo)' | head -n1) || true )
+        if [ -z "${PHYS_IFACE}" ]; then
+            PHYS_IFACE=$( (ip -o -4 addr show scope global 2>/dev/null | awk '{print $2}' | grep -vE '^(Meta|tun|tap|docker|br-|veth|wg|tailscale|zt|dummy|bond|lo)' | head -n1) || true )
+        fi
+        if [ -z "${PHYS_IFACE}" ]; then
+            PHYS_IFACE=$(ls -1 /sys/class/net 2>/dev/null | grep -E '^(eth|en|wl)' | head -n1 || true)
+        fi
+        DEFAULT_IFACE="${PHYS_IFACE:-eth0}"
     fi
-    if [ -z "${PHYS_IFACE}" ]; then
-        PHYS_IFACE=$(ls -1 /sys/class/net 2>/dev/null | grep -E '^(eth|en|wl)' | head -n1 || true)
-    fi
-    DEFAULT_IFACE="${PHYS_IFACE:-eth0}"
 
     LOCAL_IP=$(ip -o -4 addr show dev "${DEFAULT_IFACE}" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1 || true)
     if [ -z "${LOCAL_IP}" ] || [ "${LOCAL_IP}" = "127.0.0.1" ]; then
@@ -1111,8 +1114,8 @@ prompt_configuration() {
         if [ -d "${APP_DIR}" ]; then
             (cd "${APP_DIR}" && dc down --remove-orphans 2>/dev/null || true)
         fi
-        docker stop adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle uptime-kuma watchtower autoheal 2>/dev/null || true
-        docker rm -f adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle uptime-kuma watchtower autoheal 2>/dev/null || true
+        docker stop adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle watchtower autoheal 2>/dev/null || true
+        docker rm -f adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle watchtower autoheal 2>/dev/null || true
 
         log_info "Очистка служебных файлов и конфигураций..."
         local BACKUP_CERTS="/tmp/caddy_certificates_backup_$$"
@@ -1122,7 +1125,7 @@ prompt_configuration() {
             cp -r "${APP_DIR}/caddy/data/caddy/certificates" "${BACKUP_CERTS}" 2>/dev/null || true
         fi
 
-        rm -rf "${APP_DIR}/adguard" "${APP_DIR}/mihomo" "${APP_DIR}/caddy" "${APP_DIR}/metube" "${APP_DIR}/vaultwarden" "${APP_DIR}/gitea" "${APP_DIR}/qbittorrent" "${APP_DIR}/uptime-kuma" "${ENV_FILE}"
+        rm -rf "${APP_DIR}/adguard" "${APP_DIR}/mihomo" "${APP_DIR}/caddy" "${APP_DIR}/metube" "${APP_DIR}/vaultwarden" "${APP_DIR}/gitea" "${APP_DIR}/qbittorrent" "${ENV_FILE}"
 
         if [ -d "${BACKUP_CERTS}" ]; then
             mkdir -p "${APP_DIR}/caddy/data/caddy"
@@ -1164,13 +1167,13 @@ prompt_configuration() {
         mkdir -p "${SAVE_DIR}"
         SAVE_FSTYPE=$(findmnt -n -o FSTYPE -T "${SAVE_DIR}" 2>/dev/null || df -T "${SAVE_DIR}" 2>/dev/null | awk 'NR==2{print $2}' || echo "ext4")
 
-        ENABLE_GATEWAY="Y"
-        ENABLE_VAULT="Y"
-        ENABLE_GITEA="Y"
-        ENABLE_SAMBA="Y"
-        ENABLE_QBIT="Y"
-        ENABLE_METUBE="Y"
-        SSL_MODE="1"
+        ENABLE_GATEWAY="${SAVED_ENABLE_GATEWAY:-Y}"
+        ENABLE_VAULT="${SAVED_ENABLE_VAULT:-Y}"
+        ENABLE_GITEA="${SAVED_ENABLE_GITEA:-Y}"
+        ENABLE_SAMBA="${SAVED_ENABLE_SAMBA:-Y}"
+        ENABLE_QBIT="${SAVED_ENABLE_QBIT:-Y}"
+        ENABLE_METUBE="${SAVED_ENABLE_METUBE:-Y}"
+        SSL_MODE="${SAVED_SSL_MODE:-1}"
 
         echo ""
         echo -e "  ${CLR_CYAN}--- Экспресс-параметры шлюза и учетных записей ---${CLR_RESET}"
@@ -1216,7 +1219,6 @@ prompt_configuration() {
         METUBE_DOMAIN="metube.lan"
         PROXY_DOMAIN="proxy.lan"
         LOGS_DOMAIN="logs.lan"
-        STATUS_DOMAIN="status.lan"
         ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM:-N}"
         TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
         TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
@@ -1515,7 +1517,6 @@ EOF_UNLOCK
             METUBE_DOMAIN="metube.${BASE_DOMAIN}"
             PROXY_DOMAIN="proxy.${BASE_DOMAIN}"
             LOGS_DOMAIN="logs.${BASE_DOMAIN}"
-            STATUS_DOMAIN="status.${BASE_DOMAIN}"
 
             log_info "Синхронизация DuckDNS DNS-записи (${BASE_DOMAIN} -> ${LOCAL_IP})..."
             curl -fsSL -m 10 "https://www.duckdns.org/update?domains=${DUCKDNS_NAME}&token=${DUCKDNS_TOKEN}&ip=${LOCAL_IP}" >/dev/null 2>&1 || true
@@ -1531,7 +1532,6 @@ EOF_UNLOCK
             METUBE_DOMAIN="metube.lan"
             PROXY_DOMAIN="proxy.lan"
             LOGS_DOMAIN="logs.lan"
-            STATUS_DOMAIN="status.lan"
         fi
 
         SUB_URL="${SAVED_SUB_URL:-none}"
@@ -1610,12 +1610,10 @@ EOF_UNLOCK
         VAULT_DATA_DIR="${SAVE_DIR}/services/vaultwarden"
         GITEA_DATA_DIR="${SAVE_DIR}/services/gitea"
         ADGUARD_WORK_DIR="${SAVE_DIR}/services/adguard_work"
-        UPTIME_DATA_DIR="${SAVE_DIR}/services/uptime-kuma"
     else
         VAULT_DATA_DIR="${APP_DIR}/vaultwarden"
         GITEA_DATA_DIR="${APP_DIR}/gitea"
         ADGUARD_WORK_DIR="${APP_DIR}/adguard/work"
-        UPTIME_DATA_DIR="${APP_DIR}/uptime-kuma"
     fi
 
     mkdir -p "${APP_DIR}"
@@ -1647,7 +1645,6 @@ EOF_UNLOCK
         printf "SAVED_VAULT_DATA_DIR=%q\n" "${VAULT_DATA_DIR}"
         printf "SAVED_GITEA_DATA_DIR=%q\n" "${GITEA_DATA_DIR}"
         printf "SAVED_ADGUARD_WORK_DIR=%q\n" "${ADGUARD_WORK_DIR}"
-        printf "SAVED_UPTIME_DATA_DIR=%q\n" "${UPTIME_DATA_DIR}"
         printf "SAVED_INIT_SYSTEM=%q\n" "${INIT_SYSTEM}"
         printf "SAVED_SELECTED_DOH_1=%q\n" "${SELECTED_DOH_1}"
         printf "SAVED_SELECTED_DOH_2=%q\n" "${SELECTED_DOH_2}"
@@ -1657,7 +1654,6 @@ EOF_UNLOCK
         printf "SAVED_SELECTED_BOOTSTRAP_IPS=%q\n" "${SELECTED_BOOTSTRAP_IPS}"
         printf "SAVED_SELECTED_BOOTSTRAP_IP_1=%q\n" "${SELECTED_BOOTSTRAP_IP_1}"
         printf "SAVED_LOGS_DOMAIN=%q\n" "${LOGS_DOMAIN}"
-        printf "SAVED_STATUS_DOMAIN=%q\n" "${STATUS_DOMAIN}"
         printf "SAVED_ENABLE_TELEGRAM=%q\n" "${ENABLE_TELEGRAM}"
         printf "SAVED_TELEGRAM_BOT_TOKEN=%q\n" "${TELEGRAM_BOT_TOKEN}"
         printf "SAVED_TELEGRAM_CHAT_ID=%q\n" "${TELEGRAM_CHAT_ID}"
@@ -2065,7 +2061,7 @@ EOF_WD_TMR
     fi
 
     log_info "Регистрация локальных доменов в /etc/hosts..."
-    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${METUBE_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}" "${STATUS_DOMAIN}"; do
+    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${METUBE_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}"; do
         if [ -n "${DOMAIN}" ]; then
             local ESCAPED_DOMAIN
             ESCAPED_DOMAIN=$(printf '%s\n' "${DOMAIN}" | sed -e 's/[]\/$*.^[]/\\&/g')
@@ -2140,8 +2136,8 @@ setup_directories() {
     print_step_header "06/11" "СТРУКТУРА КАТАЛОГОВ И ОПТИМИЗАЦИЯ ХРАНИЛИЩА (ФС: ${CURRENT_FS^^})"
 
     mkdir -p "${APP_DIR}/caddy/data" "${APP_DIR}/caddy/config"
-    mkdir -p "${SAVE_DIR}/certificates" "${SAVE_DIR}/backups/vaultwarden" "${SAVE_DIR}/backups/gitea" "${SAVE_DIR}/backups/uptime-kuma"
-    mkdir -p "${VAULT_DATA_DIR}" "${GITEA_DATA_DIR}" "${ADGUARD_WORK_DIR}" "${UPTIME_DATA_DIR}"
+    mkdir -p "${SAVE_DIR}/certificates" "${SAVE_DIR}/backups/vaultwarden" "${SAVE_DIR}/backups/gitea"
+    mkdir -p "${VAULT_DATA_DIR}" "${GITEA_DATA_DIR}" "${ADGUARD_WORK_DIR}"
     chown -R "${USER_UID}:${USER_GID}" "${GITEA_DATA_DIR}" 2>/dev/null || true
 
     apply_nocow_helper() {
@@ -2166,7 +2162,6 @@ setup_directories() {
     apply_nocow_helper "${ADGUARD_WORK_DIR}"
     apply_nocow_helper "${VAULT_DATA_DIR}"
     apply_nocow_helper "${GITEA_DATA_DIR}"
-    apply_nocow_helper "${UPTIME_DATA_DIR}"
     mkdir -p "${APP_DIR}/adguard/conf" 
 
     if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
@@ -2770,8 +2765,6 @@ configure_gateway_services() {
     - domain: ${PROXY_DOMAIN}
       answer: ${LOCAL_IP}
     - domain: ${LOGS_DOMAIN}
-      answer: ${LOCAL_IP}
-    - domain: ${STATUS_DOMAIN}
       answer: ${LOCAL_IP}"
         [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${TORRENT_DOMAIN}
@@ -3224,6 +3217,7 @@ sniffer:
 
 tun:
   enable: true
+  device: Meta
   stack: mixed
   mtu: 1400
   auto-route: true
@@ -3512,11 +3506,6 @@ EOF_CADDY
             header_up Remote-User {http.auth.user.id}
         }
     }
-
-    @status host ${STATUS_DOMAIN}
-    handle @status {
-        reverse_proxy uptime-kuma:3001
-    }
 EOF_CADDY
         echo "}" >> "${APP_DIR}/caddy/Caddyfile"
 
@@ -3605,13 +3594,6 @@ ${LOGS_DOMAIN} {
     reverse_proxy dozzle:8080 {
         header_up Remote-User {http.auth.user.id}
     }
-}
-
-${STATUS_DOMAIN} {
-    tls internal
-    import security_headers
-    encode zstd gzip
-    reverse_proxy uptime-kuma:3001
 }
 EOF_CADDY
     fi
@@ -3900,21 +3882,6 @@ EOF_COMPOSE
       timeout: 5s
       retries: 3
       start_period: 10s
-    labels:
-      - "autoheal=true"
-
-  uptime-kuma:
-    image: louislam/uptime-kuma:1
-    container_name: uptime-kuma
-    restart: unless-stopped
-    volumes:
-      - ${UPTIME_DATA_DIR}:/app/data
-    healthcheck:
-      test: ["CMD-SHELL", "node /app/extra/healthcheck.js || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
     labels:
       - "autoheal=true"
 EOF_COMPOSE
@@ -4251,7 +4218,6 @@ norm_service() {
     local s="${1:-}"
     case "$s" in
         adguard|adguardhome) echo "adguardhome" ;;
-        kuma|uptime-kuma) echo "uptime-kuma" ;;
         vault|vaultwarden) echo "vaultwarden" ;;
         torrent|qbittorrent) echo "qbittorrent" ;;
         *) echo "$s" ;;
@@ -4281,7 +4247,7 @@ cmd_status() {
     printf "  %-18s %-12s %-14s %-10s\n" "СЕРВИС" "СТАТУС" "ЗДОРОВЬЕ" "ПАМЯТЬ"
     echo -e "  ─────────────────────────────────────────────────────────────"
     
-    local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "metube" "samba" "dozzle" "uptime-kuma" "watchtower" "autoheal")
+    local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "metube" "samba" "dozzle" "watchtower" "autoheal")
     for c in "${CONTAINERS[@]}"; do
         if docker inspect "$c" >/dev/null 2>&1; then
             local state
@@ -4378,21 +4344,6 @@ cmd_backup() {
         echo -e "  ${TAG_INFO} Бэкап Gitea..."
         "${APP_DIR}/backup_gitea.sh"
         echo -e "  ${TAG_OK} Бэкап Gitea завершен"
-    fi
-    local KUMA_DIR="${SAVED_UPTIME_DATA_DIR:-${APP_DIR}/uptime-kuma}"
-    if [ -f "${KUMA_DIR}/kuma.db" ]; then
-        echo -e "  ${TAG_INFO} Бэкап базы данных Uptime Kuma (SQLite3)..."
-        local DATE_TAG=$(date +"%Y%m%d_%H%M%S")
-        mkdir -p "${SAVED_SAVE_DIR:-/opt/homelab/save}/backups/uptime-kuma"
-        local KUMA_BKP="${SAVED_SAVE_DIR:-/opt/homelab/save}/backups/uptime-kuma/kuma_backup_${DATE_TAG}.db"
-        if ! sqlite3 "${KUMA_DIR}/kuma.db" ".backup '${KUMA_BKP}'" 2>/dev/null; then
-            cp -f "${KUMA_DIR}/kuma.db" "${KUMA_BKP}" 2>/dev/null || true
-        fi
-        gzip -f "${KUMA_BKP}" 2>/dev/null || true
-        find "${SAVED_SAVE_DIR:-/opt/homelab/save}/backups/uptime-kuma" -type f -name "kuma_backup_*.db.gz" -mtime +14 -delete 2>/dev/null || true
-        local KUMA_SIZE=$(du -h "${KUMA_BKP}.gz" 2>/dev/null | awk '{print $1}')
-        /usr/local/bin/homelab-notify "Резервное копирование" "Успешно создан бэкап Uptime Kuma (${KUMA_SIZE})" "OK" 2>/dev/null || true
-        echo -e "  ${TAG_OK} Бэкап Uptime Kuma завершен"
     fi
     echo ""
     echo -e "  ${CLR_CYAN}Файлы бэкапов в хранилище (${SAVED_SAVE_DIR:-/opt/homelab/save}/backups):${CLR_RESET}"
@@ -4562,7 +4513,7 @@ cmd_dump_logs() {
         echo "                         ЖУРНАЛЫ КОНТЕЙНЕРОВ DOCKER                          "
         echo "============================================================================="
 
-        local ALL_CONTAINERS=("adguardhome" "mihomo" "caddy" "dozzle" "uptime-kuma" "watchtower" "autoheal" "vaultwarden" "gitea" "qbittorrent" "metube" "samba")
+        local ALL_CONTAINERS=("adguardhome" "mihomo" "caddy" "dozzle" "watchtower" "autoheal" "vaultwarden" "gitea" "qbittorrent" "metube" "samba")
         for c in "${ALL_CONTAINERS[@]}"; do
             if docker inspect "$c" >/dev/null 2>&1; then
                 local st
@@ -4737,7 +4688,6 @@ EOF_DIAG
     [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]  && EXPECTED_SERVICES["metube"]="MeTube (yt-dlp)"
     EXPECTED_SERVICES["caddy"]="Caddy Reverse Proxy"
     EXPECTED_SERVICES["dozzle"]="Dozzle (Web Log Viewer)"
-    EXPECTED_SERVICES["uptime-kuma"]="Uptime Kuma (Мониторинг & Статус)"
     EXPECTED_SERVICES["watchtower"]="Watchtower (Автообновления)"
     EXPECTED_SERVICES["autoheal"]="Autoheal (Самовосстановление)"
 
@@ -4911,7 +4861,6 @@ show_summary_dashboard() {
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ MeTube (Медиа-загрузчик yt-dlp):${CLR_RESET} ${CLR_NEON_CYAN}https://${METUBE_DOMAIN}${CLR_RESET}"
     fi
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Dozzle (Логи контейнеров):${CLR_RESET}       ${CLR_NEON_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_DIM}(Авторизация: ${ADMIN_USER})${CLR_RESET}"
-    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Uptime Kuma (Мониторинг):${CLR_RESET}        ${CLR_NEON_CYAN}https://${STATUS_DOMAIN}${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 
