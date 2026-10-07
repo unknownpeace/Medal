@@ -51,23 +51,46 @@ fi
 
 set -Eeuo pipefail
 
-# --- ЦВЕТОВАЯ ПАЛИТРА И СТИЛЬ ОФОРМЛЕНИЯ ---
+# --- ЦВЕТОВАЯ ПАЛИТРА И КИБЕРПАНК СТИЛЬ ОФОРМЛЕНИЯ (2026 PRO) ---
 CLR_RESET="\033[0m"
 CLR_BOLD="\033[1m"
 CLR_DIM="\033[2m"
+CLR_ITALIC="\033[3m"
+CLR_UNDER="\033[4m"
 
 CLR_RED="\033[1;31m"
 CLR_GREEN="\033[1;32m"
 CLR_YELLOW="\033[1;33m"
 CLR_BLUE="\033[1;34m"
 CLR_CYAN="\033[1;36m"
+CLR_MAGENTA="\033[1;35m"
 CLR_WHITE="\033[1;37m"
 CLR_MUTED="\033[0;36m"
+CLR_GRAY="\033[0;90m"
 
-TAG_INFO="${CLR_BLUE}✦${CLR_RESET}"
-TAG_OK="${CLR_GREEN}✔${CLR_RESET}"
-TAG_WARN="${CLR_YELLOW}▲${CLR_RESET}"
+# Эстетические неоновые акценты (при поддержке терминала)
+if [ -t 1 ] && [ "${TERM:-}" != "dumb" ]; then
+    CLR_NEON_CYAN="\033[38;5;51m"
+    CLR_NEON_GREEN="\033[38;5;48m"
+    CLR_NEON_BLUE="\033[38;5;39m"
+    CLR_NEON_PURPLE="\033[38;5;141m"
+    CLR_NEON_PINK="\033[38;5;198m"
+    CLR_NEON_GOLD="\033[38;5;220m"
+else
+    CLR_NEON_CYAN="${CLR_CYAN}"
+    CLR_NEON_GREEN="${CLR_GREEN}"
+    CLR_NEON_BLUE="${CLR_BLUE}"
+    CLR_NEON_PURPLE="${CLR_MAGENTA}"
+    CLR_NEON_PINK="${CLR_MAGENTA}"
+    CLR_NEON_GOLD="${CLR_YELLOW}"
+fi
+
+TAG_INFO="${CLR_NEON_CYAN}✦${CLR_RESET}"
+TAG_OK="${CLR_NEON_GREEN}✔${CLR_RESET}"
+TAG_WARN="${CLR_NEON_GOLD}▲${CLR_RESET}"
 TAG_ERR="${CLR_RED}✖${CLR_RESET}"
+TAG_BOLT="${CLR_NEON_GOLD}⚡${CLR_RESET}"
+TAG_DIAMOND="${CLR_NEON_PURPLE}◈${CLR_RESET}"
 
 log_info()  { echo -e "  ${TAG_INFO} ${CLR_CYAN}$*${CLR_RESET}"; }
 log_ok()    { echo -e "  ${TAG_OK} ${CLR_GREEN}$*${CLR_RESET}"; }
@@ -78,8 +101,9 @@ print_step_header() {
     local step_num="$1"
     local step_title="$2"
     echo ""
-    echo -e "${CLR_CYAN}╭── ${CLR_WHITE}${CLR_BOLD}[${step_num}]${CLR_RESET} ${CLR_CYAN}${CLR_BOLD}${step_title}${CLR_RESET}"
-    echo -e "${CLR_CYAN}╰─────────────────────────────────────────────${CLR_RESET}"
+    echo -e "${CLR_NEON_PURPLE}╭──${CLR_NEON_CYAN} [ ${CLR_WHITE}${CLR_BOLD}${step_num}${CLR_RESET}${CLR_NEON_CYAN} ] ${CLR_NEON_PURPLE}──────────────────────────────────────────────────────────────────╮${CLR_RESET}"
+    echo -e "${CLR_NEON_PURPLE}│  ${CLR_NEON_GOLD}⚡${CLR_RESET} ${CLR_WHITE}${CLR_BOLD}${step_title}${CLR_RESET}"
+    echo -e "${CLR_NEON_PURPLE}╰────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
 }
 
 CURRENT_SPIN_PID=""
@@ -226,6 +250,7 @@ REAL_USER="${SUDO_USER:-$(awk -F: '$3 >= 1000 && $3 < 60000 {print $1; exit}' /e
 TARGET_USER="${REAL_USER:-homelab}"
 USER_UID=""
 USER_GID=""
+SAVE_FSTYPE=""
 
 MASTER_PASS=""
 MIHOMO_SECRET=""
@@ -253,21 +278,31 @@ SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 
 show_banner() {
     clear 2>/dev/null || true
-    echo -e "${CLR_CYAN}┌────────────────────────────────────────────────────────────────────────────┐${CLR_RESET}"
-    echo -e "${CLR_CYAN}│${CLR_RESET} ${CLR_WHITE}${CLR_BOLD}         HOMELAB APPLIANCE & TRANSPARENT GATEWAY (RUSSIA PRO 2026)          ${CLR_RESET}${CLR_CYAN}│${CLR_RESET}"
-    echo -e "${CLR_CYAN}├────────────────────────────────────────────────────────────────────────────┤${CLR_RESET}"
-    echo -e "${CLR_CYAN}│${CLR_RESET}  ${CLR_BLUE}┌──────────────┐${CLR_RESET}   ${CLR_GREEN}┌──────────────┐${CLR_RESET}   ${CLR_YELLOW}┌──────────────┐${CLR_RESET}   ${CLR_WHITE}┌──────────────┐${CLR_RESET}  ${CLR_CYAN}│${CLR_RESET}"
-    echo -e "${CLR_CYAN}│${CLR_RESET}  ${CLR_BLUE}│ AdGuard Home │${CLR_RESET}   ${CLR_GREEN}│  Mihomo TUN  │${CLR_RESET}   ${CLR_YELLOW}│ Caddy Proxy  │${CLR_RESET}   ${CLR_WHITE}│ Encrypted NAS│${CLR_RESET}  ${CLR_CYAN}│${CLR_RESET}"
-    echo -e "${CLR_CYAN}│${CLR_RESET}  ${CLR_BLUE}└──────┬───────┘${CLR_RESET}   ${CLR_GREEN}└──────┬───────┘${CLR_RESET}   ${CLR_YELLOW}└──────┬───────┘${CLR_RESET}   ${CLR_WHITE}└──────┬───────┘${CLR_RESET}  ${CLR_CYAN}│${CLR_RESET}"
-    echo -e "${CLR_CYAN}│${CLR_RESET}         ${CLR_DIM}│                   │                  │                  │${CLR_RESET}         ${CLR_CYAN}│${CLR_RESET}"
-    echo -e "${CLR_CYAN}│${CLR_RESET}  ${CLR_CYAN}┌──────┴───────────────────┴──────────────────┴──────────────────┴──────┐${CLR_RESET}  ${CLR_CYAN}│${CLR_RESET}"
-    echo -e "${CLR_CYAN}│${CLR_RESET}  ${CLR_CYAN}│${CLR_RESET}                   ${CLR_WHITE}${CLR_BOLD}Docker Services & Self-Hosted Platform${CLR_RESET}                  ${CLR_CYAN}│${CLR_RESET}  ${CLR_CYAN}│${CLR_RESET}"
-    echo -e "${CLR_CYAN}│${CLR_RESET}  ${CLR_CYAN}└───────────────────────────────────────────────────────────────────────┘${CLR_RESET}  ${CLR_CYAN}│${CLR_RESET}"
-    echo -e "${CLR_CYAN}└────────────────────────────────────────────────────────────────────────────┘${CLR_RESET}"
-    echo ""
-    echo -e "  ${CLR_CYAN}Комплекс прозрачного шлюза, анти-DPI обхода блокировок и умного DNS для РФ${CLR_RESET}"
-    echo -e "  ${CLR_DIM}YouTube 4K, Discord, AI, Rutracker + 100% прямой доступ к Госуслугам и банкам${CLR_RESET}"
-    echo -e "  ${CLR_DIM}Поддержка: Debian 13/12, Ubuntu 26.04/24.04 LTS, Arch Linux, Alpine Linux v3.19+ | 2026${CLR_RESET}"
+    echo -e "${CLR_NEON_CYAN}"
+    cat << 'EOF_LOGO'
+  ███╗   ███╗███████╗██████╗  █████╗ ██╗     
+  ████╗ ████║██╔════╝██╔══██╗██╔══██╗██║     
+  ██╔████╔██║█████╗  ██║  ██║███████║██║     
+  ██║╚██╔╝██║██╔══╝  ██║  ██║██╔══██║██║     
+  ██║ ╚═╝ ██║███████╗██████╔╝██║  ██║███████╗
+  ╚═╝     ╚═╝╚══════╝╚═════╝ ╚═╝  ╚═╝╚══════╝
+EOF_LOGO
+    echo -e "${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}╭──────────────────────────────────────────────────────────────────────────╮${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET} ${CLR_WHITE}${CLR_BOLD}HOMELAB APPLIANCE & TRANSPARENT GATEWAY${CLR_RESET} ${CLR_NEON_CYAN}•${CLR_RESET} ${CLR_NEON_GREEN}${CLR_BOLD}RUSSIA PRO EDITION (2026)${CLR_RESET}   ${CLR_NEON_PURPLE}│${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}├──────────────────────────────────────────────────────────────────────────┤${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_NEON_CYAN}◈ АРХИТЕКТУРА ИНТЕЛЛЕКТУАЛЬНОЙ МАРШРУТИЗАЦИИ И ОБХОДА БЛОКИРОВОК:       ${CLR_NEON_PURPLE}│${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                                                                          ${CLR_NEON_PURPLE}│${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}   ${CLR_WHITE}[ КЛИЕНТЫ LAN ]${CLR_RESET} ──► ${CLR_NEON_CYAN}[ ADGUARD HOME :53 ]${CLR_RESET} ──► ${CLR_NEON_PURPLE}[ MIHOMO TUN :1053 ]${CLR_RESET}        ${CLR_NEON_PURPLE}│${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}    0.0.0.0/0           Кэш, Реклама, Фильтры      Fake-IP / Mixed TUN / gVisor    ${CLR_NEON_PURPLE}│${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                               │                           │              ${CLR_NEON_PURPLE}│${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                               ▼ (Трекеры/Спам)            ├─► ${CLR_NEON_GREEN}[ DIRECT ]${CLR_RESET} Госуслуги / Банки ${CLR_NEON_PURPLE}│${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                         ${CLR_RED}[ 0.0.0.0 / DROP ]${CLR_RESET}        ├─► ${CLR_NEON_GOLD}[ DIRECT-DPI ]${CLR_RESET} YouTube 4K  ${CLR_NEON_PURPLE}│${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                                                    └─► ${CLR_NEON_PINK}[ PROXY/VPN ]${CLR_RESET} Discord & AI ${CLR_NEON_PURPLE}│${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}├──────────────────────────────────────────────────────────────────────────┤${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}⚡ СТЕК:${CLR_RESET} ${CLR_CYAN}AdGuard Home${CLR_RESET} │ ${CLR_CYAN}Mihomo TUN${CLR_RESET} │ ${CLR_CYAN}Caddy SSL${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Gitea${CLR_RESET}   ${CLR_NEON_PURPLE}│${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}⚡ СИСТЕМА:${CLR_RESET} ${CLR_GRAY}Debian 13/12 • Ubuntu 26.04/24.04 • Arch Linux • Alpine Linux v3.19+${CLR_RESET}  ${CLR_NEON_PURPLE}│${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}╰──────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 }
 
@@ -390,6 +425,7 @@ load_previous_config() {
         [ -n "${SAVED_ENABLE_TELEGRAM:-}" ] && ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM}"
         [ -n "${SAVED_TELEGRAM_BOT_TOKEN:-}" ] && TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN}"
         [ -n "${SAVED_TELEGRAM_CHAT_ID:-}" ] && TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID}"
+        [ -n "${SAVED_SAVE_FSTYPE:-}" ] && SAVE_FSTYPE="${SAVED_SAVE_FSTYPE}"
     fi
 }
 
@@ -464,7 +500,7 @@ install_pkgs() {
         run_spin "Обновление индексов пакетов APK" apk update
 
         local ALP_PKGS=(bash python3 py3-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g \
-                        util-linux util-linux-misc lsblk curl openssl ca-certificates jq iptables nftables apache2-utils \
+                        util-linux util-linux-misc lsblk curl openssl ca-certificates jq nftables apache2-utils \
                         unzip tar sqlite argon2 iputils shadow procps e2fsprogs \
                         docker docker-cli-compose chrony openrc)
         run_spin "Установка системных пакетов Alpine" \
@@ -473,7 +509,7 @@ install_pkgs() {
 
     elif [ "${DISTRO_FAMILY}" = "arch" ]; then
         local ARCH_PKGS=(python python-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g util-linux \
-                         curl openssl ca-certificates jq iptables nftables unzip tar sqlite \
+                         curl openssl ca-certificates jq nftables unzip tar sqlite \
                          docker docker-compose argon2 iputils acl zram-generator)
         local MISSING_PKGS=()
         for p in "${ARCH_PKGS[@]}"; do
@@ -492,7 +528,7 @@ install_pkgs() {
         run_spin "Установка системных пакетов и утилит" \
             apt-get install -y --no-install-recommends \
                 systemd-timesyncd systemd-zram-generator python3 python3-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g \
-                util-linux curl openssl ca-certificates jq iptables nftables apache2-utils \
+                util-linux curl openssl ca-certificates jq nftables apache2-utils \
                 unzip tar sqlite3 argon2 iputils-ping
 
         if ! command -v docker >/dev/null 2>&1; then
@@ -1101,19 +1137,11 @@ prompt_configuration() {
         USER_HOME=$(eval echo ~"${TARGET_USER}" 2>/dev/null || echo "/home/${TARGET_USER}")
         rm -f "${USER_HOME}/diagnostic_report.log" 2>/dev/null || true
 
-        log_info "Очистка правил межсетевого экрана (nftables / iptables)..."
+        log_info "Очистка правил межсетевого экрана (декларативная таблица inet homelab в nftables)..."
         if command -v nft >/dev/null 2>&1; then
             nft delete table inet homelab 2>/dev/null || true
             rm -f /etc/nftables.d/homelab.nft 2>/dev/null || true
             sed -i '/include.*homelab\.nft/d' /etc/nftables.conf /etc/nftables.nft 2>/dev/null || true
-        fi
-        if [ -n "${DEFAULT_IFACE:-}" ]; then
-            iptables -D INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 8083 -j DROP 2>/dev/null || true
-            iptables -D INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 9090 -j DROP 2>/dev/null || true
-            iptables -t nat -D POSTROUTING -o "${DEFAULT_IFACE}" -j MASQUERADE 2>/dev/null || true
-            iptables -t nat -D PREROUTING -i "${DEFAULT_IFACE}" -p udp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null || true
-            iptables -t nat -D PREROUTING -i "${DEFAULT_IFACE}" -p tcp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null || true
-            iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || true
         fi
 
         log_info "Восстановление стандартных записей в /etc/hosts..."
@@ -1134,6 +1162,7 @@ prompt_configuration() {
         prompt_read "  [?] Путь к каталогу данных [Enter - ${DEF_SAVE_DIR}]: " INPUT_SAVE_DIR
         SAVE_DIR=${INPUT_SAVE_DIR:-${DEF_SAVE_DIR}}
         mkdir -p "${SAVE_DIR}"
+        SAVE_FSTYPE=$(findmnt -n -o FSTYPE -T "${SAVE_DIR}" 2>/dev/null || df -T "${SAVE_DIR}" 2>/dev/null | awk 'NR==2{print $2}' || echo "ext4")
 
         ENABLE_GATEWAY="Y"
         ENABLE_VAULT="Y"
@@ -1192,12 +1221,25 @@ prompt_configuration() {
         TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
         TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
     else
-        echo -e "  ${CLR_CYAN}--- Настройка дискового хранилища ---${CLR_RESET}"
-        echo "    1) Системный диск [Enter]"
-        echo "    2) Подключить существующий раздел БЕЗ шифрования"
-        echo "    3) Отформатировать диск в Btrfs (ДАННЫЕ БУДУТ УНИЧТОЖЕНЫ)"
-        echo "    4) Подключить существующий диск LUKS2"
-        echo "    5) Отформатировать диск в LUKS2 + Btrfs (ДАННЫЕ БУДУТ УНИЧТОЖЕНЫ)"
+        local ROOT_FSTYPE
+        ROOT_FSTYPE=$(findmnt -n -o FSTYPE / 2>/dev/null || df -T / 2>/dev/null | awk 'NR==2{print $2}' || echo "ext4")
+        local ROOT_AVAIL
+        ROOT_AVAIL=$(df -h / 2>/dev/null | awk 'NR==2{print $4}' || echo "N/A")
+        local USER_HOME
+        USER_HOME=$(eval echo ~"${TARGET_USER}" 2>/dev/null || echo "/home/${TARGET_USER}")
+        local DEF_ROOT_PATH="${SAVED_SAVE_DIR:-${USER_HOME}/save}"
+
+        echo -e "  ${CLR_NEON_PURPLE}╭── НАСТРОЙКА ДИСКОВОГО ХРАНИЛИЩА ───────────────────────────────────────────╮${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│                                                                             │${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│  ${CLR_NEON_GREEN}[1] Системный диск${CLR_RESET} ${CLR_DIM}[Enter] (Раздел ОС: ${DEF_ROOT_PATH})${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│      ${CLR_WHITE}Файловая система:${CLR_RESET} ${CLR_NEON_GOLD}${ROOT_FSTYPE}${CLR_RESET}  ${CLR_WHITE}Доступно:${CLR_RESET} ${CLR_NEON_GREEN}${ROOT_AVAIL}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│                                                                             │${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│  ${CLR_CYAN}ВНЕШНИЕ / ДОПОЛНИТЕЛЬНЫЕ ДИСКИ (Системный диск исключен из списка):       │${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│  ${CLR_WHITE}[2] Подключить существующий раздел БЕЗ шифрования                         │${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│  ${CLR_WHITE}[3] Отформатировать диск в Btrfs (zstd сжатие, ДАННЫЕ УНИЧТОЖАЮТСЯ)        │${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│  ${CLR_WHITE}[4] Подключить существующий крипто-диск LUKS2                                │${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│  ${CLR_WHITE}[5] Отформатировать в LUKS2 + Btrfs (Argon2id, ДАННЫЕ УНИЧТОЖАЮТСЯ)         │${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}╰─────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
         DEF_STORAGE_MODE="${SAVED_STORAGE_MODE:-1}"
         prompt_read "  [?] Выберите вариант [1-5] [${DEF_STORAGE_MODE}]: " STORAGE_MODE
         STORAGE_MODE=${STORAGE_MODE:-${DEF_STORAGE_MODE}}
@@ -1209,6 +1251,7 @@ prompt_configuration() {
             select_disk_device
             DEV_UUID=$(blkid -s UUID -o value "${CHOSEN_DEV}" || true)
             DEV_FSTYPE=$(blkid -s TYPE -o value "${CHOSEN_DEV}" || true)
+            SAVE_FSTYPE="${DEV_FSTYPE:-ext4}"
 
             mkdir -p "${MOUNT_ROOT}"
             MOUNT_OPTS="defaults,noatime,nofail,${SYSTEMD_TIMEOUT}"
@@ -1240,6 +1283,7 @@ prompt_configuration() {
 
         elif [ "$STORAGE_MODE" = "3" ]; then
             select_disk_device
+            SAVE_FSTYPE="btrfs"
             echo ""
             log_warn "Все данные на ${CHOSEN_DEV} будут уничтожены!"
             prompt_read "  [?] Подтвердите форматирование (введите 'yes'): " CONFIRM_WIPE
@@ -1314,6 +1358,7 @@ prompt_configuration() {
 
             MAPPER_DEV="/dev/mapper/${LUKS_MAP_NAME}"
             DEV_FSTYPE=$(blkid -s TYPE -o value "${MAPPER_DEV}" || echo "btrfs")
+            SAVE_FSTYPE="${DEV_FSTYPE:-btrfs}"
 
             local ROT=$(cat "/sys/block/$(basename "$CHOSEN_DEV")/queue/rotational" 2>/dev/null || echo "1")
             local BTRFS_DISCARD="discard=async"
@@ -1419,6 +1464,7 @@ EOF_UNLOCK
             prompt_read "  [?] Каталог данных на системном диске [${DEF_SAVE_DIR}]: " INPUT_SAVE_DIR
             SAVE_DIR=${INPUT_SAVE_DIR:-${DEF_SAVE_DIR}}
             mkdir -p "${SAVE_DIR}"
+            SAVE_FSTYPE=$(findmnt -n -o FSTYPE -T "${SAVE_DIR}" 2>/dev/null || df -T "${SAVE_DIR}" 2>/dev/null | awk 'NR==2{print $2}' || echo "${ROOT_FSTYPE:-ext4}")
         fi
 
         echo ""
@@ -1596,6 +1642,7 @@ EOF_UNLOCK
         printf "SAVED_STORAGE_MODE=%q\n" "${STORAGE_MODE}"
         printf "SAVED_SUBDIR_NAME=%q\n" "${SUBDIR_NAME}"
         printf "SAVED_SAVE_DIR=%q\n" "${SAVE_DIR}"
+        printf "SAVED_SAVE_FSTYPE=%q\n" "${SAVE_FSTYPE}"
         printf "SAVED_SHARE_NAME=%q\n" "${SHARE_NAME}"
         printf "SAVED_VAULT_DATA_DIR=%q\n" "${VAULT_DATA_DIR}"
         printf "SAVED_GITEA_DATA_DIR=%q\n" "${GITEA_DATA_DIR}"
@@ -1747,14 +1794,20 @@ net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 net.ipv4.conf.all.send_redirects = 0
 net.ipv4.conf.default.send_redirects = 0
+net.ipv4.conf.${DEFAULT_IFACE}.send_redirects = 0
 net.ipv4.conf.all.accept_redirects = 0
 net.ipv4.conf.default.accept_redirects = 0
-net.ipv4.conf.all.rp_filter = 2
-net.ipv4.conf.default.rp_filter = 2
-net.ipv4.conf.${DEFAULT_IFACE}.rp_filter = 2
+net.ipv4.conf.${DEFAULT_IFACE}.accept_redirects = 0
+net.ipv4.conf.all.rp_filter = 0
+net.ipv4.conf.default.rp_filter = 0
+net.ipv4.conf.${DEFAULT_IFACE}.rp_filter = 0
 EOF_SYSCTL
         sysctl -p /etc/sysctl.d/99-gateway.conf 2>/dev/null || sysctl --system >/dev/null 2>&1 || true
-        sysctl -w net.ipv6.conf.all.disable_ipv6=1 net.ipv6.conf.default.disable_ipv6=1 net.ipv6.conf.lo.disable_ipv6=1 >/dev/null 2>&1 || true
+        sysctl -w net.ipv4.ip_forward=1 \
+                  net.ipv4.conf.all.send_redirects=0 net.ipv4.conf.default.send_redirects=0 net.ipv4.conf.${DEFAULT_IFACE}.send_redirects=0 \
+                  net.ipv4.conf.all.accept_redirects=0 net.ipv4.conf.default.accept_redirects=0 net.ipv4.conf.${DEFAULT_IFACE}.accept_redirects=0 \
+                  net.ipv4.conf.all.rp_filter=0 net.ipv4.conf.default.rp_filter=0 net.ipv4.conf.${DEFAULT_IFACE}.rp_filter=0 \
+                  net.ipv6.conf.all.disable_ipv6=1 net.ipv6.conf.default.disable_ipv6=1 net.ipv6.conf.lo.disable_ipv6=1 >/dev/null 2>&1 || true
 
         if command -v nmcli >/dev/null 2>&1 && [ -n "${DEFAULT_IFACE}" ]; then
             nmcli connection modify "${DEFAULT_IFACE}" ipv6.method disabled 2>/dev/null || true
@@ -1764,19 +1817,22 @@ EOF_SYSCTL
         cat <<EOF_NFT > /etc/nftables.d/homelab.nft
 table inet homelab {
     chain forward {
-        type filter hook forward priority 0; policy accept;
+        type filter hook forward priority -10; policy accept;
         tcp flags syn tcp option maxseg size set rt mtu
+        accept
     }
 
     chain prerouting {
         type nat hook prerouting priority dstnat; policy accept;
         iifname "${DEFAULT_IFACE}" tcp dport 53 redirect to :53
         iifname "${DEFAULT_IFACE}" udp dport 53 redirect to :53
+        iifname "${DEFAULT_IFACE}" tcp dport 853 reject with tcp reset
     }
 
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         oifname "${DEFAULT_IFACE}" masquerade
+        oifname "Meta" masquerade
     }
 
     chain input {
@@ -1807,23 +1863,12 @@ EOF_NFT
             rc-update add nftables default >/dev/null 2>&1 || true
         fi
 
-        if [ "$NFT_APPLIED" -eq 0 ]; then
-            log_warn "nftables не применился или отсутствует, применен режим обратной совместимости с iptables"
-            iptables -P FORWARD ACCEPT 2>/dev/null || true
-            if [ -n "${DEFAULT_IFACE}" ]; then
-                iptables -t nat -C POSTROUTING -o "${DEFAULT_IFACE}" -j MASQUERADE 2>/dev/null || \
-                iptables -t nat -A POSTROUTING -o "${DEFAULT_IFACE}" -j MASQUERADE 2>/dev/null || true
-                iptables -t nat -C PREROUTING -i "${DEFAULT_IFACE}" -p udp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null || \
-                iptables -t nat -A PREROUTING -i "${DEFAULT_IFACE}" -p udp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null || true
-                iptables -t nat -C PREROUTING -i "${DEFAULT_IFACE}" -p tcp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null || \
-                iptables -t nat -A PREROUTING -i "${DEFAULT_IFACE}" -p tcp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null || true
-                iptables -t mangle -C FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || \
-                iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || true
-                iptables -C INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 8083 -j DROP 2>/dev/null || \
-                iptables -A INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 8083 -j DROP 2>/dev/null || true
-                iptables -C INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 9090 -j DROP 2>/dev/null || \
-                iptables -A INPUT -i "${DEFAULT_IFACE}" -p tcp --dport 9090 -j DROP 2>/dev/null || true
-            fi
+        # Гарантированное открытие транзита в цепочках Docker через nftables
+        if nft list chain ip filter DOCKER-USER >/dev/null 2>&1; then
+            nft insert rule ip filter DOCKER-USER counter accept 2>/dev/null || true
+        fi
+        if nft list chain ip filter FORWARD >/dev/null 2>&1; then
+            nft insert rule ip filter FORWARD counter accept 2>/dev/null || true
         fi
 
         log_info "Установка интеллектуального сторожевого таймера защиты от петель маршрутизации..."
@@ -1887,26 +1932,34 @@ nameserver 1.1.1.1
 EOF_RESOLV_FIX
 fi
 
-sysctl -w net.ipv4.ip_forward=1 net.ipv6.conf.all.disable_ipv6=1 net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1 || true
+sysctl -w net.ipv4.ip_forward=1 \
+          net.ipv4.conf.all.send_redirects=0 net.ipv4.conf.default.send_redirects=0 net.ipv4.conf."${IFACE}".send_redirects=0 \
+          net.ipv4.conf.all.accept_redirects=0 net.ipv4.conf.default.accept_redirects=0 net.ipv4.conf."${IFACE}".accept_redirects=0 \
+          net.ipv4.conf.all.rp_filter=0 net.ipv4.conf.default.rp_filter=0 net.ipv4.conf."${IFACE}".rp_filter=0 \
+          net.ipv6.conf.all.disable_ipv6=1 net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1 || true
+
 APPLIED_NFT=0
 if command -v nft >/dev/null 2>&1 && [ -n "$IFACE" ]; then
     mkdir -p /etc/nftables.d
     cat << EOF_NFT_WD > /etc/nftables.d/homelab.nft
 table inet homelab {
     chain forward {
-        type filter hook forward priority 0; policy accept;
+        type filter hook forward priority -10; policy accept;
         tcp flags syn tcp option maxseg size set rt mtu
+        accept
     }
 
     chain prerouting {
         type nat hook prerouting priority dstnat; policy accept;
         iifname "$IFACE" tcp dport 53 redirect to :53
         iifname "$IFACE" udp dport 53 redirect to :53
+        iifname "$IFACE" tcp dport 853 reject with tcp reset
     }
 
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         oifname "$IFACE" masquerade
+        oifname "Meta" masquerade
     }
 
     chain input {
@@ -1921,50 +1974,54 @@ EOF_NFT_WD
     fi
 fi
 
-if [ "$APPLIED_NFT" -eq 0 ]; then
-    iptables -P FORWARD ACCEPT 2>/dev/null || true
-    if [ -n "$IFACE" ]; then
-        iptables -t nat -C POSTROUTING -o "$IFACE" -j MASQUERADE 2>/dev/null || \
-        iptables -t nat -A POSTROUTING -o "$IFACE" -j MASQUERADE 2>/dev/null || true
-
-        iptables -t nat -C PREROUTING -i "$IFACE" -p udp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null || \
-        iptables -t nat -A PREROUTING -i "$IFACE" -p udp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null || true
-        iptables -t nat -C PREROUTING -i "$IFACE" -p tcp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null || \
-        iptables -t nat -A PREROUTING -i "$IFACE" -p tcp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null || true
-        iptables -t mangle -C FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || \
-        iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || true
-
-        iptables -C INPUT -i "$IFACE" -p tcp --dport 8083 -j DROP 2>/dev/null || \
-        iptables -A INPUT -i "$IFACE" -p tcp --dport 8083 -j DROP 2>/dev/null || true
-        iptables -C INPUT -i "$IFACE" -p tcp --dport 9090 -j DROP 2>/dev/null || \
-        iptables -A INPUT -i "$IFACE" -p tcp --dport 9090 -j DROP 2>/dev/null || true
+if [ "$APPLIED_NFT" -eq 1 ]; then
+    # Гарантированное открытие транзита в цепочках Docker через nftables
+    if nft list chain ip filter DOCKER-USER >/dev/null 2>&1; then
+        nft insert rule ip filter DOCKER-USER counter accept 2>/dev/null || true
+    fi
+    if nft list chain ip filter FORWARD >/dev/null 2>&1; then
+        nft insert rule ip filter FORWARD counter accept 2>/dev/null || true
     fi
 fi
 
 if command -v docker >/dev/null 2>&1 && docker inspect adguardhome >/dev/null 2>&1; then
-    DNS_CHECK_OK=0
-    if timeout 2 nc -z 127.0.0.1 53 2>/dev/null || python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(1.5); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 53)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
-        DNS_CHECK_OK=1
-    fi
-    if [ "$DNS_CHECK_OK" -eq 0 ]; then
-        logger -t gateway-watchdog "DNS-резолвер AdGuard Home (порт 53) не отвечает, выполняется автоматический перезапуск..." 2>/dev/null || true
-        docker restart adguardhome >/dev/null 2>&1 || true
-        /usr/local/bin/homelab-notify "Самовосстановление DNS" "Порт 53 не отвечал на запросы. Контейнер AdGuard Home автоматически перезапущен сторожем." "WARN" 2>/dev/null || true
+    AG_STATUS=$(docker inspect -f '{{.State.Status}}' adguardhome 2>/dev/null || echo "none")
+    AG_HEALTH=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' adguardhome 2>/dev/null || echo "none")
+    if [ "$AG_STATUS" = "running" ] && [ "$AG_HEALTH" != "starting" ]; then
+        DNS_CHECK_OK=0
+        if timeout 2 nc -z 127.0.0.1 53 2>/dev/null || python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 53)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
+            DNS_CHECK_OK=1
+        fi
+        if [ "$DNS_CHECK_OK" -eq 0 ]; then
+            sleep 2
+            if ! (timeout 2 nc -z 127.0.0.1 53 2>/dev/null || python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 53)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null); then
+                logger -t gateway-watchdog "DNS-резолвер AdGuard Home (порт 53) не отвечает, выполняется автоматический перезапуск..." 2>/dev/null || true
+                docker restart adguardhome >/dev/null 2>&1 || true
+                /usr/local/bin/homelab-notify "Самовосстановление DNS" "Порт 53 не отвечал на запросы. Контейнер AdGuard Home автоматически перезапущен сторожем." "WARN" 2>/dev/null || true
+            fi
+        fi
     fi
 fi
 
 if command -v docker >/dev/null 2>&1 && docker inspect mihomo >/dev/null 2>&1; then
-    MIHOMO_CHECK_OK=0
-    if python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null || \
-       wget -q --spider --header="Authorization: Bearer ${SAVED_MIHOMO_SECRET:-${MIHOMO_SECRET:-}}" http://127.0.0.1:9090/version 2>/dev/null || \
-       wget -q --spider http://127.0.0.1:9090/ui/ 2>/dev/null || \
-       timeout 2 nc -z 127.0.0.1 9090 2>/dev/null; then
-        MIHOMO_CHECK_OK=1
-    fi
-    if [ "$MIHOMO_CHECK_OK" -eq 0 ]; then
-        logger -t gateway-watchdog "Ядро маршрутизации Mihomo (порт 9090) не отвечает, выполняется автоматический перезапуск..." 2>/dev/null || true
-        docker restart mihomo >/dev/null 2>&1 || true
-        /usr/local/bin/homelab-notify "Самовосстановление Mihomo" "Ядро маршрутизации не отвечало. Контейнер mihomo автоматически перезапущен сторожем." "WARN" 2>/dev/null || true
+    MH_STATUS=$(docker inspect -f '{{.State.Status}}' mihomo 2>/dev/null || echo "none")
+    MH_HEALTH=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' mihomo 2>/dev/null || echo "none")
+    if [ "$MH_STATUS" = "running" ] && [ "$MH_HEALTH" != "starting" ]; then
+        MIHOMO_CHECK_OK=0
+        if python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null || \
+           wget -q --spider --header="Authorization: Bearer ${SAVED_MIHOMO_SECRET:-${MIHOMO_SECRET:-}}" http://127.0.0.1:9090/version 2>/dev/null || \
+           wget -q --spider http://127.0.0.1:9090/ui/ 2>/dev/null || \
+           timeout 2 nc -z 127.0.0.1 9090 2>/dev/null; then
+            MIHOMO_CHECK_OK=1
+        fi
+        if [ "$MIHOMO_CHECK_OK" -eq 0 ]; then
+            sleep 2
+            if ! (python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null || timeout 2 nc -z 127.0.0.1 9090 2>/dev/null); then
+                logger -t gateway-watchdog "Ядро маршрутизации Mihomo (порт 9090) не отвечает, выполняется автоматический перезапуск..." 2>/dev/null || true
+                docker restart mihomo >/dev/null 2>&1 || true
+                /usr/local/bin/homelab-notify "Самовосстановление Mihomo" "Ядро маршрутизации не отвечало. Контейнер mihomo автоматически перезапущен сторожем." "WARN" 2>/dev/null || true
+            fi
+        fi
     fi
 fi
 EOF_WATCHDOG
@@ -2075,7 +2132,12 @@ EOF_NOTIFY
 }
 
 setup_directories() {
-    print_step_header "06/11" "СТРУКТУРА КАТАЛОГОВ И BTRFS NO-COW"
+    local CURRENT_FS="${SAVE_FSTYPE:-${SAVED_SAVE_FSTYPE:-}}"
+    if [ -z "${CURRENT_FS}" ]; then
+        CURRENT_FS=$(findmnt -n -o FSTYPE -T "${SAVE_DIR}" 2>/dev/null || df -T "${SAVE_DIR}" 2>/dev/null | awk 'NR==2{print $2}' || echo "ext4")
+    fi
+
+    print_step_header "06/11" "СТРУКТУРА КАТАЛОГОВ И ОПТИМИЗАЦИЯ ХРАНИЛИЩА (ФС: ${CURRENT_FS^^})"
 
     mkdir -p "${APP_DIR}/caddy/data" "${APP_DIR}/caddy/config"
     mkdir -p "${SAVE_DIR}/certificates" "${SAVE_DIR}/backups/vaultwarden" "${SAVE_DIR}/backups/gitea" "${SAVE_DIR}/backups/uptime-kuma"
@@ -2085,11 +2147,22 @@ setup_directories() {
     apply_nocow_helper() {
         local target_dir="$1"
         mkdir -p "${target_dir}"
-        chattr +C "${target_dir}" 2>/dev/null || true
-        find "${target_dir}" -maxdepth 2 -type f -exec chattr +C {} + 2>/dev/null || true
+        if [ "${CURRENT_FS}" = "btrfs" ]; then
+            chattr +C "${target_dir}" 2>/dev/null || true
+            find "${target_dir}" -maxdepth 2 -type f -exec chattr +C {} + 2>/dev/null || true
+        fi
     }
 
-    log_info "Применение Btrfs No-COW к каталогам баз данных и медиа-потоков..."
+    if [ "${CURRENT_FS}" = "btrfs" ]; then
+        log_info "Обнаружена файловая система Btrfs: применение No-COW к каталогам баз данных и загрузок..."
+        echo -e "      ${CLR_DIM}Отключение Copy-on-Write для SQLite баз данных и торрент-загрузок${CLR_RESET}"
+        echo -e "      ${CLR_DIM}(Защита накопителя от CoW-фрагментации и деградации производительности)${CLR_RESET}"
+    elif [[ "${CURRENT_FS}" =~ ^(ext4|ext3|xfs)$ ]]; then
+        log_ok "Файловая система: ${CURRENT_FS} (прямая блочная запись in-place, фрагментация CoW отсутствует)"
+    else
+        log_info "Файловая система: ${CURRENT_FS} (стандартный режим блочного размещения)"
+    fi
+
     apply_nocow_helper "${ADGUARD_WORK_DIR}"
     apply_nocow_helper "${VAULT_DATA_DIR}"
     apply_nocow_helper "${GITEA_DATA_DIR}"
@@ -2720,7 +2793,8 @@ block_auth_min: 15
 language: "ru"
 theme: auto
 dns:
-  bind_host: 0.0.0.0
+  bind_hosts:
+    - 0.0.0.0
   port: 53
   block_ipv6: true
   anonymize_client_ip: true
@@ -2732,14 +2806,16 @@ dns:
     - ${SELECTED_DOT_1:-tls://common.dot.dns.yandex.net}
     - ${SELECTED_DOT_2:-tls://1.1.1.1}
     - ${SELECTED_DOH_1:-https://common.dot.dns.yandex.net/dns-query}
-  upstream_timeout: 2s
+  upstream_timeout: 4s
   bootstrap_dns:
 ${BOOTSTRAP_YAML_LINES}
   upstream_mode: load_balance
-  cache_enabled: true
-  cache_size: 4194304
-  cache_ttl_min: 0
-  cache_ttl_max: 3600
+  use_private_ptr_resolvers: true
+  local_ptr_upstreams:
+    - 127.0.0.1:1053
+  cache_size: 8388608
+  cache_ttl_min: 60
+  cache_ttl_max: 86400
   cache_optimistic: true
   enable_dnssec: false
 querylog:
@@ -2774,18 +2850,51 @@ filters:
     id: 4
 whitelist_filters: []
 user_rules:
-  - '@@||whoer.net^\$important'
-  - '@@||aniliberty.top^\$important'
-  - '@@||anilibria.top^\$important'
-  - '@@||*.libria.fun^\$important'
+  - '@@||connectivitycheck.gstatic.com^\$important'
+  - '@@||*.connectivitycheck.gstatic.com^\$important'
+  - '@@||connectivitycheck.android.com^\$important'
+  - '@@||*.connectivitycheck.android.com^\$important'
+  - '@@||clients3.google.com^\$important'
+  - '@@||play.googleapis.com^\$important'
+  - '@@||captive.apple.com^\$important'
+  - '@@||connect.rom.miui.com^\$important'
+  - '@@||wifi.miui.com^\$important'
+  - '@@||connectivity.samsung.com.cn^\$important'
+  - '@@||connectivitycheck.platform.hicloud.com^\$important'
+  - '@@||detectportal.firefox.com^\$important'
+  - '@@||msftconnecttest.com^\$important'
+  - '@@||msftncsi.com^\$important'
+  - '@@||gosuslugi.ru^\$important'
+  - '@@||*.gosuslugi.ru^\$important'
+  - '@@||sberbank.ru^\$important'
+  - '@@||*.sberbank.ru^\$important'
+  - '@@||tbank.ru^\$important'
+  - '@@||*.tbank.ru^\$important'
+  - '@@||vtb.ru^\$important'
+  - '@@||*.vtb.ru^\$important'
+  - '@@||alfabank.ru^\$important'
+  - '@@||*.alfabank.ru^\$important'
+  - '@@||mirconnect.ru^\$important'
+  - '@@||cbr.ru^\$important'
+  - '@@||nalog.gov.ru^\$important'
+  - '@@||mos.ru^\$important'
+  - '@@||emias.info^\$important'
+  - '@@||yandex.ru^\$important'
+  - '@@||yandex.net^\$important'
+  - '@@||vk.com^\$important'
   - '@@||2ip.ru^\$important'
   - '@@||speedtest.net^\$important'
+  - '@@||whoer.net^\$important'
   - '@@||ntc.party^\$important'
   - '@@||4pda.to^\$important'
   - '@@||rutracker.org^\$important'
-  - '@@||gosuslugi.ru^\$important'
-  - '@@||sberbank.ru^\$important'
-  - '@@||tbank.ru^\$important'
+  - '@@||rutracker.net^\$important'
+  - '@@||rutracker.nl^\$important'
+  - '@@||nnmclub.to^\$important'
+  - '@@||rutor.info^\$important'
+  - '@@||anilibria.top^\$important'
+  - '@@||aniliberty.top^\$important'
+  - '@@||*.libria.fun^\$important'
 EOF_AGH
 
         local ESCAPED_MIHOMO_SECRET
@@ -3012,11 +3121,26 @@ dns:
   respect-rules: true
   fake-ip-filter:
     - "+.lan"
+    - "+.local"
     - "+.duckdns.org"
     - "+.pool.ntp.org"
     - "time.*.com"
     - "time.*.gov"
     - "time.*.apple.com"
+    # Captive Portal и проверка доступности сети (Android, Google, Apple, Xiaomi, Samsung, Huawei, Windows)
+    - "+.connectivitycheck.gstatic.com"
+    - "connectivitycheck.gstatic.com"
+    - "+.connectivitycheck.android.com"
+    - "connectivitycheck.android.com"
+    - "clients3.google.com"
+    - "play.googleapis.com"
+    - "+.gvt2.com"
+    - "captive.apple.com"
+    - "+.apple.com"
+    - "connect.rom.miui.com"
+    - "wifi.miui.com"
+    - "connectivity.samsung.com.cn"
+    - "connectivitycheck.platform.hicloud.com"
     - "+.msftconnecttest.com"
     - "+.msftncsi.com"
     - "detectportal.firefox.com"
@@ -3041,6 +3165,9 @@ dns:
       - 77.88.8.8
       - 77.88.8.1
     "+.ru,+.su,+.xn--p1ai,+.xn--80asehdb,+.xn--80aswg,+.xn--80adxhks,+.xn--c1avg,+.yandex.net,+.yastatic.net,+.vk.com,+.userapi.com,+.vk-portal.net,+.gosuslugi.org,+.emias.info,+.2gis.com":
+      - 77.88.8.8
+      - 77.88.8.1
+    "connectivitycheck.gstatic.com,+.connectivitycheck.gstatic.com,connectivitycheck.android.com,+.connectivitycheck.android.com,clients3.google.com,play.googleapis.com,captive.apple.com,+.apple.com,connect.rom.miui.com,wifi.miui.com,detectportal.firefox.com":
       - 77.88.8.8
       - 77.88.8.1
   default-nameserver:
@@ -3115,6 +3242,22 @@ ${PROXY_PROVIDERS_CONFIG}
 ${PROXY_GROUPS_CONFIG}
 
 rules:
+  # Проверка доступности сети (Captive Portal Android, Apple, Xiaomi, Samsung, Windows) — МГНОВЕННО НАПРЯМУЮ!
+  - DOMAIN,connectivitycheck.gstatic.com,DIRECT
+  - DOMAIN-SUFFIX,connectivitycheck.gstatic.com,DIRECT
+  - DOMAIN,connectivitycheck.android.com,DIRECT
+  - DOMAIN-SUFFIX,connectivitycheck.android.com,DIRECT
+  - DOMAIN,clients3.google.com,DIRECT
+  - DOMAIN,play.googleapis.com,DIRECT
+  - DOMAIN,detectportal.firefox.com,DIRECT
+  - DOMAIN,captive.apple.com,DIRECT
+  - DOMAIN-SUFFIX,apple.com,DIRECT
+  - DOMAIN,connect.rom.miui.com,DIRECT
+  - DOMAIN,wifi.miui.com,DIRECT
+  - DOMAIN,connectivity.samsung.com.cn,DIRECT
+  - DOMAIN,connectivitycheck.platform.hicloud.com,DIRECT
+  - DOMAIN-KEYWORD,connectivitycheck,DIRECT
+
   # Блокировка QUIC (UDP 443) для форсирования надежного TCP/HTTP2 (YouTube/браузеры)
   - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT
 
@@ -3778,7 +3921,7 @@ EOF_COMPOSE
     if [ "${INIT_SYSTEM}" = "systemd" ]; then
         local WATCHDOG_EXEC_LINE=""
         if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
-            WATCHDOG_EXEC_LINE="ExecStartPre=/usr/local/bin/gateway-watchdog.sh"
+            WATCHDOG_EXEC_LINE="ExecStartPost=-/usr/local/bin/gateway-watchdog.sh"
         fi
 
         cat <<EOF_HOMELAB_SVC > /etc/systemd/system/homelab.service
@@ -3793,8 +3936,8 @@ ${STORAGE_DEP_LINE}
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=${APP_DIR}
-${WATCHDOG_EXEC_LINE}
 ExecStart=/usr/local/bin/dc up -d
+${WATCHDOG_EXEC_LINE}
 ExecStop=/usr/local/bin/dc stop
 TimeoutStartSec=300
 
@@ -3815,9 +3958,10 @@ depend() {
 }
 start() {
     ebegin "Starting Homelab Docker Compose Stack"
-    /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
     cd "${APP_DIR}" && /usr/local/bin/dc up -d
-    eend $?
+    local ec=$?
+    /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
+    eend \$ec
 }
 stop() {
     ebegin "Stopping Homelab Docker Compose Stack"
@@ -4126,9 +4270,7 @@ cmd_status() {
     
     local FW_STATUS="не активен"
     if command -v nft >/dev/null 2>&1 && nft list table inet homelab >/dev/null 2>&1; then
-        FW_STATUS="${CLR_GREEN}nftables (inet homelab)${CLR_RESET}"
-    elif command -v iptables >/dev/null 2>&1 && iptables -t nat -C POSTROUTING -o "${SAVED_PHYS_IFACE:-eth0}" -j MASQUERADE 2>/dev/null; then
-        FW_STATUS="${CLR_YELLOW}iptables (legacy)${CLR_RESET}"
+        FW_STATUS="${CLR_GREEN}nftables (таблица inet homelab)${CLR_RESET}"
     fi
     echo -e "  ${CLR_WHITE}• Фаервол / NAT:${CLR_RESET}     ${FW_STATUS}"
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
@@ -4269,30 +4411,32 @@ cmd_doctor() {
         echo -e "  ${TAG_ERR} IPv4 Forwarding ядра:                   ${CLR_RED}[ОТКЛЮЧЕН]${CLR_RESET}"
     fi
 
-    if command -v nft >/dev/null 2>&1 && nft list table inet homelab >/dev/null 2>&1; then
-        echo -e "  ${TAG_OK} nftables (таблица inet homelab):        ${CLR_GREEN}[АКТИВНА И ПРИМЕНЕНА]${CLR_RESET}"
-    elif command -v iptables >/dev/null 2>&1 && iptables -t nat -C POSTROUTING -o "${SAVED_PHYS_IFACE:-eth0}" -j MASQUERADE 2>/dev/null; then
-        echo -e "  ${TAG_WARN} Фаервол iptables:                       ${CLR_YELLOW}[РЕЖИМ СОВМЕСТИМОСТИ]${CLR_RESET}"
-    else
-        echo -e "  ${TAG_ERR} Фаервол и NAT маскарадинг:              ${CLR_RED}[НЕ НАЙДЕН]${CLR_RESET}"
-    fi
+    if [[ "${SAVED_ENABLE_GATEWAY:-Y}" =~ ^[Yy]$ ]]; then
+        if command -v nft >/dev/null 2>&1 && nft list table inet homelab >/dev/null 2>&1; then
+            echo -e "  ${TAG_OK} nftables (таблица inet homelab):        ${CLR_GREEN}[АКТИВНА И ПРИМЕНЕНА]${CLR_RESET}"
+        else
+            echo -e "  ${TAG_ERR} nftables (таблица inet homelab):        ${CLR_RED}[НЕ НАЙДЕНА/ОШИБКА]${CLR_RESET}"
+        fi
 
-    if python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 53)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
-        echo -e "  ${TAG_OK} DNS Резолвер AdGuard Home (порт 53):    ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
-    else
-        echo -e "  ${TAG_ERR} DNS Резолвер AdGuard Home (порт 53):    ${CLR_RED}[НЕ ОТВЕЧАЕТ]${CLR_RESET}"
-    fi
+        if python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 53)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
+            echo -e "  ${TAG_OK} DNS Резолвер AdGuard Home (порт 53):    ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+        else
+            echo -e "  ${TAG_ERR} DNS Резолвер AdGuard Home (порт 53):    ${CLR_RED}[НЕ ОТВЕЧАЕТ]${CLR_RESET}"
+        fi
 
-    if python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 1053)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
-        echo -e "  ${TAG_OK} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
-    else
-        echo -e "  ${TAG_WARN} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
-    fi
+        if python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 1053)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
+            echo -e "  ${TAG_OK} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+        else
+            echo -e "  ${TAG_WARN} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
+        fi
 
-    if python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null; then
-        echo -e "  ${TAG_OK} REST API Mihomo (порт 9090):            ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+        if python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null; then
+            echo -e "  ${TAG_OK} REST API Mihomo (порт 9090):            ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+        else
+            echo -e "  ${TAG_WARN} REST API Mihomo (порт 9090):            ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
+        fi
     else
-        echo -e "  ${TAG_WARN} REST API Mihomo (порт 9090):            ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
+        echo -e "  ${TAG_INFO} Сетевой шлюз (AdGuard + Mihomo):       ${CLR_DIM}[ОТКЛЮЧЕН В КОНФИГУРАЦИИ]${CLR_RESET}"
     fi
 
     if [ -c /dev/net/tun ]; then
@@ -4315,24 +4459,32 @@ cmd_doctor() {
         fi
     fi
 
-    if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -E -q 'dport 53 redirect|redirect to :?53'; then
-        echo -e "  ${TAG_OK} Перехват DNS в LAN (DNS Hijack):         ${CLR_GREEN}[АКТИВЕН (порт 53 -> AdGuard)]${CLR_RESET}"
-    elif command -v iptables >/dev/null 2>&1 && iptables -t nat -C PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null; then
-        echo -e "  ${TAG_OK} Перехват DNS в LAN (iptables):            ${CLR_GREEN}[АКТИВЕН (порт 53 -> AdGuard)]${CLR_RESET}"
-    else
-        echo -e "  ${TAG_WARN} Перехват DNS в LAN (DNS Hijack):         ${CLR_YELLOW}[НЕ НАСТРОЕН]${CLR_RESET}"
-    fi
+    if [[ "${SAVED_ENABLE_GATEWAY:-Y}" =~ ^[Yy]$ ]]; then
+        if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -E -q 'dport 53 redirect|redirect to :?53'; then
+            echo -e "  ${TAG_OK} Перехват DNS в LAN (DNS Hijack):         ${CLR_GREEN}[АКТИВЕН (порт 53 -> AdGuard)]${CLR_RESET}"
+        else
+            echo -e "  ${TAG_WARN} Перехват DNS в LAN (DNS Hijack):         ${CLR_YELLOW}[НЕ НАСТРОЕН]${CLR_RESET}"
+        fi
 
-    if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -q 'maxseg size set rt mtu'; then
-        echo -e "  ${TAG_OK} Оптимизация MTU (TCP MSS Clamping):      ${CLR_GREEN}[АКТИВНА (защита от дропов)]${CLR_RESET}"
-    elif command -v iptables >/dev/null 2>&1 && iptables -t mangle -C FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null; then
-        echo -e "  ${TAG_OK} Оптимизация MTU (iptables TCPMSS):        ${CLR_GREEN}[АКТИВНА (защита от дропов)]${CLR_RESET}"
-    else
-        echo -e "  ${TAG_WARN} Оптимизация MTU (TCP MSS Clamping):      ${CLR_YELLOW}[НЕ НАСТРОЕНА]${CLR_RESET}"
-    fi
+        if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -q 'maxseg size set rt mtu'; then
+            echo -e "  ${TAG_OK} Оптимизация MTU (TCP MSS Clamping):      ${CLR_GREEN}[АКТИВНА (защита от дропов)]${CLR_RESET}"
+        else
+            echo -e "  ${TAG_WARN} Оптимизация MTU (TCP MSS Clamping):      ${CLR_YELLOW}[НЕ НАСТРОЕНА]${CLR_RESET}"
+        fi
 
-    if [ -f /opt/homelab/mihomo/config.yaml ] && grep -q 'tls-fragment' /opt/homelab/mihomo/config.yaml 2>/dev/null; then
-        echo -e "  ${TAG_OK} Обход DPI (TLS ClientHello Fragment):     ${CLR_GREEN}[АКТИВЕН (DIRECT-DPI)]${CLR_RESET}"
+        if [ -f /opt/homelab/mihomo/config.yaml ] && grep -q 'tls-fragment' /opt/homelab/mihomo/config.yaml 2>/dev/null; then
+            echo -e "  ${TAG_OK} Обход DPI (TLS ClientHello Fragment):     ${CLR_GREEN}[АКТИВЕН (DIRECT-DPI)]${CLR_RESET}"
+        fi
+
+        if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -q 'priority -10'; then
+            echo -e "  ${TAG_OK} Пересылка трафика LAN/TUN (nftables FORWARD): ${CLR_GREEN}[АКТИВНА (priority -10)]${CLR_RESET}"
+        else
+            echo -e "  ${TAG_WARN} Пересылка трафика LAN/TUN (nftables FORWARD): ${CLR_YELLOW}[ПРОВЕРЬТЕ NFTABLES]${CLR_RESET}"
+        fi
+
+        if [ -f /opt/homelab/mihomo/config.yaml ] && grep -q 'connectivitycheck' /opt/homelab/mihomo/config.yaml 2>/dev/null; then
+            echo -e "  ${TAG_OK} Доступность сети Android (Captive Portal 204):   ${CLR_GREEN}[АКТИВНА (DIRECT)]${CLR_RESET}"
+        fi
     fi
 
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
@@ -4378,7 +4530,11 @@ cmd_dump_logs() {
         echo "ОЗУ:             $(free -h 2>/dev/null || true)"
         echo "Хранилище:       $(df -h 2>/dev/null || true)"
         echo "IP адреса:       $(ip -o -4 addr show 2>/dev/null || ifconfig 2>/dev/null || true)"
-        echo "Маршруты:        $(ip route show 2>/dev/null || route -n 2>/dev/null || true)"
+        echo "Маршруты (main): $(ip route show 2>/dev/null || route -n 2>/dev/null || true)"
+        echo "Правила routing policy (ip rule):"
+        ip rule show 2>/dev/null || true
+        echo "Маршруты (все таблицы):"
+        ip route show table all 2>/dev/null || true
         echo ""
         echo "--- СТАТУС КОНТЕЙНЕРОВ DOCKER ---"
         docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || true
@@ -4386,12 +4542,11 @@ cmd_dump_logs() {
         echo "--- РЕЗУЛЬТАТЫ САМОДИАГНОСТИКИ (HOMELAB DOCTOR) ---"
         cmd_doctor 2>&1 || true
         echo ""
-        echo "--- ПРАВИЛА ФАЕРВОЛА (NFTABLES / IPTABLES) ---"
+        echo "--- ПРАВИЛА ФАЕРВОЛА (NFTABLES) ---"
         if command -v nft >/dev/null 2>&1; then
             nft list table inet homelab 2>/dev/null || nft list ruleset 2>/dev/null || echo "nftables: нет активных правил"
         else
-            iptables -L -n -v 2>/dev/null || true
-            iptables -t nat -L -n -v 2>/dev/null || true
+            echo "nftables: утилита nft не найдена"
         fi
         echo ""
         echo "============================================================================="
@@ -4634,8 +4789,6 @@ EOF_DIAG
         local FW_STATUS="НЕ АКТИВЕН"
         if command -v nft >/dev/null 2>&1 && nft list table inet homelab >/dev/null 2>&1; then
             FW_STATUS="nftables (inet homelab)"
-        elif iptables -t nat -C POSTROUTING -o "${DEFAULT_IFACE}" -j MASQUERADE 2>/dev/null; then
-            FW_STATUS="iptables (legacy)"
         fi
         echo -e "    ${TAG_OK} Фаервол и NAT:            ${CLR_GREEN}[${FW_STATUS}]${CLR_RESET}"
         echo "Firewall status: ${FW_STATUS}" >> "${DIAG_LOG}"
@@ -4708,114 +4861,121 @@ EOF_SYS_INFO
 
 show_summary_dashboard() {
     echo ""
-    echo -e "${CLR_GREEN}╭── ${CLR_WHITE}${CLR_BOLD}HOMELAB APPLIANCE & TRANSPARENT GATEWAY УСПЕШНО РАЗВЕРНУТ${CLR_RESET}"
-    echo -e "${CLR_GREEN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+    echo -e "  ${CLR_NEON_GREEN}╔════════════════════════════════════════════════════════════════════════════╗${CLR_RESET}"
+    echo -e "  ${CLR_NEON_GREEN}║${CLR_RESET} ${CLR_WHITE}${CLR_BOLD}  HOMELAB APPLIANCE & TRANSPARENT GATEWAY УСПЕШНО РАЗВЕРНУТ И АКТИВЕН       ${CLR_RESET}${CLR_NEON_GREEN}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_GREEN}╚════════════════════════════════════════════════════════════════════════════╝${CLR_RESET}"
     echo ""
 
-    echo -e "  ${CLR_CYAN}${CLR_BOLD}╭── СЕТЕВОЙ ШЛЮЗ И МАРШРУТИЗАЦИЯ (RUSSIA PRO EDITION) ───────${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}╭── СЕТЕВОЙ ШЛЮЗ И МАРШРУТИЗАЦИЯ (RUSSIA PRO 2026) ──────────────────────────╮${CLR_RESET}"
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_WHITE}• AdGuard Home (DNS & AdBlock):${CLR_RESET} ${CLR_CYAN}https://${ADGUARD_DOMAIN}${CLR_RESET}"
-        echo -e "  ${CLR_WHITE}• Mihomo Smart Routing UI:${CLR_RESET}      ${CLR_CYAN}https://${PROXY_DOMAIN}${CLR_RESET}"
-        echo -e "  ${CLR_WHITE}• Секрет панели управления:${CLR_RESET}     ${CLR_YELLOW}${MIHOMO_SECRET}${CLR_RESET}"
-        echo -e "  ${CLR_WHITE}• Госуслуги, банки и РФ-сервисы:${CLR_RESET} ${CLR_GREEN}100% ПРЯМОЙ ДОСТУП (DIRECT, без капч и геоблоков)${CLR_RESET}"
-        echo -e "  ${CLR_WHITE}• Обход замедления (DPI Desync):${CLR_RESET} ${CLR_GREEN}АКТИВЕН (TLS ClientHello Fragmentation -> DIRECT-DPI)${CLR_RESET}"
-        echo -e "  ${CLR_WHITE}• Защита от утечек и обхода DNS:${CLR_RESET} ${CLR_GREEN}АКТИВНА (nftables DNS Hijack -> порт 53)${CLR_RESET}"
-        echo -e "  ${CLR_WHITE}• Автоматический TCP MSS Clamping:${CLR_RESET} ${CLR_GREEN}АКТИВЕН (защита от зависания сайтов на MTU)${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ AdGuard Home (DNS & AdBlock):${CLR_RESET}    ${CLR_NEON_CYAN}https://${ADGUARD_DOMAIN}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Mihomo Smart Routing UI:${CLR_RESET}         ${CLR_NEON_CYAN}https://${PROXY_DOMAIN}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Секрет API панели управления:${CLR_RESET}    ${CLR_NEON_GOLD}${MIHOMO_SECRET}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Госуслуги, банки и сервисы РФ:${CLR_RESET}   ${CLR_NEON_GREEN}100% ПРЯМОЙ ДОСТУП (DIRECT, без капч и задержек)${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Обход замедления (DPI Desync):${CLR_RESET}   ${CLR_NEON_GREEN}АКТИВЕН (TLS ClientHello Fragmentation -> DIRECT-DPI)${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Защита от перехвата и утечек:${CLR_RESET}    ${CLR_NEON_GREEN}АКТИВНА (nftables DNS Hijack -> порт 53)${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Автоматический TCP MSS Clamp:${CLR_RESET}    ${CLR_NEON_GREEN}АКТИВЕН (защита от зависания пакетов на MTU)${CLR_RESET}"
         if [ -n "${SELECTED_DOH_1:-}" ]; then
-            echo -e "  ${CLR_WHITE}• Быстрый DoH (HTTPS):${CLR_RESET}          ${CLR_GREEN}${SELECTED_DOH_1}${CLR_RESET}"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Скоростной DoH (HTTPS):${CLR_RESET}          ${CLR_NEON_CYAN}${SELECTED_DOH_1}${CLR_RESET}"
         fi
         if [ -n "${SELECTED_DOT_1:-}" ]; then
-            echo -e "  ${CLR_WHITE}• Быстрый DoT (TLS):${CLR_RESET}            ${CLR_GREEN}${SELECTED_DOT_1}${CLR_RESET}"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Защищенный DoT (TLS):${CLR_RESET}            ${CLR_NEON_CYAN}${SELECTED_DOT_1}${CLR_RESET}"
         fi
     else
-        echo -e "  ${CLR_MUTED}• Прозрачный шлюз отключен в конфигурации${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_MUTED}• Прозрачный сетевой шлюз отключен в конфигурации${CLR_RESET}"
     fi
-    echo -e "  ${CLR_CYAN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 
-    echo -e "  ${CLR_CYAN}${CLR_BOLD}╭── ВЕБ-СЕРВИСЫ И ОБЛАЧНЫЕ ПРИЛОЖЕНИЯ (HTTPS) ────────────────${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}╭── ВЕБ-СЕРВИСЫ И ОБЛАЧНЫЕ ПРИЛОЖЕНИЯ (HTTPS) ───────────────────────────────╮${CLR_RESET}"
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_WHITE}• Vaultwarden (Пароли):${CLR_RESET}         ${CLR_CYAN}https://${VAULT_DOMAIN}${CLR_RESET}"
-        echo -e "  ${CLR_WHITE}• Панель администратора:${CLR_RESET}        ${CLR_CYAN}https://${VAULT_DOMAIN}/admin${CLR_RESET}"
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Vaultwarden (Пароли):${CLR_RESET}            ${CLR_NEON_CYAN}https://${VAULT_DOMAIN}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Панель администратора:${CLR_RESET}           ${CLR_NEON_CYAN}https://${VAULT_DOMAIN}/admin${CLR_RESET}"
     fi
     if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_WHITE}• Gitea (Git-сервер):${CLR_RESET}        ${CLR_CYAN}https://${GITEA_DOMAIN}${CLR_RESET} ${CLR_MUTED}(SSH порт: 2222)${CLR_RESET}"
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Gitea (Git-сервер):${CLR_RESET}              ${CLR_NEON_CYAN}https://${GITEA_DOMAIN}${CLR_RESET} ${CLR_DIM}(SSH порт: 2222)${CLR_RESET}"
     fi
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_WHITE}• qBittorrent (VueTorrent):${CLR_RESET}     ${CLR_CYAN}https://${TORRENT_DOMAIN}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ qBittorrent (VueTorrent):${CLR_RESET}        ${CLR_NEON_CYAN}https://${TORRENT_DOMAIN}${CLR_RESET}"
     fi
     if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_WHITE}• MeTube (Медиа-загрузчик):${CLR_RESET}     ${CLR_CYAN}https://${METUBE_DOMAIN}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ MeTube (Медиа-загрузчик yt-dlp):${CLR_RESET} ${CLR_NEON_CYAN}https://${METUBE_DOMAIN}${CLR_RESET}"
     fi
-    echo -e "  ${CLR_WHITE}• Dozzle (Журналы логов WebUI):${CLR_RESET}   ${CLR_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_MUTED}(Auth: ${ADMIN_USER})${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Uptime Kuma (Мониторинг):${CLR_RESET}     ${CLR_CYAN}https://${STATUS_DOMAIN}${CLR_RESET}"
-    echo -e "  ${CLR_CYAN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Dozzle (Логи контейнеров):${CLR_RESET}       ${CLR_NEON_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_DIM}(Авторизация: ${ADMIN_USER})${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Uptime Kuma (Мониторинг):${CLR_RESET}        ${CLR_NEON_CYAN}https://${STATUS_DOMAIN}${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 
-    echo -e "  ${CLR_CYAN}${CLR_BOLD}╭── ЕДИНЫЕ УЧЕТНЫЕ ДАННЫЕ ────────────────────────────────────${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Имя администратора:${CLR_RESET}           ${CLR_GREEN}${ADMIN_USER}${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Единый мастер-пароль:${CLR_RESET}         ${CLR_GREEN}${MASTER_PASS}${CLR_RESET}"
+    echo -e "  ${CLR_NEON_GOLD}╭── ЕДИНЫЕ УЧЕТНЫЕ ДАННЫЕ И СЕКРЕТЫ ─────────────────────────────────────────╮${CLR_RESET}"
+    echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Имя администратора:${CLR_RESET}             ${CLR_NEON_GREEN}${ADMIN_USER}${CLR_RESET}"
+    echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Единый мастер-пароль:${CLR_RESET}           ${CLR_NEON_GREEN}${MASTER_PASS}${CLR_RESET}"
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_WHITE}• Токен Vaultwarden /admin:${CLR_RESET}     ${CLR_YELLOW}${VAULT_ADMIN_TOKEN}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Токен Vaultwarden /admin:${CLR_RESET}       ${CLR_NEON_GOLD}${VAULT_ADMIN_TOKEN}${CLR_RESET}"
     fi
     if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_WHITE}• Telegram-оповещения:${CLR_RESET}          ${CLR_GREEN}АКТИВНЫ (Chat ID: ${TELEGRAM_CHAT_ID})${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Telegram-оповещения:${CLR_RESET}            ${CLR_NEON_GREEN}АКТИВНЫ (Chat ID: ${TELEGRAM_CHAT_ID})${CLR_RESET}"
     fi
-    echo -e "  ${CLR_CYAN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+    echo -e "  ${CLR_NEON_GOLD}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 
     if [ "$SSL_MODE" = "1" ]; then
-        echo -e "  ${CLR_CYAN}${CLR_BOLD}╭── ДОВЕРИЕ СЕРТИФИКАТАМ (ROOT CA CERTIFICATE) ───────────────${CLR_RESET}"
-        echo -e "  ${CLR_WHITE}• Сертификат CA на сервере:${CLR_RESET}     ${CLR_YELLOW}${SAVE_DIR}/certificates/caddy-root.crt${CLR_RESET}"
-        printf "  ${CLR_WHITE}• Сетевой путь (SMB):${CLR_RESET}           ${CLR_YELLOW}\\\\\\\\%s\\\\%s\\\\certificates\\\\caddy-root.crt${CLR_RESET}\n" "${LOCAL_IP}" "${SHARE_NAME}"
-        echo -e "  ${CLR_MUTED}(Установите в 'Доверенные корневые центры' на ПК/смартфоне для зелёного замка)${CLR_RESET}"
-        echo -e "  ${CLR_CYAN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+        echo -e "  ${CLR_NEON_BLUE}╭── ДОВЕРИЕ СЕРТИФИКАТАМ (ROOT CA CERTIFICATE) ──────────────────────────────╮${CLR_RESET}"
+        echo -e "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_WHITE}🔒 Сертификат CA на сервере:${CLR_RESET}       ${CLR_NEON_GOLD}${SAVE_DIR}/certificates/caddy-root.crt${CLR_RESET}"
+        printf "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_WHITE}🔒 Сетевой путь (SMB):${CLR_RESET}             ${CLR_NEON_GOLD}\\\\\\\\%s\\\\%s\\\\certificates\\\\caddy-root.crt${CLR_RESET}\n" "${LOCAL_IP}" "${SHARE_NAME}"
+        echo -e "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_DIM}(Установите в 'Доверенные корневые центры' на клиентах для зелёного замка)${CLR_RESET}"
+        echo -e "  ${CLR_NEON_BLUE}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
         echo ""
     fi
 
     if [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_CYAN}${CLR_BOLD}╭── СЕТЕВОЕ ХРАНИЛИЩЕ SAMBA (WINDOWS / MAC / LINUX) ───────────${CLR_RESET}"
-        printf "  ${CLR_WHITE}• Сетевой адрес шары:${CLR_RESET}           ${CLR_GREEN}\\\\\\\\%s\\\\%s${CLR_RESET}\n" "${LOCAL_IP}" "${SHARE_NAME}"
-        echo -e "  ${CLR_WHITE}• Логин / Пароль:${CLR_RESET}               ${ADMIN_USER} / ${SAMBA_PASS}"
-        echo -e "  ${CLR_CYAN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+        echo -e "  ${CLR_NEON_BLUE}╭── СЕТЕВОЕ ХРАНИЛИЩЕ SAMBA (WINDOWS / MAC / LINUX) ─────────────────────────╮${CLR_RESET}"
+        printf "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_WHITE}📁 Сетевой адрес папки:${CLR_RESET}            ${CLR_NEON_GREEN}\\\\\\\\%s\\\\%s${CLR_RESET}\n" "${LOCAL_IP}" "${SHARE_NAME}"
+        echo -e "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_WHITE}📁 Учетная запись / Пароль:${CLR_RESET}        ${ADMIN_USER} / ${SAMBA_PASS}"
+        echo -e "  ${CLR_NEON_BLUE}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
         echo ""
     fi
 
-    if [ "$STORAGE_MODE" != "1" ]; then
-        echo -e "  ${CLR_CYAN}${CLR_BOLD}╭── ДИСКОВОЕ ХРАНИЛИЩЕ И РАЗДЕЛЫ ─────────────────────────────${CLR_RESET}"
-        echo -e "  ${CLR_WHITE}• Точка монтирования:${CLR_RESET}           ${MOUNT_ROOT}"
-        echo -e "  ${CLR_WHITE}• Каталог данных:${CLR_RESET}               ${SAVE_DIR}"
-        if [ "$STORAGE_MODE" = "4" ] || [ "$STORAGE_MODE" = "5" ]; then
-            echo -e "  ${CLR_WHITE}• Ручная разблокировка LUKS:${CLR_RESET}    sudo homelab-unlock"
-        fi
-        echo -e "  ${CLR_CYAN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
-        echo ""
+    local CUR_FS="${SAVE_FSTYPE:-${SAVED_SAVE_FSTYPE:-ext4}}"
+    echo -e "  ${CLR_NEON_PURPLE}╭── ДИСКОВОЕ ХРАНИЛИЩЕ И ОПТИМИЗАЦИЯ ────────────────────────────────────────╮${CLR_RESET}"
+    if [ "$STORAGE_MODE" = "1" ]; then
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}💾 Режим размещения:${CLR_RESET}              ${CLR_NEON_GREEN}Системный накопитель (OS Root Partition)${CLR_RESET}"
+    else
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}💾 Режим размещения:${CLR_RESET}              ${CLR_NEON_GREEN}Внешний накопитель (Точка монтирования: ${MOUNT_ROOT})${CLR_RESET}"
     fi
-
-    echo -e "  ${CLR_GREEN}${CLR_BOLD}╭── НАСТРОЙКА ДОМАШНЕГО РОУТЕРА (1 ДЕЙСТВИЕ ДЛЯ ВСЕХ УСТРОЙСТВ) ──────────┐${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}В параметрах DHCP вашего роутера укажите:${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Первичный DNS-сервер:${CLR_RESET}         ${CLR_GREEN}${LOCAL_IP}${CLR_RESET}"
-    if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_WHITE}• Основной шлюз (Gateway):${CLR_RESET}      ${CLR_GREEN}${LOCAL_IP}${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}💾 Каталог данных стека:${CLR_RESET}          ${CLR_NEON_CYAN}${SAVE_DIR}${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}💾 Файловая система:${CLR_RESET}              ${CLR_NEON_GOLD}${CUR_FS^^}${CLR_RESET}"
+    if [ "${CUR_FS}" = "btrfs" ]; then
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}💾 Оптимизация фрагментации:${CLR_RESET}      ${CLR_NEON_GREEN}No-COW активен (chattr +C для SQLite БД и торрентов)${CLR_RESET}"
+    else
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}💾 Оптимизация фрагментации:${CLR_RESET}      ${CLR_NEON_GREEN}Прямая in-place запись (CoW-фрагментация исключена архитектурно)${CLR_RESET}"
     fi
-    echo -e "  ${CLR_MUTED}После этого все смартфоны, ПК и Smart TV в сети сразу получат фильтрацию${CLR_RESET}"
-    echo -e "  ${CLR_MUTED}рекламы, доступ к локальным *.lan доменам и интеллектуальную маршрутизацию!${CLR_RESET}"
-    echo -e "  ${CLR_GREEN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+    if [ "$STORAGE_MODE" = "4" ] || [ "$STORAGE_MODE" = "5" ]; then
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}💾 Ручная разблокировка LUKS:${CLR_RESET}     ${CLR_NEON_GOLD}sudo homelab-unlock${CLR_RESET}"
+    fi
+    echo -e "  ${CLR_NEON_PURPLE}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 
-    local RESTART_CMD="sudo systemctl restart homelab.service"
-    [ "${INIT_SYSTEM}" = "openrc" ] && RESTART_CMD="sudo rc-service homelab restart"
+    echo -e "  ${CLR_NEON_GREEN}╭── НАСТРОЙКА ДОМАШНЕГО РОУТЕРА (1 ДЕЙСТВИЕ ДЛЯ ВСЕЙ СЕТИ) ──────────────────╮${CLR_RESET}"
+    echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}В параметрах DHCP вашего роутера укажите:${CLR_RESET}"
+    echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}• Первичный DNS-сервер:${CLR_RESET}            ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET}"
+    if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}• Основной шлюз (Gateway):${CLR_RESET}         ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET}"
+    fi
+    echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_DIM}После этого все смартфоны, ПК и Smart TV в сети сразу получат фильтрацию${CLR_RESET}"
+    echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_DIM}рекламы, доступ к локальным *.lan доменам и интеллектуальную маршрутизацию!${CLR_RESET}"
+    echo -e "  ${CLR_NEON_GREEN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
+    echo ""
 
-    echo -e "  ${CLR_CYAN}${CLR_BOLD}╭── ЕДИНАЯ КОНСОЛЬНАЯ УТИЛИТА УПРАВЛЕНИЯ (HOMELAB CLI) ────────${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Дашборд и статус сервисов:${CLR_RESET}   ${CLR_GREEN}homelab status${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Самодиагностика DNS/TUN/NAT:${CLR_RESET} ${CLR_GREEN}homelab doctor${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Просмотр логов контейнеров:${CLR_RESET}  ${CLR_GREEN}homelab logs [сервис] -f${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Экспорт всех логов в файл:${CLR_RESET}   ${CLR_GREEN}homelab dump-logs${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Перезапуск стека/сервиса:${CLR_RESET}    ${CLR_GREEN}homelab restart [сервис]${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Создание горячего бэкапа:${CLR_RESET}    ${CLR_GREEN}homelab backup${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Отправка теста в Telegram:${CLR_RESET}   ${CLR_GREEN}homelab notify [текст]${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Безопасное обновление стека:${CLR_RESET} ${CLR_GREEN}homelab update${CLR_RESET}"
-    echo -e "  ${CLR_CYAN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}╭── ЕДИНАЯ КОНСОЛЬНАЯ УТИЛИТА УПРАВЛЕНИЯ (HOMELAB CLI) ───────────────────────╮${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Статус и дашборд:${CLR_RESET}            ${CLR_NEON_GREEN}homelab status${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Полная самодиагностика:${CLR_RESET}      ${CLR_NEON_GREEN}homelab doctor${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журналы сервисов в реалтайме:${CLR_RESET} ${CLR_NEON_GREEN}homelab logs [сервис] -f${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Экспорт всех логов в файл:${CLR_RESET}   ${CLR_NEON_GREEN}homelab dump-logs${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Перезапуск стека/сервиса:${CLR_RESET}    ${CLR_NEON_GREEN}homelab restart [сервис]${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Горячий бэкап баз данных:${CLR_RESET}    ${CLR_NEON_GREEN}homelab backup${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Тестовое оповещение в TG:${CLR_RESET}    ${CLR_NEON_GREEN}homelab notify [текст]${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Безопасный апдейт образов:${CLR_RESET}   ${CLR_NEON_GREEN}homelab update${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 }
 
