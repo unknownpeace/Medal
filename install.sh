@@ -2056,7 +2056,7 @@ EOF_WD_TMR
             fi
             touch /etc/crontabs/cron.update 2>/dev/null || true
             rc-update add crond default >/dev/null 2>&1 || true
-            rc-service crond start >/dev/null 2>&1 || rc-service crond restart >/dev/null 2>&1 || true
+            rc-service crond status >/dev/null 2>&1 || rc-service crond start >/dev/null 2>&1 || true
         fi
     fi
 
@@ -2812,7 +2812,8 @@ ${BOOTSTRAP_YAML_LINES}
   use_private_ptr_resolvers: true
   local_ptr_upstreams:
 ${PTR_UPSTREAMS_YAML}
-  cache_size: 0
+  cache_size: 4194304
+  cache_enabled: false
   cache_ttl_min: 0
   cache_ttl_max: 0
   cache_optimistic: false
@@ -3738,7 +3739,7 @@ EOF_COMPOSE
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 30s
+      start_period: 60s
     labels:
       - "autoheal=true"
 
@@ -4027,7 +4028,7 @@ EOF_BKP_TMR
             fi
             touch /etc/crontabs/cron.update 2>/dev/null || true
             rc-update add crond default >/dev/null 2>&1 || true
-            rc-service crond start >/dev/null 2>&1 || rc-service crond restart >/dev/null 2>&1 || true
+            rc-service crond status >/dev/null 2>&1 || rc-service crond start >/dev/null 2>&1 || true
         fi
     fi
 
@@ -4097,7 +4098,7 @@ EOF_GITEA_BKP_TMR
             fi
             touch /etc/crontabs/cron.update 2>/dev/null || true
             rc-update add crond default >/dev/null 2>&1 || true
-            rc-service crond start >/dev/null 2>&1 || rc-service crond restart >/dev/null 2>&1 || true
+            rc-service crond status >/dev/null 2>&1 || rc-service crond start >/dev/null 2>&1 || true
         fi
     fi
 
@@ -4418,7 +4419,7 @@ cmd_doctor() {
             echo -e "  ${TAG_WARN} Перехват DNS в LAN (DNS Hijack):         ${CLR_YELLOW}[НЕ НАСТРОЕН]${CLR_RESET}"
         fi
 
-        if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -q 'maxseg size set rt mtu'; then
+        if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -E -q 'maxseg|tcp option maxseg'; then
             echo -e "  ${TAG_OK} Оптимизация MTU (TCP MSS Clamping):      ${CLR_GREEN}[АКТИВНА (защита от дропов)]${CLR_RESET}"
         else
             echo -e "  ${TAG_WARN} Оптимизация MTU (TCP MSS Clamping):      ${CLR_YELLOW}[НЕ НАСТРОЕНА]${CLR_RESET}"
@@ -4428,7 +4429,7 @@ cmd_doctor() {
             echo -e "  ${TAG_OK} Прокси-подписка (VLESS/Trojan/SS):        ${CLR_GREEN}[АКТИВНА (my-sub -> AUTO/PROXY)]${CLR_RESET}"
         fi
 
-        if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -q 'priority -10'; then
+        if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -E -q 'priority.*- ?10|hook forward'; then
             echo -e "  ${TAG_OK} Пересылка трафика LAN/TUN (nftables FORWARD): ${CLR_GREEN}[АКТИВНА (priority -10)]${CLR_RESET}"
         else
             echo -e "  ${TAG_WARN} Пересылка трафика LAN/TUN (nftables FORWARD): ${CLR_YELLOW}[ПРОВЕРЬТЕ NFTABLES]${CLR_RESET}"
@@ -4438,8 +4439,8 @@ cmd_doctor() {
             echo -e "  ${TAG_OK} Доступность сети Android (Captive Portal 204):   ${CLR_GREEN}[АКТИВНА (DIRECT)]${CLR_RESET}"
         fi
 
-        if [ -f /opt/homelab/adguard/conf/AdGuardHome.yaml ] && grep -q 'cache_size: 0' /opt/homelab/adguard/conf/AdGuardHome.yaml 2>/dev/null; then
-            echo -e "  ${TAG_OK} Синхронизация Fake-IP (AdGuard Cache 0):   ${CLR_GREEN}[АКТИВНА (кэш отключен, нет рассинхрона)]${CLR_RESET}"
+        if [ -f /opt/homelab/adguard/conf/AdGuardHome.yaml ] && grep -E -q 'cache_enabled: false|cache_size: 0' /opt/homelab/adguard/conf/AdGuardHome.yaml 2>/dev/null; then
+            echo -e "  ${TAG_OK} Синхронизация Fake-IP (AdGuard Cache Off):   ${CLR_GREEN}[АКТИВНА (кэш отключен, нет рассинхрона)]${CLR_RESET}"
         fi
 
         if [ -f /opt/homelab/adguard/conf/AdGuardHome.yaml ] && grep -q 'anonymize_client_ip: false' /opt/homelab/adguard/conf/AdGuardHome.yaml 2>/dev/null; then
