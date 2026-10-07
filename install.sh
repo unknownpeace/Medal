@@ -2780,6 +2780,12 @@ configure_gateway_services() {
     - domain: ${METUBE_DOMAIN}
       answer: ${LOCAL_IP}"
 
+        local PTR_UPSTREAMS_YAML="    - 127.0.0.1:1053"
+        if [ -n "${ROUTER_GATEWAY:-}" ] && [ "${ROUTER_GATEWAY}" != "127.0.0.1" ]; then
+            PTR_UPSTREAMS_YAML="    - ${ROUTER_GATEWAY}
+    - 127.0.0.1:1053"
+        fi
+
         cat <<EOF_AGH > "${APP_DIR}/adguard/conf/AdGuardHome.yaml"
 schema_version: 34
 http:
@@ -2797,7 +2803,7 @@ dns:
     - 0.0.0.0
   port: 53
   block_ipv6: true
-  anonymize_client_ip: true
+  anonymize_client_ip: false
   ratelimit: 0
   refuse_any: true
   upstream_dns:
@@ -2812,19 +2818,28 @@ ${BOOTSTRAP_YAML_LINES}
   upstream_mode: load_balance
   use_private_ptr_resolvers: true
   local_ptr_upstreams:
-    - 127.0.0.1:1053
-  cache_size: 8388608
-  cache_ttl_min: 60
-  cache_ttl_max: 86400
-  cache_optimistic: true
+${PTR_UPSTREAMS_YAML}
+  cache_size: 0
+  cache_ttl_min: 0
+  cache_ttl_max: 0
+  cache_optimistic: false
   enable_dnssec: false
 querylog:
   enabled: true
+  file_enabled: true
   interval: 24h
-  anonymize_client_ip: true
+  size_memory: 1000
+  anonymize_client_ip: false
 stats:
   enabled: true
   interval: 24h
+clients:
+  runtime_sources:
+    whois: true
+    arp: true
+    rdns: true
+    dhcp: true
+    hosts: true
 filtering:
   filtering_enabled: true
   protection_enabled: true
@@ -3109,6 +3124,8 @@ dns:
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
   respect-rules: true
+  store-fake-ip: true
+  cache-algorithm: arc
   fake-ip-filter:
     - "+.lan"
     - "+.local"
@@ -4468,6 +4485,14 @@ cmd_doctor() {
 
         if [ -f /opt/homelab/mihomo/config.yaml ] && grep -q 'connectivitycheck' /opt/homelab/mihomo/config.yaml 2>/dev/null; then
             echo -e "  ${TAG_OK} Доступность сети Android (Captive Portal 204):   ${CLR_GREEN}[АКТИВНА (DIRECT)]${CLR_RESET}"
+        fi
+
+        if [ -f /opt/homelab/adguard/conf/AdGuardHome.yaml ] && grep -q 'cache_size: 0' /opt/homelab/adguard/conf/AdGuardHome.yaml 2>/dev/null; then
+            echo -e "  ${TAG_OK} Синхронизация Fake-IP (AdGuard Cache 0):   ${CLR_GREEN}[АКТИВНА (кэш отключен, нет рассинхрона)]${CLR_RESET}"
+        fi
+
+        if [ -f /opt/homelab/adguard/conf/AdGuardHome.yaml ] && grep -q 'anonymize_client_ip: false' /opt/homelab/adguard/conf/AdGuardHome.yaml 2>/dev/null; then
+            echo -e "  ${TAG_OK} Идентификация клиентов LAN (AdGuard):     ${CLR_GREEN}[АКТИВНА (полные IP и имена устройств)]${CLR_RESET}"
         fi
     fi
 
