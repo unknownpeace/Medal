@@ -365,6 +365,10 @@ load_previous_config() {
         [ -n "${SAVED_SELECTED_BOOTSTRAP_IPS:-}" ] && SELECTED_BOOTSTRAP_IPS="${SAVED_SELECTED_BOOTSTRAP_IPS}"
         [ -n "${SAVED_SELECTED_BOOTSTRAP_IP_1:-}" ] && SELECTED_BOOTSTRAP_IP_1="${SAVED_SELECTED_BOOTSTRAP_IP_1}"
         [ -n "${SAVED_LOGS_DOMAIN:-}" ] && LOGS_DOMAIN="${SAVED_LOGS_DOMAIN}"
+        [ -n "${SAVED_STATUS_DOMAIN:-}" ] && STATUS_DOMAIN="${SAVED_STATUS_DOMAIN}"
+        [ -n "${SAVED_ENABLE_TELEGRAM:-}" ] && ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM}"
+        [ -n "${SAVED_TELEGRAM_BOT_TOKEN:-}" ] && TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN}"
+        [ -n "${SAVED_TELEGRAM_CHAT_ID:-}" ] && TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID}"
     fi
 }
 
@@ -1050,8 +1054,8 @@ prompt_configuration() {
         if [ -d "${APP_DIR}" ]; then
             (cd "${APP_DIR}" && dc down --remove-orphans 2>/dev/null || true)
         fi
-        docker stop adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle watchtower autoheal 2>/dev/null || true
-        docker rm -f adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle watchtower autoheal 2>/dev/null || true
+        docker stop adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle uptime-kuma watchtower autoheal 2>/dev/null || true
+        docker rm -f adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle uptime-kuma watchtower autoheal 2>/dev/null || true
 
         log_info "Очистка служебных файлов и конфигураций..."
         local BACKUP_CERTS="/tmp/caddy_certificates_backup_$$"
@@ -1061,7 +1065,7 @@ prompt_configuration() {
             cp -r "${APP_DIR}/caddy/data/caddy/certificates" "${BACKUP_CERTS}" 2>/dev/null || true
         fi
 
-        rm -rf "${APP_DIR}/adguard" "${APP_DIR}/mihomo" "${APP_DIR}/caddy" "${APP_DIR}/metube" "${APP_DIR}/vaultwarden" "${APP_DIR}/gitea" "${APP_DIR}/qbittorrent" "${ENV_FILE}"
+        rm -rf "${APP_DIR}/adguard" "${APP_DIR}/mihomo" "${APP_DIR}/caddy" "${APP_DIR}/metube" "${APP_DIR}/vaultwarden" "${APP_DIR}/gitea" "${APP_DIR}/qbittorrent" "${APP_DIR}/uptime-kuma" "${ENV_FILE}"
 
         if [ -d "${BACKUP_CERTS}" ]; then
             mkdir -p "${APP_DIR}/caddy/data/caddy"
@@ -1070,7 +1074,7 @@ prompt_configuration() {
             log_ok "SSL-сертификаты успешно сохранены для последующего использования"
         fi
 
-        rm -f /usr/local/bin/gateway-watchdog.sh /usr/local/bin/homelab-unlock /usr/local/bin/homelab
+        rm -f /usr/local/bin/gateway-watchdog.sh /usr/local/bin/homelab-unlock /usr/local/bin/homelab /usr/local/bin/homelab-notify
         rm -f /opt/homelab/diagnostic_report.log
         local USER_HOME
         USER_HOME=$(eval echo ~"${TARGET_USER}" 2>/dev/null || echo "/home/${TARGET_USER}")
@@ -1159,6 +1163,10 @@ prompt_configuration() {
         METUBE_DOMAIN="metube.lan"
         PROXY_DOMAIN="proxy.lan"
         LOGS_DOMAIN="logs.lan"
+        STATUS_DOMAIN="status.lan"
+        ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM:-N}"
+        TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
+        TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
     else
         echo -e "  ${CLR_CYAN}--- Настройка дискового хранилища ---${CLR_RESET}"
         echo "    1) Системный диск [Enter]"
@@ -1437,6 +1445,7 @@ EOF_UNLOCK
             METUBE_DOMAIN="metube.${BASE_DOMAIN}"
             PROXY_DOMAIN="proxy.${BASE_DOMAIN}"
             LOGS_DOMAIN="logs.${BASE_DOMAIN}"
+            STATUS_DOMAIN="status.${BASE_DOMAIN}"
 
             log_info "Синхронизация DuckDNS DNS-записи (${BASE_DOMAIN} -> ${LOCAL_IP})..."
             curl -fsSL -m 10 "https://www.duckdns.org/update?domains=${DUCKDNS_NAME}&token=${DUCKDNS_TOKEN}&ip=${LOCAL_IP}" >/dev/null 2>&1 || true
@@ -1452,6 +1461,7 @@ EOF_UNLOCK
             METUBE_DOMAIN="metube.lan"
             PROXY_DOMAIN="proxy.lan"
             LOGS_DOMAIN="logs.lan"
+            STATUS_DOMAIN="status.lan"
         fi
 
         SUB_URL="${SAVED_SUB_URL:-none}"
@@ -1495,6 +1505,27 @@ EOF_UNLOCK
         else
             VAULT_ADMIN_TOKEN="${SAVED_VAULT_ADMIN_TOKEN:-${MASTER_PASS}}"
         fi
+
+        echo ""
+        echo -e "  ${CLR_CYAN}--- Telegram-оповещения (Сбои и Бэкапы) ---${CLR_RESET}"
+        read -rp "  [?] Настроить Telegram-оповещения? [y/N] [${SAVED_ENABLE_TELEGRAM:-N}]: " INPUT_ENABLE_TG || true
+        ENABLE_TELEGRAM=${INPUT_ENABLE_TG:-${SAVED_ENABLE_TELEGRAM:-N}}
+        if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
+            read -rp "  [?] Telegram Bot Token [${SAVED_TELEGRAM_BOT_TOKEN:-}]: " INPUT_TG_TOKEN || true
+            TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-${SAVED_TELEGRAM_BOT_TOKEN:-}}
+            read -rp "  [?] Telegram Chat ID [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT || true
+            TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-${SAVED_TELEGRAM_CHAT_ID:-}}
+            if [ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]; then
+                log_ok "Telegram-оповещения настроены"
+            else
+                log_warn "Токен или Chat ID не заполнены, оповещения отключены"
+                ENABLE_TELEGRAM="N"
+            fi
+        else
+            ENABLE_TELEGRAM="N"
+            TELEGRAM_BOT_TOKEN=""
+            TELEGRAM_CHAT_ID=""
+        fi
     fi
 
     SHARE_NAME=$(basename "${SAVE_DIR}" | tr -cd '[:alnum:]_-')
@@ -1509,10 +1540,12 @@ EOF_UNLOCK
         VAULT_DATA_DIR="${SAVE_DIR}/services/vaultwarden"
         GITEA_DATA_DIR="${SAVE_DIR}/services/gitea"
         ADGUARD_WORK_DIR="${SAVE_DIR}/services/adguard_work"
+        UPTIME_DATA_DIR="${SAVE_DIR}/services/uptime-kuma"
     else
         VAULT_DATA_DIR="${APP_DIR}/vaultwarden"
         GITEA_DATA_DIR="${APP_DIR}/gitea"
         ADGUARD_WORK_DIR="${APP_DIR}/adguard/work"
+        UPTIME_DATA_DIR="${APP_DIR}/uptime-kuma"
     fi
 
     mkdir -p "${APP_DIR}"
@@ -1543,6 +1576,7 @@ EOF_UNLOCK
         printf "SAVED_VAULT_DATA_DIR=%q\n" "${VAULT_DATA_DIR}"
         printf "SAVED_GITEA_DATA_DIR=%q\n" "${GITEA_DATA_DIR}"
         printf "SAVED_ADGUARD_WORK_DIR=%q\n" "${ADGUARD_WORK_DIR}"
+        printf "SAVED_UPTIME_DATA_DIR=%q\n" "${UPTIME_DATA_DIR}"
         printf "SAVED_INIT_SYSTEM=%q\n" "${INIT_SYSTEM}"
         printf "SAVED_SELECTED_DOH_1=%q\n" "${SELECTED_DOH_1}"
         printf "SAVED_SELECTED_DOH_2=%q\n" "${SELECTED_DOH_2}"
@@ -1552,6 +1586,10 @@ EOF_UNLOCK
         printf "SAVED_SELECTED_BOOTSTRAP_IPS=%q\n" "${SELECTED_BOOTSTRAP_IPS}"
         printf "SAVED_SELECTED_BOOTSTRAP_IP_1=%q\n" "${SELECTED_BOOTSTRAP_IP_1}"
         printf "SAVED_LOGS_DOMAIN=%q\n" "${LOGS_DOMAIN}"
+        printf "SAVED_STATUS_DOMAIN=%q\n" "${STATUS_DOMAIN}"
+        printf "SAVED_ENABLE_TELEGRAM=%q\n" "${ENABLE_TELEGRAM}"
+        printf "SAVED_TELEGRAM_BOT_TOKEN=%q\n" "${TELEGRAM_BOT_TOKEN}"
+        printf "SAVED_TELEGRAM_CHAT_ID=%q\n" "${TELEGRAM_CHAT_ID}"
     } > "${ENV_FILE}"
     chmod 600 "${ENV_FILE}"
     chown root:root "${ENV_FILE}" 2>/dev/null || true
@@ -1608,6 +1646,7 @@ sys.exit(1)
     else
         log_ok "Bcrypt-хэш для AdGuard Home успешно сформирован"
     fi
+    AGH_HASH_CADDY="${AGH_HASH//\$/\\\$}"
 
     VAULT_ADMIN_HASH_ESCAPED=""
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
@@ -1798,6 +1837,7 @@ if [ -n "$ROUTER_IP" ] && [ "$ROUTER_IP" != "$SERVER_IP" ] && [[ "$ROUTER_IP" =~
     if [ "$CURRENT_MAIN_GW" = "$SERVER_IP" ] || [ -z "$CURRENT_MAIN_GW" ]; then
         logger -t gateway-watchdog "Восстановление корректного маршрута default через ${ROUTER_IP} на ${IFACE}" 2>/dev/null || true
         ip route replace default via "$ROUTER_IP" dev "$IFACE" metric 100 2>/dev/null || true
+        /usr/local/bin/homelab-notify "Шлюз и маршрутизация" "Восстановлен корректный маршрут default через ${ROUTER_IP} на ${IFACE}" "WARN" 2>/dev/null || true
     fi
 fi
 
@@ -1890,7 +1930,7 @@ EOF_WD_TMR
     fi
 
     log_info "Регистрация локальных доменов в /etc/hosts..."
-    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${METUBE_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}"; do
+    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${METUBE_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}" "${STATUS_DOMAIN}"; do
         if [ -n "${DOMAIN}" ]; then
             local ESCAPED_DOMAIN
             ESCAPED_DOMAIN=$(printf '%s\n' "${DOMAIN}" | sed -e 's/[]\/$*.^[]/\\&/g')
@@ -1901,15 +1941,59 @@ EOF_WD_TMR
             fi
         fi
     done
-    log_ok "Сетевой стек и сторож маршрутизации настроены"
+
+    log_info "Настройка сервиса системных оповещений (homelab-notify)..."
+    cat << 'EOF_NOTIFY' > /usr/local/bin/homelab-notify
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -f /opt/homelab/.env ]; then
+    # shellcheck disable=SC1091
+    source /opt/homelab/.env
+fi
+
+TG_ENABLED="${SAVED_ENABLE_TELEGRAM:-N}"
+BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
+CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
+
+if [[ ! "$TG_ENABLED" =~ ^[Yy]$ ]] || [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
+    exit 0
+fi
+
+TITLE="${1:-Оповещение Homelab}"
+MESSAGE="${2:-}"
+SEVERITY="${3:-INFO}"
+
+EMOJI="ℹ️"
+[ "$SEVERITY" = "OK" ] && EMOJI="✅"
+[ "$SEVERITY" = "WARN" ] && EMOJI="⚠️"
+[ "$SEVERITY" = "CRIT" ] && EMOJI="🚨"
+
+HOST_NAME=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "homelab")
+TIME_NOW=$(date '+%Y-%m-%d %H:%M:%S')
+
+TEXT="${EMOJI} *[${SEVERITY}] ${TITLE}*
+🖥 *Хост:* \`${HOST_NAME}\`
+⏱ *Время:* \`${TIME_NOW}\`
+
+${MESSAGE}"
+
+curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+    -d "chat_id=${CHAT_ID}" \
+    -d "text=${TEXT}" \
+    -d "parse_mode=Markdown" >/dev/null 2>&1 || true
+EOF_NOTIFY
+    chmod 755 /usr/local/bin/homelab-notify
+
+    log_ok "Сетевой стек, сторож маршрутизации и служба оповещений настроены"
 }
 
 setup_directories() {
     print_step_header "06/11" "СТРУКТУРА КАТАЛОГОВ И BTRFS NO-COW"
 
     mkdir -p "${APP_DIR}/caddy/data" "${APP_DIR}/caddy/config"
-    mkdir -p "${SAVE_DIR}/certificates" "${SAVE_DIR}/backups/vaultwarden" "${SAVE_DIR}/backups/gitea"
-    mkdir -p "${VAULT_DATA_DIR}" "${GITEA_DATA_DIR}" "${ADGUARD_WORK_DIR}"
+    mkdir -p "${SAVE_DIR}/certificates" "${SAVE_DIR}/backups/vaultwarden" "${SAVE_DIR}/backups/gitea" "${SAVE_DIR}/backups/uptime-kuma"
+    mkdir -p "${VAULT_DATA_DIR}" "${GITEA_DATA_DIR}" "${ADGUARD_WORK_DIR}" "${UPTIME_DATA_DIR}"
     chown -R "${USER_UID}:${USER_GID}" "${GITEA_DATA_DIR}" 2>/dev/null || true
 
     apply_nocow_helper() {
@@ -1923,6 +2007,7 @@ setup_directories() {
     apply_nocow_helper "${ADGUARD_WORK_DIR}"
     apply_nocow_helper "${VAULT_DATA_DIR}"
     apply_nocow_helper "${GITEA_DATA_DIR}"
+    apply_nocow_helper "${UPTIME_DATA_DIR}"
     mkdir -p "${APP_DIR}/adguard/conf" 
 
     if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
@@ -2526,6 +2611,8 @@ configure_gateway_services() {
     - domain: ${PROXY_DOMAIN}
       answer: ${LOCAL_IP}
     - domain: ${LOGS_DOMAIN}
+      answer: ${LOCAL_IP}
+    - domain: ${STATUS_DOMAIN}
       answer: ${LOCAL_IP}"
         [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${TORRENT_DOMAIN}
@@ -3218,7 +3305,17 @@ EOF_CADDY
         cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @logs host ${LOGS_DOMAIN}
     handle @logs {
-        reverse_proxy dozzle:8080
+        basic_auth {
+            ${ADMIN_USER} ${AGH_HASH_CADDY}
+        }
+        reverse_proxy dozzle:8080 {
+            header_up Remote-User {http.auth.user.id}
+        }
+    }
+
+    @status host ${STATUS_DOMAIN}
+    handle @status {
+        reverse_proxy uptime-kuma:3001
     }
 EOF_CADDY
         echo "}" >> "${APP_DIR}/caddy/Caddyfile"
@@ -3302,7 +3399,19 @@ ${LOGS_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy dozzle:8080
+    basic_auth {
+        ${ADMIN_USER} ${AGH_HASH_CADDY}
+    }
+    reverse_proxy dozzle:8080 {
+        header_up Remote-User {http.auth.user.id}
+    }
+}
+
+${STATUS_DOMAIN} {
+    tls internal
+    import security_headers
+    encode zstd gzip
+    reverse_proxy uptime-kuma:3001
 }
 EOF_CADDY
     fi
@@ -3584,12 +3693,28 @@ EOF_COMPOSE
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - "DOZZLE_NO_ANALYTICS=true"
+      - "DOZZLE_AUTH_PROVIDER=forward-proxy"
     healthcheck:
       test: ["CMD", "/dozzle", "healthcheck"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+    labels:
+      - "autoheal=true"
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    volumes:
+      - ${UPTIME_DATA_DIR}:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "node /app/extra/healthcheck.js || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     labels:
       - "autoheal=true"
 EOF_COMPOSE
@@ -3696,6 +3821,8 @@ if [ -f "${DB_SRC}" ]; then
     chmod 700 "${BACKUP_DIR}" 2>/dev/null || true
     chown -R "${SAVED_TARGET_USER:-root}:${USER_GID:-0}" "${BACKUP_DIR}" 2>/dev/null || true
     find "${BACKUP_DIR}" -type f -name "vaultwarden_backup_*.tar.gz" -mtime +14 -delete 2>/dev/null || true
+    BKP_SIZE=$(du -h "${BACKUP_DIR}/vaultwarden_backup_${DATE_TAG}.tar.gz" 2>/dev/null | awk '{print $1}')
+    /usr/local/bin/homelab-notify "Резервное копирование" "Успешно создан ночной бэкап Vaultwarden (${BKP_SIZE})" "OK" 2>/dev/null || true
 fi
 EOF_BACKUP
         chmod 750 "${APP_DIR}/backup_vaultwarden.sh"
@@ -3764,6 +3891,8 @@ if docker inspect -f '{{.State.Status}}' gitea 2>/dev/null | grep -q "running"; 
     chmod 640 "${BACKUP_DIR}"/gitea_backup_*.zip 2>/dev/null || true
     chmod 750 "${BACKUP_DIR}" 2>/dev/null || true
     find "${BACKUP_DIR}" -type f -name "gitea_backup_*.zip" -mtime +14 -delete 2>/dev/null || true
+    BKP_SIZE=$(du -h "${BACKUP_DIR}/${DUMP_NAME}" 2>/dev/null | awk '{print $1}')
+    /usr/local/bin/homelab-notify "Резервное копирование" "Успешно создан ночной бэкап Gitea (${BKP_SIZE})" "OK" 2>/dev/null || true
 fi
 EOF_GITEA_BKP
         chmod 750 "${APP_DIR}/backup_gitea.sh"
@@ -3932,7 +4061,7 @@ cmd_status() {
     printf "  %-18s %-12s %-14s %-10s\n" "СЕРВИС" "СТАТУС" "ЗДОРОВЬЕ" "ПАМЯТЬ"
     echo -e "  ─────────────────────────────────────────────────────────────"
     
-    local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "metube" "samba" "dozzle" "watchtower" "autoheal")
+    local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "metube" "samba" "dozzle" "uptime-kuma" "watchtower" "autoheal")
     for c in "${CONTAINERS[@]}"; do
         if docker inspect "$c" >/dev/null 2>&1; then
             local state
@@ -3992,9 +4121,24 @@ cmd_backup() {
         "${APP_DIR}/backup_gitea.sh"
         echo -e "  ${TAG_OK} Бэкап Gitea завершен"
     fi
+    local KUMA_DIR="${SAVED_UPTIME_DATA_DIR:-${APP_DIR}/uptime-kuma}"
+    if [ -f "${KUMA_DIR}/kuma.db" ]; then
+        echo -e "  ${TAG_INFO} Бэкап базы данных Uptime Kuma (SQLite3)..."
+        local DATE_TAG=$(date +"%Y%m%d_%H%M%S")
+        mkdir -p "${SAVED_SAVE_DIR:-/opt/homelab/save}/backups/uptime-kuma"
+        local KUMA_BKP="${SAVED_SAVE_DIR:-/opt/homelab/save}/backups/uptime-kuma/kuma_backup_${DATE_TAG}.db"
+        if ! sqlite3 "${KUMA_DIR}/kuma.db" ".backup '${KUMA_BKP}'" 2>/dev/null; then
+            cp -f "${KUMA_DIR}/kuma.db" "${KUMA_BKP}" 2>/dev/null || true
+        fi
+        gzip -f "${KUMA_BKP}" 2>/dev/null || true
+        find "${SAVED_SAVE_DIR:-/opt/homelab/save}/backups/uptime-kuma" -type f -name "kuma_backup_*.db.gz" -mtime +14 -delete 2>/dev/null || true
+        local KUMA_SIZE=$(du -h "${KUMA_BKP}.gz" 2>/dev/null | awk '{print $1}')
+        /usr/local/bin/homelab-notify "Резервное копирование" "Успешно создан бэкап Uptime Kuma (${KUMA_SIZE})" "OK" 2>/dev/null || true
+        echo -e "  ${TAG_OK} Бэкап Uptime Kuma завершен"
+    fi
     echo ""
     echo -e "  ${CLR_CYAN}Файлы бэкапов в хранилище (${SAVED_SAVE_DIR:-/opt/homelab/save}/backups):${CLR_RESET}"
-    find "${SAVED_SAVE_DIR:-/opt/homelab/save}/backups" -type f \( -name "*.tar.gz" -o -name "*.zip" \) 2>/dev/null | while read -r f; do
+    find "${SAVED_SAVE_DIR:-/opt/homelab/save}/backups" -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.db.gz" \) 2>/dev/null | while read -r f; do
         printf "    ${CLR_GREEN}•${CLR_RESET} %-45s ${CLR_YELLOW}[%s]${CLR_RESET}\n" "$(basename "$f")" "$(du -h "$f" 2>/dev/null | awk '{print $1}')"
     done
 }
@@ -4063,6 +4207,16 @@ cmd_update() {
     echo -e "  ${TAG_OK} Стек Homelab успешно обновлен до последних версий!"
 }
 
+cmd_notify() {
+    local msg="${1:-Тестовое уведомление из консоли Homelab CLI}"
+    echo -e "  ${TAG_INFO} Отправка уведомления в Telegram..."
+    if /usr/local/bin/homelab-notify "Тест Homelab CLI" "$msg" "INFO"; then
+        echo -e "  ${TAG_OK} Команда отправки выполнена"
+    else
+        echo -e "  ${TAG_ERR} Сбой отправки (проверьте параметры Telegram в /opt/homelab/.env)"
+    fi
+}
+
 cmd_help() {
     echo -e "${CLR_CYAN}${CLR_BOLD}Утилита управления комплексом Homelab & Transparent Gateway${CLR_RESET}"
     echo ""
@@ -4076,6 +4230,7 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}logs [сервис] [-f]${CLR_RESET}  Просмотр журналов логов (с ключом -f для реалтайма)"
     echo -e "  ${CLR_WHITE}doctor${CLR_RESET}              Комплексная самодиагностика DNS, TUN, NAT и прав"
     echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
+    echo -e "  ${CLR_WHITE}notify [текст]${CLR_RESET}      Отправить тестовое оповещение в Telegram"
     echo -e "  ${CLR_WHITE}update${CLR_RESET}              Обновление всех Docker-образов стека"
     echo -e "  ${CLR_WHITE}unlock${CLR_RESET}              Ручная разблокировка шифрованного диска LUKS"
     echo -e "  ${CLR_WHITE}help${CLR_RESET}                Показать эту справку"
@@ -4090,6 +4245,7 @@ case "${1:-status}" in
     logs) shift; cmd_logs "$@" ;;
     backup) cmd_backup ;;
     doctor|check) cmd_doctor ;;
+    notify|test-notify) shift; cmd_notify "$@" ;;
     update) cmd_update ;;
     unlock)
         if [ -x /usr/local/bin/homelab-unlock ]; then
@@ -4156,6 +4312,7 @@ EOF_DIAG
     [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]  && EXPECTED_SERVICES["metube"]="MeTube (yt-dlp)"
     EXPECTED_SERVICES["caddy"]="Caddy Reverse Proxy"
     EXPECTED_SERVICES["dozzle"]="Dozzle (Web Log Viewer)"
+    EXPECTED_SERVICES["uptime-kuma"]="Uptime Kuma (Мониторинг & Статус)"
     EXPECTED_SERVICES["watchtower"]="Watchtower (Автообновления)"
     EXPECTED_SERVICES["autoheal"]="Autoheal (Самовосстановление)"
 
@@ -4276,6 +4433,7 @@ EOF_SYS_INFO
     if [ "${HAS_ISSUES}" -eq 0 ]; then
         echo -e "  ${CLR_GREEN}${CLR_BOLD}✔  ДИАГНОСТИКА: Все сервисы функционируют нормально, сбоев не обнаружено!${CLR_RESET}"
         echo ""
+        /usr/local/bin/homelab-notify "Самодиагностика Homelab" "Комплекс успешно развернут. Все сервисы функционируют нормально (0 ошибок)." "OK" 2>/dev/null || true
     else
         echo -e "  ${CLR_RED}${CLR_BOLD}▲  ДИАГНОСТИКА: Обнаружены отклонения в работе сервисов!${CLR_RESET}"
         echo -e "  ${CLR_YELLOW}Подробный журнал диагностики и логов сбоев сохранен в:${CLR_RESET}"
@@ -4283,6 +4441,7 @@ EOF_SYS_INFO
         echo -e "      ${CLR_WHITE}${CLR_BOLD}cat ${DIAG_LOG}${CLR_RESET}"
         echo -e "      ${CLR_DIM}или в домашнем каталоге:${CLR_RESET} ${CLR_WHITE}cat ${USER_DIAG_LOG}${CLR_RESET}"
         echo ""
+        /usr/local/bin/homelab-notify "Сбой в Homelab" "Обнаружены отклонения при проверке сервисов! См. /opt/homelab/diagnostic_report.log" "CRIT" 2>/dev/null || true
     fi
 }
 
@@ -4325,7 +4484,8 @@ show_summary_dashboard() {
     if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_WHITE}• MeTube (Медиа-загрузчик):${CLR_RESET}     ${CLR_CYAN}https://${METUBE_DOMAIN}${CLR_RESET}"
     fi
-    echo -e "  ${CLR_WHITE}• Dozzle (Журналы логов WebUI):${CLR_RESET}   ${CLR_CYAN}https://${LOGS_DOMAIN}${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Dozzle (Журналы логов WebUI):${CLR_RESET}   ${CLR_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_MUTED}(Auth: ${ADMIN_USER})${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Uptime Kuma (Мониторинг):${CLR_RESET}     ${CLR_CYAN}https://${STATUS_DOMAIN}${CLR_RESET}"
     echo -e "  ${CLR_CYAN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
     echo ""
 
@@ -4334,6 +4494,9 @@ show_summary_dashboard() {
     echo -e "  ${CLR_WHITE}• Единый мастер-пароль:${CLR_RESET}         ${CLR_GREEN}${MASTER_PASS}${CLR_RESET}"
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_WHITE}• Токен Vaultwarden /admin:${CLR_RESET}     ${CLR_YELLOW}${VAULT_ADMIN_TOKEN}${CLR_RESET}"
+    fi
+    if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
+        echo -e "  ${CLR_WHITE}• Telegram-оповещения:${CLR_RESET}          ${CLR_GREEN}АКТИВНЫ (Chat ID: ${TELEGRAM_CHAT_ID})${CLR_RESET}"
     fi
     echo -e "  ${CLR_CYAN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
     echo ""
@@ -4386,6 +4549,7 @@ show_summary_dashboard() {
     echo -e "  ${CLR_WHITE}• Просмотр логов контейнеров:${CLR_RESET}  ${CLR_GREEN}homelab logs [сервис] -f${CLR_RESET}"
     echo -e "  ${CLR_WHITE}• Перезапуск стека/сервиса:${CLR_RESET}    ${CLR_GREEN}homelab restart [сервис]${CLR_RESET}"
     echo -e "  ${CLR_WHITE}• Создание горячего бэкапа:${CLR_RESET}    ${CLR_GREEN}homelab backup${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Отправка теста в Telegram:${CLR_RESET}   ${CLR_GREEN}homelab notify [текст]${CLR_RESET}"
     echo -e "  ${CLR_WHITE}• Безопасное обновление стека:${CLR_RESET} ${CLR_GREEN}homelab update${CLR_RESET}"
     echo -e "  ${CLR_CYAN}${CLR_BOLD}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
     echo ""
