@@ -297,7 +297,7 @@ EOF_LOGO
     echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}    0.0.0.0/0           Кэш, Реклама, Фильтры      Fake-IP / Mixed TUN / gVisor    ${CLR_NEON_PURPLE}│${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                               │                           │              ${CLR_NEON_PURPLE}│${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                               ▼ (Трекеры/Спам)            ├─► ${CLR_NEON_GREEN}[ DIRECT ]${CLR_RESET} Госуслуги / Банки ${CLR_NEON_PURPLE}│${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                         ${CLR_RED}[ 0.0.0.0 / DROP ]${CLR_RESET}        ├─► ${CLR_NEON_GOLD}[ DIRECT-DPI ]${CLR_RESET} YouTube 4K  ${CLR_NEON_PURPLE}│${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                         ${CLR_RED}[ 0.0.0.0 / DROP ]${CLR_RESET}        ├─► ${CLR_NEON_GOLD}[ AUTO/PROXY ]${CLR_RESET} YouTube 4K  ${CLR_NEON_PURPLE}│${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                                                    └─► ${CLR_NEON_PINK}[ PROXY/VPN ]${CLR_RESET} Discord & AI ${CLR_NEON_PURPLE}│${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}├──────────────────────────────────────────────────────────────────────────┤${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}⚡ СТЕК:${CLR_RESET} ${CLR_CYAN}AdGuard Home${CLR_RESET} │ ${CLR_CYAN}Mihomo TUN${CLR_RESET} │ ${CLR_CYAN}Caddy SSL${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Gitea${CLR_RESET}   ${CLR_NEON_PURPLE}│${CLR_RESET}"
@@ -2923,7 +2923,6 @@ proxy-groups:
     type: select
     proxies:
       - AUTO
-      - DIRECT-DPI
       - DIRECT
     use:
       - my-sub
@@ -2939,7 +2938,6 @@ proxy-groups:
   - name: YouTube
     type: select
     proxies:
-      - DIRECT-DPI
       - AUTO
       - PROXY
       - DIRECT
@@ -2949,7 +2947,6 @@ proxy-groups:
   - name: Discord
     type: select
     proxies:
-      - DIRECT-DPI
       - AUTO
       - PROXY
       - DIRECT
@@ -2960,7 +2957,6 @@ proxy-groups:
     type: select
     proxies:
       - AUTO
-      - DIRECT-DPI
       - PROXY
       - DIRECT
     use:
@@ -2969,9 +2965,8 @@ proxy-groups:
   - name: AI-Services
     type: select
     proxies:
-      - PROXY
       - AUTO
-      - DIRECT-DPI
+      - PROXY
       - DIRECT
     use:
       - my-sub"
@@ -2982,31 +2977,26 @@ proxy-groups:
   - name: PROXY
     type: select
     proxies:
-      - DIRECT-DPI
       - DIRECT
 
   - name: YouTube
     type: select
     proxies:
-      - DIRECT-DPI
       - DIRECT
 
   - name: Discord
     type: select
     proxies:
-      - DIRECT-DPI
       - DIRECT
 
   - name: Telegram
     type: select
     proxies:
       - DIRECT
-      - DIRECT-DPI
 
   - name: AI-Services
     type: select
     proxies:
-      - DIRECT-DPI
       - DIRECT"
         fi
 
@@ -3231,13 +3221,7 @@ tun:
     - "172.16.0.0/12"
     - "10.0.0.0/8"
 
-proxies:
-  - name: DIRECT-DPI
-    type: direct
-    tls-fragment:
-      enable: true
-      size: "1-3"
-      sleep: "2-5"
+proxies: []
 ${PROXY_PROVIDERS_CONFIG}
 ${PROXY_GROUPS_CONFIG}
 
@@ -4472,8 +4456,8 @@ cmd_doctor() {
             echo -e "  ${TAG_WARN} Оптимизация MTU (TCP MSS Clamping):      ${CLR_YELLOW}[НЕ НАСТРОЕНА]${CLR_RESET}"
         fi
 
-        if [ -f /opt/homelab/mihomo/config.yaml ] && grep -q 'tls-fragment' /opt/homelab/mihomo/config.yaml 2>/dev/null; then
-            echo -e "  ${TAG_OK} Обход DPI (TLS ClientHello Fragment):     ${CLR_GREEN}[АКТИВЕН (DIRECT-DPI)]${CLR_RESET}"
+        if [ -f /opt/homelab/mihomo/config.yaml ] && grep -q 'my-sub' /opt/homelab/mihomo/config.yaml 2>/dev/null; then
+            echo -e "  ${TAG_OK} Прокси-подписка (VLESS/Trojan/SS):        ${CLR_GREEN}[АКТИВНА (my-sub -> AUTO/PROXY)]${CLR_RESET}"
         fi
 
         if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -q 'priority -10'; then
@@ -4872,7 +4856,7 @@ show_summary_dashboard() {
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Mihomo Smart Routing UI:${CLR_RESET}         ${CLR_NEON_CYAN}https://${PROXY_DOMAIN}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Секрет API панели управления:${CLR_RESET}    ${CLR_NEON_GOLD}${MIHOMO_SECRET}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Госуслуги, банки и сервисы РФ:${CLR_RESET}   ${CLR_NEON_GREEN}100% ПРЯМОЙ ДОСТУП (DIRECT, без капч и задержек)${CLR_RESET}"
-        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Обход замедления (DPI Desync):${CLR_RESET}   ${CLR_NEON_GREEN}АКТИВЕН (TLS ClientHello Fragmentation -> DIRECT-DPI)${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Маршрутизация YouTube & Media:${CLR_RESET}  ${CLR_NEON_GREEN}АКТИВНА (Туннелирование -> AUTO / PROXY)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Защита от перехвата и утечек:${CLR_RESET}    ${CLR_NEON_GREEN}АКТИВНА (nftables DNS Hijack -> порт 53)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Автоматический TCP MSS Clamp:${CLR_RESET}    ${CLR_NEON_GREEN}АКТИВЕН (защита от зависания пакетов на MTU)${CLR_RESET}"
         if [ -n "${SELECTED_DOH_1:-}" ]; then
