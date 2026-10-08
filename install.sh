@@ -319,7 +319,7 @@ SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.12"
+HOMELAB_VERSION="2.8.13"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -4341,7 +4341,6 @@ EOF_COMPOSE
       - "STATE_DIR=/downloads/.metube"
       - "TEMP_DIR=/downloads/tmp"
       - "YTDL_OPTIONS_FILE=/downloads/.metube/ytdl_options.json"
-      - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["ios","android","mweb","web"]}}}'
       - "YTDL_NIGHTLY_UPDATE_TIME=04:30"
       - "DEFAULT_THEME=auto"
     volumes:
@@ -4894,41 +4893,8 @@ for p in set(db_paths):
     fi
 
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
-        if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
-            log_ok "Режим обновления: существующий администратор Navidrome (${ADMIN_USER}) сохранен"
-        else
-            log_info "Автоматическая инициализация администратора Navidrome (${ADMIN_USER})..."
-            local NAVIDROME_READY=0
-            for i in {1..30}; do
-                if docker inspect -f '{{.State.Status}}' navidrome 2>/dev/null | grep -q "running"; then
-                    local RES_CREATE
-                    RES_CREATE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:4533/auth/setup" \
-                        -H "Content-Type: application/json" \
-                        -d "{\"userName\":\"${ADMIN_USER}\",\"name\":\"${ADMIN_USER}\",\"password\":\"${MASTER_PASS}\"}" 2>/dev/null || echo "000")
-                    if [ "${RES_CREATE}" = "200" ] || [ "${RES_CREATE}" = "201" ]; then
-                        log_ok "Администратор Navidrome (${ADMIN_USER}) успешно создан с мастер-паролем"
-                        NAVIDROME_READY=1
-                        break
-                    elif [ "${RES_CREATE}" = "404" ]; then
-                        local RES_FALLBACK
-                        RES_FALLBACK=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:4533/api/setup" \
-                            -H "Content-Type: application/json" \
-                            -d "{\"userName\":\"${ADMIN_USER}\",\"name\":\"${ADMIN_USER}\",\"password\":\"${MASTER_PASS}\"}" 2>/dev/null || echo "000")
-                        if [ "${RES_FALLBACK}" = "200" ] || [ "${RES_FALLBACK}" = "201" ]; then
-                            log_ok "Администратор Navidrome (${ADMIN_USER}) успешно создан с мастер-паролем"
-                            NAVIDROME_READY=1
-                            break
-                        fi
-                    elif [ "${RES_CREATE}" = "400" ] || [ "${RES_CREATE}" = "409" ]; then
-                        log_ok "Администратор Navidrome (${ADMIN_USER}) уже инициализирован"
-                        NAVIDROME_READY=1
-                        break
-                    fi
-                fi
-                sleep 2
-            done
-            [ $NAVIDROME_READY -eq 1 ] && log_ok "Navidrome готов к работе (порт 4533 / ${MUSIC_DOMAIN})"
-        fi
+        log_ok "Сервис Navidrome готов к работе (порт 4533 / ${MUSIC_DOMAIN})"
+        log_info "Создание учетной записи администратора Navidrome выполняется в веб-интерфейсе при первом открытии: https://${MUSIC_DOMAIN}"
     fi
 
     if [ "$SSL_MODE" = "1" ]; then
@@ -5343,7 +5309,7 @@ cmd_update() {
 
 cmd_version() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.12}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.13}"
     echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
 
     local REMOTE_VER=""
@@ -5377,7 +5343,7 @@ cmd_upgrade() {
     done
 
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.12}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.13}"
     echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
     echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
 
@@ -6011,6 +5977,7 @@ show_summary_dashboard() {
     fi
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Navidrome (Hi-Fi Музыка / Spotify):${CLR_RESET}   ${CLR_NEON_CYAN}https://${MUSIC_DOMAIN}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_DIM}    (Администратор создается в веб-панели при первом входе)${CLR_RESET}"
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_DIM}    (Клиенты: Symfonium для Android / Substreamer для iOS / Feishin для ПК)${CLR_RESET}"
     fi
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Dozzle (Логи контейнеров):${CLR_RESET}       ${CLR_NEON_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_DIM}(Авторизация: ${ADMIN_USER})${CLR_RESET}"
@@ -6130,6 +6097,8 @@ main() {
     setup_backups_and_start
     diagnose_and_verify_system
     show_summary_dashboard
+    exit 0
 }
 
 main "$@"
+exit 0

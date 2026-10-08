@@ -514,7 +514,6 @@ EOF_COMPOSE
       - "STATE_DIR=/downloads/.metube"
       - "TEMP_DIR=/downloads/tmp"
       - "YTDL_OPTIONS_FILE=/downloads/.metube/ytdl_options.json"
-      - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["ios","android","mweb","web"]}}}'
       - "YTDL_NIGHTLY_UPDATE_TIME=04:30"
       - "DEFAULT_THEME=auto"
     volumes:
