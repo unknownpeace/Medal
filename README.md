@@ -126,7 +126,14 @@ flowchart TD
 Выполните одну команду в терминале вашего сервера:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<ВАШ_АККАУНТ>/<ВАШ_РЕПОЗИТОРИЙ>/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/unknownpeace/Medal/main/install.sh | sudo bash
+```
+
+*Или через git clone (при желании):*
+```bash
+git clone https://github.com/unknownpeace/Medal.git
+cd Medal
+sudo ./install.sh
 ```
 
 > [!TIP]
