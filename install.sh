@@ -2876,7 +2876,8 @@ ${BOOTSTRAP_YAML_LINES}
   use_private_ptr_resolvers: true
   local_ptr_upstreams:
 ${PTR_UPSTREAMS_YAML}
-  cache_size: 0
+  cache_size: 4194304
+  cache_enabled: false
   cache_ttl_min: 0
   cache_ttl_max: 0
   cache_optimistic: false
