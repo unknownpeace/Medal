@@ -128,7 +128,7 @@ user_rules:
   - '||mask.icloud.com^'
   - '||mask-h2.icloud.com^'
   # Блокировка ECH (HTTPS type 65) для защиты от скрытого сброса TLS рукопожатий цензурой ТСПУ
-  - '|*^$dnstype=HTTPS'
+  - '|*^\$dnstype=HTTPS'
   - '@@||connectivitycheck.gstatic.com^\$important'
   - '@@||*.connectivitycheck.gstatic.com^\$important'
   - '@@||connectivitycheck.android.com^\$important'
