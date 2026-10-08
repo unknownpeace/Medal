@@ -783,7 +783,7 @@ cmd_update() {
 
 cmd_version() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.14}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.15}"
     echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
 
     local REMOTE_VER=""
@@ -817,7 +817,7 @@ cmd_upgrade() {
     done
 
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.14}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.15}"
     echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
     echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
 
@@ -976,7 +976,11 @@ cmd_cookies() {
 
     if [ "$arg" = "clear" ] || [ "$arg" = "remove" ] || [ "$arg" = "delete" ] || [ "$arg" = "rm" ]; then
         rm -f "${cookie_file}"
-        echo '{}' > "${ytdl_conf}"
+        python3 -c "
+import json
+opts = {'extractor_retries': 5, 'fragment_retries': 5, 'file_access_retries': 5, 'retry_sleep_functions': {'extractor': 2}, 'socket_timeout': 30}
+with open('${ytdl_conf}', 'w', encoding='utf-8') as f: json.dump(opts, f, indent=2)
+" 2>/dev/null || echo '{"extractor_retries": 5, "fragment_retries": 5, "socket_timeout": 30}' > "${ytdl_conf}"
         chown -R "${SAVED_TARGET_USER:-homelab}:${SAVED_TARGET_USER:-homelab}" "${cookie_dir}" 2>/dev/null || true
         echo -e "  ${TAG_OK} Файл cookies.txt удален, параметры yt-dlp сброшены"
         if docker inspect metube >/dev/null 2>&1; then
@@ -993,7 +997,11 @@ cmd_cookies() {
         cat > "${tmp_c}"
         if [ -s "${tmp_c}" ]; then
             mv -f "${tmp_c}" "${cookie_file}"
-            echo '{"cookiefile": "/downloads/.metube/cookies.txt"}' > "${ytdl_conf}"
+            python3 -c "
+import json
+opts = {'cookiefile': '/downloads/.metube/cookies.txt', 'extractor_retries': 5, 'fragment_retries': 5, 'file_access_retries': 5, 'retry_sleep_functions': {'extractor': 2}, 'socket_timeout': 30}
+with open('${ytdl_conf}', 'w', encoding='utf-8') as f: json.dump(opts, f, indent=2)
+" 2>/dev/null || echo '{"cookiefile": "/downloads/.metube/cookies.txt", "extractor_retries": 5, "socket_timeout": 30}' > "${ytdl_conf}"
             chown -R "${SAVED_TARGET_USER:-homelab}:${SAVED_TARGET_USER:-homelab}" "${cookie_dir}" 2>/dev/null || true
             chmod 600 "${cookie_file}" 2>/dev/null || true
             echo -e "  ${TAG_OK} Файл cookies.txt успешно сохранен (${cookie_file})"
@@ -1012,7 +1020,11 @@ cmd_cookies() {
 
     if [ -f "$arg" ]; then
         cp -f "$arg" "${cookie_file}"
-        echo '{"cookiefile": "/downloads/.metube/cookies.txt"}' > "${ytdl_conf}"
+        python3 -c "
+import json
+opts = {'cookiefile': '/downloads/.metube/cookies.txt', 'extractor_retries': 5, 'fragment_retries': 5, 'file_access_retries': 5, 'retry_sleep_functions': {'extractor': 2}, 'socket_timeout': 30}
+with open('${ytdl_conf}', 'w', encoding='utf-8') as f: json.dump(opts, f, indent=2)
+" 2>/dev/null || echo '{"cookiefile": "/downloads/.metube/cookies.txt", "extractor_retries": 5, "socket_timeout": 30}' > "${ytdl_conf}"
         chown -R "${SAVED_TARGET_USER:-homelab}:${SAVED_TARGET_USER:-homelab}" "${cookie_dir}" 2>/dev/null || true
         chmod 600 "${cookie_file}" 2>/dev/null || true
         echo -e "  ${TAG_OK} Cookies успешно установлены из: ${arg}"

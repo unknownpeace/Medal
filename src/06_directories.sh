@@ -56,12 +56,23 @@ setup_directories() {
     if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
         mkdir -p "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp"
         local YTDL_CONF="${SAVE_DIR}/downloads/.metube/ytdl_options.json"
-        if [ ! -f "${YTDL_CONF}" ]; then
-            if [ -s "${SAVE_DIR}/downloads/.metube/cookies.txt" ]; then
-                echo '{"cookiefile": "/downloads/.metube/cookies.txt"}' > "${YTDL_CONF}"
-            else
-                echo '{}' > "${YTDL_CONF}"
-            fi
+        if [ ! -f "${YTDL_CONF}" ] || [ ! -s "${YTDL_CONF}" ]; then
+            python3 -c "
+import json, os
+p = '${YTDL_CONF}'
+opts = {
+    'extractor_retries': 5,
+    'fragment_retries': 5,
+    'file_access_retries': 5,
+    'retry_sleep_functions': {'extractor': 2},
+    'socket_timeout': 30
+}
+cookie_p = '${SAVE_DIR}/downloads/.metube/cookies.txt'
+if os.path.isfile(cookie_p) and os.path.getsize(cookie_p) > 0:
+    opts['cookiefile'] = '/downloads/.metube/cookies.txt'
+with open(p, 'w', encoding='utf-8') as f:
+    json.dump(opts, f, indent=2)
+" 2>/dev/null || echo '{"extractor_retries": 5, "fragment_retries": 5, "socket_timeout": 30}' > "${YTDL_CONF}"
         fi
         chown -R "${USER_UID:-1000}:${USER_GID:-1000}" "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
         chmod 777 "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true

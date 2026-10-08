@@ -241,11 +241,15 @@ EOF_TIMESYNC
         fi
     elif [ "${INIT_SYSTEM}" = "openrc" ]; then
         if command -v chronyd >/dev/null 2>&1; then
+            # Отключение конфликтующего встроенного busybox ntpd в Alpine Linux для предотвращения clock interference
+            rc-service ntpd stop >/dev/null 2>&1 || true
+            rc-update del ntpd default >/dev/null 2>&1 || true
+            rc-update del ntpd boot >/dev/null 2>&1 || true
             rc-update add chronyd default >/dev/null 2>&1 || true
-            rc-service chronyd start >/dev/null 2>&1 || true
+            rc-service chronyd status >/dev/null 2>&1 || rc-service chronyd start >/dev/null 2>&1 || true
         elif command -v ntpd >/dev/null 2>&1; then
             rc-update add ntpd default >/dev/null 2>&1 || true
-            rc-service ntpd start >/dev/null 2>&1 || true
+            rc-service ntpd status >/dev/null 2>&1 || rc-service ntpd start >/dev/null 2>&1 || true
         fi
     fi
     return 0

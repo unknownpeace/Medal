@@ -319,7 +319,7 @@ SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.14"
+HOMELAB_VERSION="2.8.15"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -567,11 +567,15 @@ EOF_TIMESYNC
         fi
     elif [ "${INIT_SYSTEM}" = "openrc" ]; then
         if command -v chronyd >/dev/null 2>&1; then
+            # Отключение конфликтующего встроенного busybox ntpd в Alpine Linux для предотвращения clock interference
+            rc-service ntpd stop >/dev/null 2>&1 || true
+            rc-update del ntpd default >/dev/null 2>&1 || true
+            rc-update del ntpd boot >/dev/null 2>&1 || true
             rc-update add chronyd default >/dev/null 2>&1 || true
-            rc-service chronyd start >/dev/null 2>&1 || true
+            rc-service chronyd status >/dev/null 2>&1 || rc-service chronyd start >/dev/null 2>&1 || true
         elif command -v ntpd >/dev/null 2>&1; then
             rc-update add ntpd default >/dev/null 2>&1 || true
-            rc-service ntpd start >/dev/null 2>&1 || true
+            rc-service ntpd status >/dev/null 2>&1 || rc-service ntpd start >/dev/null 2>&1 || true
         fi
     fi
     return 0
@@ -2463,12 +2467,23 @@ setup_directories() {
     if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
         mkdir -p "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp"
         local YTDL_CONF="${SAVE_DIR}/downloads/.metube/ytdl_options.json"
-        if [ ! -f "${YTDL_CONF}" ]; then
-            if [ -s "${SAVE_DIR}/downloads/.metube/cookies.txt" ]; then
-                echo '{"cookiefile": "/downloads/.metube/cookies.txt"}' > "${YTDL_CONF}"
-            else
-                echo '{}' > "${YTDL_CONF}"
-            fi
+        if [ ! -f "${YTDL_CONF}" ] || [ ! -s "${YTDL_CONF}" ]; then
+            python3 -c "
+import json, os
+p = '${YTDL_CONF}'
+opts = {
+    'extractor_retries': 5,
+    'fragment_retries': 5,
+    'file_access_retries': 5,
+    'retry_sleep_functions': {'extractor': 2},
+    'socket_timeout': 30
+}
+cookie_p = '${SAVE_DIR}/downloads/.metube/cookies.txt'
+if os.path.isfile(cookie_p) and os.path.getsize(cookie_p) > 0:
+    opts['cookiefile'] = '/downloads/.metube/cookies.txt'
+with open(p, 'w', encoding='utf-8') as f:
+    json.dump(opts, f, indent=2)
+" 2>/dev/null || echo '{"extractor_retries": 5, "fragment_retries": 5, "socket_timeout": 30}' > "${YTDL_CONF}"
         fi
         chown -R "${USER_UID:-1000}:${USER_GID:-1000}" "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
         chmod 777 "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
@@ -4233,9 +4248,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://127.0.0.1:80/alive >/dev/null 2>&1 || wget -q --spider http://127.0.0.1:80/alive || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     labels:
       - "autoheal=true"
 
@@ -4272,9 +4287,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:3000/api/v1/version >/dev/null 2>&1 || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     labels:
       - "autoheal=true"
 
@@ -4304,9 +4319,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:8080/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
     labels:
       - "autoheal=true"
 
@@ -4349,9 +4364,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/ 2>/dev/null || curl -fs http://localhost:8081/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       - "autoheal=true"
 
@@ -4385,9 +4400,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:4533/ping 2>/dev/null || curl -fs http://localhost:4533/ping >/dev/null 2>&1 || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       - "autoheal=true"
 
@@ -4417,9 +4432,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80 2>/dev/null || pgrep caddy >/dev/null 2>&1 || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     labels:
       - "autoheal=true"
 
@@ -4442,9 +4457,9 @@ EOF_COMPOSE
     restart: unless-stopped
     environment:
       - "AUTOHEAL_CONTAINER_LABEL=autoheal"
-      - "AUTOHEAL_INTERVAL=15"
-      - "AUTOHEAL_START_PERIOD=30"
-      - "AUTOHEAL_DEFAULT_STOP_TIMEOUT=10"
+      - "AUTOHEAL_INTERVAL=30"
+      - "AUTOHEAL_START_PERIOD=60"
+      - "AUTOHEAL_DEFAULT_STOP_TIMEOUT=15"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
@@ -4460,9 +4475,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD", "/dozzle", "healthcheck"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     labels:
       - "autoheal=true"
 EOF_COMPOSE
@@ -5314,7 +5329,7 @@ cmd_update() {
 
 cmd_version() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.14}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.15}"
     echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
 
     local REMOTE_VER=""
@@ -5348,7 +5363,7 @@ cmd_upgrade() {
     done
 
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.14}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.15}"
     echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
     echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
 
@@ -5507,7 +5522,11 @@ cmd_cookies() {
 
     if [ "$arg" = "clear" ] || [ "$arg" = "remove" ] || [ "$arg" = "delete" ] || [ "$arg" = "rm" ]; then
         rm -f "${cookie_file}"
-        echo '{}' > "${ytdl_conf}"
+        python3 -c "
+import json
+opts = {'extractor_retries': 5, 'fragment_retries': 5, 'file_access_retries': 5, 'retry_sleep_functions': {'extractor': 2}, 'socket_timeout': 30}
+with open('${ytdl_conf}', 'w', encoding='utf-8') as f: json.dump(opts, f, indent=2)
+" 2>/dev/null || echo '{"extractor_retries": 5, "fragment_retries": 5, "socket_timeout": 30}' > "${ytdl_conf}"
         chown -R "${SAVED_TARGET_USER:-homelab}:${SAVED_TARGET_USER:-homelab}" "${cookie_dir}" 2>/dev/null || true
         echo -e "  ${TAG_OK} Файл cookies.txt удален, параметры yt-dlp сброшены"
         if docker inspect metube >/dev/null 2>&1; then
@@ -5524,7 +5543,11 @@ cmd_cookies() {
         cat > "${tmp_c}"
         if [ -s "${tmp_c}" ]; then
             mv -f "${tmp_c}" "${cookie_file}"
-            echo '{"cookiefile": "/downloads/.metube/cookies.txt"}' > "${ytdl_conf}"
+            python3 -c "
+import json
+opts = {'cookiefile': '/downloads/.metube/cookies.txt', 'extractor_retries': 5, 'fragment_retries': 5, 'file_access_retries': 5, 'retry_sleep_functions': {'extractor': 2}, 'socket_timeout': 30}
+with open('${ytdl_conf}', 'w', encoding='utf-8') as f: json.dump(opts, f, indent=2)
+" 2>/dev/null || echo '{"cookiefile": "/downloads/.metube/cookies.txt", "extractor_retries": 5, "socket_timeout": 30}' > "${ytdl_conf}"
             chown -R "${SAVED_TARGET_USER:-homelab}:${SAVED_TARGET_USER:-homelab}" "${cookie_dir}" 2>/dev/null || true
             chmod 600 "${cookie_file}" 2>/dev/null || true
             echo -e "  ${TAG_OK} Файл cookies.txt успешно сохранен (${cookie_file})"
@@ -5543,7 +5566,11 @@ cmd_cookies() {
 
     if [ -f "$arg" ]; then
         cp -f "$arg" "${cookie_file}"
-        echo '{"cookiefile": "/downloads/.metube/cookies.txt"}' > "${ytdl_conf}"
+        python3 -c "
+import json
+opts = {'cookiefile': '/downloads/.metube/cookies.txt', 'extractor_retries': 5, 'fragment_retries': 5, 'file_access_retries': 5, 'retry_sleep_functions': {'extractor': 2}, 'socket_timeout': 30}
+with open('${ytdl_conf}', 'w', encoding='utf-8') as f: json.dump(opts, f, indent=2)
+" 2>/dev/null || echo '{"cookiefile": "/downloads/.metube/cookies.txt", "extractor_retries": 5, "socket_timeout": 30}' > "${ytdl_conf}"
         chown -R "${SAVED_TARGET_USER:-homelab}:${SAVED_TARGET_USER:-homelab}" "${cookie_dir}" 2>/dev/null || true
         chmod 600 "${cookie_file}" 2>/dev/null || true
         echo -e "  ${TAG_OK} Cookies успешно установлены из: ${arg}"

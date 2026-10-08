@@ -406,9 +406,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://127.0.0.1:80/alive >/dev/null 2>&1 || wget -q --spider http://127.0.0.1:80/alive || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     labels:
       - "autoheal=true"
 
@@ -445,9 +445,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:3000/api/v1/version >/dev/null 2>&1 || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     labels:
       - "autoheal=true"
 
@@ -477,9 +477,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:8080/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
     labels:
       - "autoheal=true"
 
@@ -522,9 +522,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/ 2>/dev/null || curl -fs http://localhost:8081/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       - "autoheal=true"
 
@@ -558,9 +558,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:4533/ping 2>/dev/null || curl -fs http://localhost:4533/ping >/dev/null 2>&1 || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       - "autoheal=true"
 
@@ -590,9 +590,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80 2>/dev/null || pgrep caddy >/dev/null 2>&1 || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     labels:
       - "autoheal=true"
 
@@ -615,9 +615,9 @@ EOF_COMPOSE
     restart: unless-stopped
     environment:
       - "AUTOHEAL_CONTAINER_LABEL=autoheal"
-      - "AUTOHEAL_INTERVAL=15"
-      - "AUTOHEAL_START_PERIOD=30"
-      - "AUTOHEAL_DEFAULT_STOP_TIMEOUT=10"
+      - "AUTOHEAL_INTERVAL=30"
+      - "AUTOHEAL_START_PERIOD=60"
+      - "AUTOHEAL_DEFAULT_STOP_TIMEOUT=15"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
@@ -633,9 +633,9 @@ EOF_COMPOSE
     healthcheck:
       test: ["CMD", "/dozzle", "healthcheck"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     labels:
       - "autoheal=true"
 EOF_COMPOSE
