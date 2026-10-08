@@ -504,13 +504,17 @@ EOF_COMPOSE
       - "UID=${USER_UID}"
       - "GID=${USER_GID}"
       - "ALLOW_PRIVATE_ADDRESSES=true"
+      - "ALLOW_YTDL_OPTIONS_OVERRIDES=true"
       - "DOWNLOAD_DIR=/downloads"
       - "AUDIO_DOWNLOAD_DIR=/music"
       - "CUSTOM_DIRS=true"
       - "CREATE_CUSTOM_DIRS=true"
       - "STATE_DIR=/downloads/.metube"
       - "TEMP_DIR=/downloads/tmp"
-      - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["android","web"]}}}'
+      - "YTDL_OPTIONS_FILE=/downloads/.metube/ytdl_options.json"
+      - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["ios","android","mweb","web"]}}}'
+      - "YTDL_NIGHTLY_UPDATE_TIME=04:30"
+      - "DEFAULT_THEME=auto"
     volumes:
       - ${SAVE_DIR}/downloads:/downloads
       - ${SAVE_DIR}/music:/music
@@ -600,7 +604,7 @@ EOF_COMPOSE
     environment:
       - "DOCKER_API_VERSION=${DETECTED_DOCKER_API:-1.45}"
       - "WATCHTOWER_CLEANUP=true"
-      - "WATCHTOWER_POLL_INTERVAL=86400"
+      - "WATCHTOWER_SCHEDULE=0 0 4 * * *"
       - "WATCHTOWER_INCLUDE_RESTARTING=true"
       - "WATCHTOWER_TIMEOUT=30s"
 

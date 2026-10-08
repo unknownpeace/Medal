@@ -42,7 +42,26 @@ configure_gateway_services() {
     - 127.0.0.1:1053"
         fi
 
-        cat <<EOF_AGH > "${APP_DIR}/adguard/conf/AdGuardHome.yaml"
+        local AGH_CONF="${APP_DIR}/adguard/conf/AdGuardHome.yaml"
+        if [ -s "${AGH_CONF}" ] && [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
+            log_ok "Обновление DNS-переопределений в AdGuardHome.yaml (фильтры и правила сохранены)"
+            python3 -c "
+import sys, re
+conf_file = sys.argv[1]
+with open(conf_file, 'r', encoding='utf-8') as f:
+    c = f.read()
+
+new_rewrites = '  rewrites:' + sys.stdin.read().rstrip('\r\n')
+if '  rewrites:' in c:
+    c = re.sub(r'  rewrites:.*?(?=\n\S|\n  [a-zA-Z0-9_]+:|\Z)', new_rewrites, c, flags=re.DOTALL)
+elif 'filtering:' in c:
+    c = re.sub(r'(filtering:\s*\n)', r'\1' + new_rewrites + '\n', c)
+
+with open(conf_file, 'w', encoding='utf-8') as f:
+    f.write(c)
+" "${AGH_CONF}" <<< "${REWRITE_ENTRIES}" 2>/dev/null || true
+        else
+            cat <<EOF_AGH > "${AGH_CONF}"
 schema_version: 34
 http:
   address: 0.0.0.0:8083
@@ -165,6 +184,7 @@ user_rules:
   - '@@||aniliberty.top^\$important'
   - '@@||*.libria.fun^\$important'
 EOF_AGH
+        fi
 
         local ESCAPED_MIHOMO_SECRET
         ESCAPED_MIHOMO_SECRET=$(python3 -c "import sys, json; print(json.dumps(sys.stdin.read().rstrip('\r\n')))" <<< "${MIHOMO_SECRET}")

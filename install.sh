@@ -319,7 +319,7 @@ SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.8"
+HOMELAB_VERSION="2.8.9"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -2448,6 +2448,20 @@ setup_directories() {
         chmod 775 "${SAVE_DIR}/music" 2>/dev/null || true
     fi
 
+    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+        mkdir -p "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp"
+        local YTDL_CONF="${SAVE_DIR}/downloads/.metube/ytdl_options.json"
+        if [ ! -f "${YTDL_CONF}" ]; then
+            if [ -s "${SAVE_DIR}/downloads/.metube/cookies.txt" ]; then
+                echo '{"cookiefile": "/downloads/.metube/cookies.txt"}' > "${YTDL_CONF}"
+            else
+                echo '{}' > "${YTDL_CONF}"
+            fi
+        fi
+        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
+        chmod 775 "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
+    fi
+
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         mkdir -p "${APP_DIR}/configs/navidrome"
         apply_nocow_helper "${APP_DIR}/configs/navidrome"
@@ -2530,10 +2544,14 @@ dk = hashlib.pbkdf2_hmac('sha512', pw, salt, 100000, dklen=64)
 print(f'@ByteArray({base64.b64encode(salt).decode()}:{base64.b64encode(dk).decode()})')
 " <<< "${MASTER_PASS}" 2>/dev/null || echo "")
         
-        local ALT_UI_FLAG="false"
-        [ "${VUETORRENT_OK}" -eq 1 ] && ALT_UI_FLAG="true"
+        local QBIT_CONF="${APP_DIR}/qbittorrent/config/qBittorrent/qBittorrent.conf"
+        if [ -s "${QBIT_CONF}" ] && [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
+            log_ok "Конфигурация qBittorrent уже настроена (пользовательские параметры сохранены)"
+        else
+            local ALT_UI_FLAG="false"
+            [ "${VUETORRENT_OK}" -eq 1 ] && ALT_UI_FLAG="true"
 
-        cat <<EOF_QBIT_CONF > "${APP_DIR}/qbittorrent/config/qBittorrent/qBittorrent.conf"
+            cat <<EOF_QBIT_CONF > "${QBIT_CONF}"
 [LegalNotice]
 Accepted=true
 
@@ -2570,6 +2588,7 @@ WebUI\TrustedProxiesList=0.0.0.0/0
 WebUI\UseUPnP=false
 WebUI\Username=${ADMIN_USER}
 EOF_QBIT_CONF
+        fi
         chown -R "${USER_UID}:${USER_GID}" "${APP_DIR}/qbittorrent" 2>/dev/null || true
     fi
 
@@ -3167,7 +3186,26 @@ configure_gateway_services() {
     - 127.0.0.1:1053"
         fi
 
-        cat <<EOF_AGH > "${APP_DIR}/adguard/conf/AdGuardHome.yaml"
+        local AGH_CONF="${APP_DIR}/adguard/conf/AdGuardHome.yaml"
+        if [ -s "${AGH_CONF}" ] && [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
+            log_ok "Обновление DNS-переопределений в AdGuardHome.yaml (фильтры и правила сохранены)"
+            python3 -c "
+import sys, re
+conf_file = sys.argv[1]
+with open(conf_file, 'r', encoding='utf-8') as f:
+    c = f.read()
+
+new_rewrites = '  rewrites:' + sys.stdin.read().rstrip('\r\n')
+if '  rewrites:' in c:
+    c = re.sub(r'  rewrites:.*?(?=\n\S|\n  [a-zA-Z0-9_]+:|\Z)', new_rewrites, c, flags=re.DOTALL)
+elif 'filtering:' in c:
+    c = re.sub(r'(filtering:\s*\n)', r'\1' + new_rewrites + '\n', c)
+
+with open(conf_file, 'w', encoding='utf-8') as f:
+    f.write(c)
+" "${AGH_CONF}" <<< "${REWRITE_ENTRIES}" 2>/dev/null || true
+        else
+            cat <<EOF_AGH > "${AGH_CONF}"
 schema_version: 34
 http:
   address: 0.0.0.0:8083
@@ -3290,6 +3328,7 @@ user_rules:
   - '@@||aniliberty.top^\$important'
   - '@@||*.libria.fun^\$important'
 EOF_AGH
+        fi
 
         local ESCAPED_MIHOMO_SECRET
         ESCAPED_MIHOMO_SECRET=$(python3 -c "import sys, json; print(json.dumps(sys.stdin.read().rstrip('\r\n')))" <<< "${MIHOMO_SECRET}")
@@ -4335,13 +4374,17 @@ EOF_COMPOSE
       - "UID=${USER_UID}"
       - "GID=${USER_GID}"
       - "ALLOW_PRIVATE_ADDRESSES=true"
+      - "ALLOW_YTDL_OPTIONS_OVERRIDES=true"
       - "DOWNLOAD_DIR=/downloads"
       - "AUDIO_DOWNLOAD_DIR=/music"
       - "CUSTOM_DIRS=true"
       - "CREATE_CUSTOM_DIRS=true"
       - "STATE_DIR=/downloads/.metube"
       - "TEMP_DIR=/downloads/tmp"
-      - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["android","web"]}}}'
+      - "YTDL_OPTIONS_FILE=/downloads/.metube/ytdl_options.json"
+      - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["ios","android","mweb","web"]}}}'
+      - "YTDL_NIGHTLY_UPDATE_TIME=04:30"
+      - "DEFAULT_THEME=auto"
     volumes:
       - ${SAVE_DIR}/downloads:/downloads
       - ${SAVE_DIR}/music:/music
@@ -4431,7 +4474,7 @@ EOF_COMPOSE
     environment:
       - "DOCKER_API_VERSION=${DETECTED_DOCKER_API:-1.45}"
       - "WATCHTOWER_CLEANUP=true"
-      - "WATCHTOWER_POLL_INTERVAL=86400"
+      - "WATCHTOWER_SCHEDULE=0 0 4 * * *"
       - "WATCHTOWER_INCLUDE_RESTARTING=true"
       - "WATCHTOWER_TIMEOUT=30s"
 
@@ -4911,13 +4954,20 @@ norm_service() {
         torrent|qbittorrent) echo "qbittorrent" ;;
         music|navidrome) echo "navidrome" ;;
         tube|video|metube) echo "metube" ;;
+        git|gitea) echo "gitea" ;;
+        proxy|clash|meta|mihomo) echo "mihomo" ;;
+        smb|samba) echo "samba" ;;
+        caddy|web|proxy-web) echo "caddy" ;;
+        logs|dozzle) echo "dozzle" ;;
+        autoheal) echo "autoheal" ;;
+        watchtower) echo "watchtower" ;;
         *) echo "$s" ;;
     esac
 }
 
 cmd_status() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── HOMELAB APPLIANCE: СТАТУС СИСТЕМЫ И СЕРВИСОВ ───────────────${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Версия комплекса:${CLR_RESET}  ${CLR_GREEN}v${SAVED_HOMELAB_VERSION:-2.8.8}${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Версия комплекса:${CLR_RESET}  ${CLR_GREEN}v${SAVED_HOMELAB_VERSION:-2.8.9}${CLR_RESET}"
     echo -e "  ${CLR_WHITE}• Ядро / ОС:${CLR_RESET}         $(uname -srm) [$(grep -E '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '\"' || echo 'Linux')]"
     local host_uptime=""
     if [ -r /proc/uptime ]; then
@@ -4957,6 +5007,17 @@ cmd_status() {
         FW_STATUS="${CLR_GREEN}nftables (таблица inet homelab)${CLR_RESET}"
     fi
     echo -e "  ${CLR_WHITE}• Фаервол / NAT:${CLR_RESET}     ${FW_STATUS}"
+
+    if docker inspect metube >/dev/null 2>&1; then
+        local c_file="${target_save}/downloads/.metube/cookies.txt"
+        if [ -s "${c_file}" ]; then
+            local c_sz
+            c_sz=$(ls -lh "${c_file}" 2>/dev/null | awk '{print $5}' || echo "OK")
+            echo -e "  ${CLR_WHITE}• YouTube Cookies:${CLR_RESET}   ${CLR_GREEN}🟢 Загружен (${c_sz})${CLR_RESET}"
+        else
+            echo -e "  ${CLR_WHITE}• YouTube Cookies:${CLR_RESET}   ${CLR_YELLOW}🟡 Не загружен (команда: homelab cookies)${CLR_RESET}"
+        fi
+    fi
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
     echo ""
 
@@ -4965,14 +5026,20 @@ cmd_status() {
     echo -e "  ─────────────────────────────────────────────────────────────"
     
     local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "metube" "navidrome" "samba" "dozzle" "watchtower" "autoheal")
+    declare -A DOCKER_MEM
+    if command -v docker >/dev/null 2>&1; then
+        while read -r d_name d_mem; do
+            [ -n "$d_name" ] && DOCKER_MEM["$d_name"]="$d_mem"
+        done < <(docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' 2>/dev/null | awk '{print $1, $2}' || true)
+    fi
+
     for c in "${CONTAINERS[@]}"; do
         if docker inspect "$c" >/dev/null 2>&1; then
             local state
             state=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo "stopped")
             local health
             health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null || echo "none")
-            local mem
-            mem=$(docker stats --no-stream --format "{{.MemUsage}}" "$c" 2>/dev/null | cut -d/ -f1 | tr -d ' ' || echo "N/A")
+            local mem="${DOCKER_MEM[$c]:-—}"
             
             local state_str="${CLR_GREEN}Running${CLR_RESET}"
             [ "$state" != "running" ] && state_str="${CLR_RED}${state}${CLR_RESET}"
@@ -4982,9 +5049,25 @@ cmd_status() {
             [ "$health" = "starting" ] && health_str="${CLR_YELLOW}Starting${CLR_RESET}"
             [ "$health" = "unhealthy" ] && health_str="${CLR_RED}UNHEALTHY${CLR_RESET}"
             
-            printf "  %-18s %-22b %-24b %-10s\n" "$c" "$state_str" "$health_str" "${mem:-N/A}"
+            printf "  %-18s %-22b %-24b %-10s\n" "$c" "$state_str" "$health_str" "${mem}"
         fi
     done
+    echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+
+    echo ""
+    echo -e "${CLR_CYAN}${CLR_BOLD}╭── АДРЕСА СЕРВИСОВ И ВЕБ-ПОРТАЛОВ ────────────────────────────${CLR_RESET}"
+    local BASE_IP="${SAVED_LOCAL_IP:-${LOCAL_IP:-127.0.0.1}}"
+    [ -n "${SAVED_MUSIC_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🎵 Музыка (Navidrome):${CLR_RESET}   https://${SAVED_MUSIC_DOMAIN} (порт 4533)"
+    [ -n "${SAVED_METUBE_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🎬 Загрузчик (MeTube):${CLR_RESET}   https://${SAVED_METUBE_DOMAIN} (порт 8081)"
+    [ -n "${SAVED_TORRENT_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}📥 Торренты (qBit):${CLR_RESET}      https://${SAVED_TORRENT_DOMAIN} (порт 8080)"
+    [ -n "${SAVED_VAULT_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🔑 Пароли (Vaultwarden):${CLR_RESET} https://${SAVED_VAULT_DOMAIN}"
+    [ -n "${SAVED_GITEA_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🐙 Git-сервер (Gitea):${CLR_RESET}   https://${SAVED_GITEA_DOMAIN} (порт 3000)"
+    [ -n "${SAVED_ADGUARD_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🛡️  DNS (AdGuard Home):${CLR_RESET}   https://${SAVED_ADGUARD_DOMAIN} (порт 8083)"
+    [ -n "${SAVED_PROXY_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🚀 Прокси (Mihomo UI):${CLR_RESET}   https://${SAVED_PROXY_DOMAIN}"
+    [ -n "${SAVED_LOGS_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}📋 Логи (Dozzle):${CLR_RESET}        https://${SAVED_LOGS_DOMAIN}"
+    if docker inspect samba >/dev/null 2>&1; then
+        echo -e "  ${CLR_WHITE}📂 Samba Хранилище:${CLR_RESET}      \\\\${BASE_IP}\\${SAVED_SHARE_NAME:-storage} и \\\\${BASE_IP}\\music"
+    fi
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
 }
 
@@ -5194,7 +5277,7 @@ cmd_update() {
 
 cmd_version() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.8}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.9}"
     echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
 
     local REMOTE_VER=""
@@ -5228,7 +5311,7 @@ cmd_upgrade() {
     done
 
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.8}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.9}"
     echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
     echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
 
@@ -5346,6 +5429,99 @@ cmd_notify() {
     fi
 }
 
+cmd_cookies() {
+    local target_save="${SAVED_SAVE_DIR:-/opt/homelab/save}"
+    local cookie_dir="${target_save}/downloads/.metube"
+    local cookie_file="${cookie_dir}/cookies.txt"
+    local ytdl_conf="${cookie_dir}/ytdl_options.json"
+    mkdir -p "${cookie_dir}"
+
+    local arg="${1:-}"
+
+    if [ -z "$arg" ]; then
+        echo -e "${CLR_CYAN}${CLR_BOLD}╭── УПРАВЛЕНИЕ YOUTUBE COOKIES ДЛЯ METUBE ────────────────────${CLR_RESET}"
+        if [ -s "${cookie_file}" ]; then
+            local c_size c_date
+            c_size=$(ls -lh "${cookie_file}" 2>/dev/null | awk '{print $5}' || echo "N/A")
+            c_date=$(date -r "${cookie_file}" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "N/A")
+            echo -e "  ${TAG_OK} YouTube Cookies: ${CLR_GREEN}[АКТИВЕН]${CLR_RESET}"
+            echo -e "      • Размер файла:   ${CLR_WHITE}${c_size}${CLR_RESET}"
+            echo -e "      • Дата изменения: ${CLR_WHITE}${c_date}${CLR_RESET}"
+            echo -e "      • Путь на диске:  ${CLR_WHITE}${cookie_file}${CLR_RESET}"
+            echo ""
+            echo -e "  ${TAG_INFO} Для обновления файла cookies выполните:"
+            echo -e "      ${CLR_GREEN}homelab cookies /путь/к/cookies.txt${CLR_RESET}"
+            echo -e "      или вставьте из буфера: ${CLR_GREEN}homelab cookies --paste${CLR_RESET}"
+            echo -e "      или скопируйте через Samba: ${CLR_WHITE}\\\\${SAVED_LOCAL_IP:-IP}\\${SAVED_SHARE_NAME:-storage}\\downloads\\.metube\\cookies.txt${CLR_RESET}"
+            echo -e "  ${TAG_INFO} Для удаления cookies: ${CLR_YELLOW}homelab cookies clear${CLR_RESET}"
+        else
+            echo -e "  ${TAG_WARN} YouTube Cookies: ${CLR_YELLOW}[НЕ ЗАГРУЖЕН]${CLR_RESET}"
+            echo -e "  ${CLR_WHITE}Файл cookies необходим для скачивания приватных видео, плейлистов${CLR_RESET}"
+            echo -e "  ${CLR_WHITE}и обхода блокировок YouTube (\"Sign in to confirm you're not a bot\").${CLR_RESET}"
+            echo ""
+            echo -e "  ${TAG_INFO} Способы установки cookies:"
+            echo -e "    1) Указать файл на сервере:  ${CLR_GREEN}homelab cookies /путь/к/cookies.txt${CLR_RESET}"
+            echo -e "    2) Вставить текст из буфера: ${CLR_GREEN}homelab cookies --paste${CLR_RESET}"
+            echo -e "    3) Поместить через Samba в:  ${CLR_WHITE}\\\\${SAVED_LOCAL_IP:-IP}\\${SAVED_SHARE_NAME:-storage}\\downloads\\.metube\\cookies.txt${CLR_RESET}"
+        fi
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+        return 0
+    fi
+
+    if [ "$arg" = "clear" ] || [ "$arg" = "remove" ] || [ "$arg" = "delete" ] || [ "$arg" = "rm" ]; then
+        rm -f "${cookie_file}"
+        echo '{}' > "${ytdl_conf}"
+        chown -R "${SAVED_TARGET_USER:-homelab}:${SAVED_TARGET_USER:-homelab}" "${cookie_dir}" 2>/dev/null || true
+        echo -e "  ${TAG_OK} Файл cookies.txt удален, параметры yt-dlp сброшены"
+        if docker inspect metube >/dev/null 2>&1; then
+            docker restart metube >/dev/null 2>&1 || true
+            echo -e "  ${TAG_OK} Контейнер MeTube перезапущен"
+        fi
+        return 0
+    fi
+
+    if [ "$arg" = "--paste" ] || [ "$arg" = "-p" ]; then
+        echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВСТАВКА СОДЕРЖИМОГО COOKIES.TXT ──────────────────────────${CLR_RESET}"
+        echo -e "  ${CLR_WHITE}Вставьте содержимое файла cookies (Netscape format) и нажмите Enter, затем Ctrl+D:${CLR_RESET}"
+        local tmp_c="${cookie_file}.tmp.$$"
+        cat > "${tmp_c}"
+        if [ -s "${tmp_c}" ]; then
+            mv -f "${tmp_c}" "${cookie_file}"
+            echo '{"cookiefile": "/downloads/.metube/cookies.txt"}' > "${ytdl_conf}"
+            chown -R "${SAVED_TARGET_USER:-homelab}:${SAVED_TARGET_USER:-homelab}" "${cookie_dir}" 2>/dev/null || true
+            chmod 600 "${cookie_file}" 2>/dev/null || true
+            echo -e "  ${TAG_OK} Файл cookies.txt успешно сохранен (${cookie_file})"
+            if docker inspect metube >/dev/null 2>&1; then
+                echo -e "  ${TAG_INFO} Перезапуск MeTube для применения cookies..."
+                docker restart metube >/dev/null 2>&1 || true
+                echo -e "  ${TAG_OK} Контейнер MeTube успешно перезапущен"
+            fi
+        else
+            rm -f "${tmp_c}"
+            echo -e "  ${TAG_ERR} Пустой ввод. Изменения не сохранены."
+        fi
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+        return 0
+    fi
+
+    if [ -f "$arg" ]; then
+        cp -f "$arg" "${cookie_file}"
+        echo '{"cookiefile": "/downloads/.metube/cookies.txt"}' > "${ytdl_conf}"
+        chown -R "${SAVED_TARGET_USER:-homelab}:${SAVED_TARGET_USER:-homelab}" "${cookie_dir}" 2>/dev/null || true
+        chmod 600 "${cookie_file}" 2>/dev/null || true
+        echo -e "  ${TAG_OK} Cookies успешно установлены из: ${arg}"
+        if docker inspect metube >/dev/null 2>&1; then
+            echo -e "  ${TAG_INFO} Перезапуск MeTube для применения cookies..."
+            docker restart metube >/dev/null 2>&1 || true
+            echo -e "  ${TAG_OK} Контейнер MeTube успешно перезапущен"
+        fi
+        return 0
+    else
+        echo -e "  ${TAG_ERR} Указанный файл не найден: ${arg}"
+        return 1
+    fi
+}
+
 cmd_dump_logs() {
     local out_file="${1:-/opt/homelab/homelab_logs.txt}"
     local user_file="/home/${SAVED_TARGET_USER:-homelab}/homelab_logs.txt"
@@ -5455,6 +5631,7 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}doctor${CLR_RESET}              Комплексная самодиагностика DNS, TUN, NAT и прав"
     echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
     echo -e "  ${CLR_WHITE}notify [текст]${CLR_RESET}      Отправить тестовое оповещение в Telegram"
+    echo -e "  ${CLR_WHITE}cookies [файл|--paste|clear]${CLR_RESET} Управление cookies YouTube для MeTube (yt-dlp)"
     echo -e "  ${CLR_WHITE}update${CLR_RESET}              Обновление всех Docker-образов стека"
     echo -e "  ${CLR_WHITE}upgrade [--force]${CLR_RESET}   Бесшовный апгрейд ядра комплекса из GitHub (OTA)"
     echo -e "  ${CLR_WHITE}rollback${CLR_RESET}            Откат к предыдущей версии из снимка восстановления"
@@ -5473,6 +5650,7 @@ case "${1:-status}" in
     dump|dump-logs|export-logs|collect|report) shift; cmd_dump_logs "$@" ;;
     backup) cmd_backup ;;
     doctor|check) cmd_doctor ;;
+    cookies|cookie) shift; cmd_cookies "$@" ;;
     upgrade|self-update|ota) shift; cmd_upgrade "$@" ;;
     rollback|revert) cmd_rollback ;;
     version|-v|--version|check-update) cmd_version ;;
@@ -5846,6 +6024,7 @@ show_summary_dashboard() {
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Перезапуск стека/сервиса:${CLR_RESET}    ${CLR_NEON_GREEN}homelab restart [сервис]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Горячий бэкап баз данных:${CLR_RESET}    ${CLR_NEON_GREEN}homelab backup${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Тестовое оповещение в TG:${CLR_RESET}    ${CLR_NEON_GREEN}homelab notify [текст]${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Управление cookies YouTube:${CLR_RESET}  ${CLR_NEON_GREEN}homelab cookies [файл]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Безопасный апдейт образов:${CLR_RESET}   ${CLR_NEON_GREEN}homelab update${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Бесшовный апгрейд ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab upgrade${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Проверка версии и обновлений:${CLR_RESET} ${CLR_NEON_GREEN}homelab version${CLR_RESET}"

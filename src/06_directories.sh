@@ -53,6 +53,20 @@ setup_directories() {
         chmod 775 "${SAVE_DIR}/music" 2>/dev/null || true
     fi
 
+    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+        mkdir -p "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp"
+        local YTDL_CONF="${SAVE_DIR}/downloads/.metube/ytdl_options.json"
+        if [ ! -f "${YTDL_CONF}" ]; then
+            if [ -s "${SAVE_DIR}/downloads/.metube/cookies.txt" ]; then
+                echo '{"cookiefile": "/downloads/.metube/cookies.txt"}' > "${YTDL_CONF}"
+            else
+                echo '{}' > "${YTDL_CONF}"
+            fi
+        fi
+        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
+        chmod 775 "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
+    fi
+
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         mkdir -p "${APP_DIR}/configs/navidrome"
         apply_nocow_helper "${APP_DIR}/configs/navidrome"
@@ -135,10 +149,14 @@ dk = hashlib.pbkdf2_hmac('sha512', pw, salt, 100000, dklen=64)
 print(f'@ByteArray({base64.b64encode(salt).decode()}:{base64.b64encode(dk).decode()})')
 " <<< "${MASTER_PASS}" 2>/dev/null || echo "")
         
-        local ALT_UI_FLAG="false"
-        [ "${VUETORRENT_OK}" -eq 1 ] && ALT_UI_FLAG="true"
+        local QBIT_CONF="${APP_DIR}/qbittorrent/config/qBittorrent/qBittorrent.conf"
+        if [ -s "${QBIT_CONF}" ] && [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
+            log_ok "Конфигурация qBittorrent уже настроена (пользовательские параметры сохранены)"
+        else
+            local ALT_UI_FLAG="false"
+            [ "${VUETORRENT_OK}" -eq 1 ] && ALT_UI_FLAG="true"
 
-        cat <<EOF_QBIT_CONF > "${APP_DIR}/qbittorrent/config/qBittorrent/qBittorrent.conf"
+            cat <<EOF_QBIT_CONF > "${QBIT_CONF}"
 [LegalNotice]
 Accepted=true
 
@@ -175,6 +193,7 @@ WebUI\TrustedProxiesList=0.0.0.0/0
 WebUI\UseUPnP=false
 WebUI\Username=${ADMIN_USER}
 EOF_QBIT_CONF
+        fi
         chown -R "${USER_UID}:${USER_GID}" "${APP_DIR}/qbittorrent" 2>/dev/null || true
     fi
 
