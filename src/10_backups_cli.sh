@@ -374,7 +374,7 @@ norm_service() {
 
 cmd_status() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── HOMELAB APPLIANCE: СТАТУС СИСТЕМЫ И СЕРВИСОВ ───────────────${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Версия комплекса:${CLR_RESET}  ${CLR_GREEN}v${SAVED_HOMELAB_VERSION:-2.5.0}${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Версия комплекса:${CLR_RESET}  ${CLR_GREEN}v${SAVED_HOMELAB_VERSION:-2.8.7}${CLR_RESET}"
     echo -e "  ${CLR_WHITE}• Ядро / ОС:${CLR_RESET}         $(uname -srm) [$(grep -E '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '\"' || echo 'Linux')]"
     local host_uptime=""
     if [ -r /proc/uptime ]; then
@@ -651,7 +651,7 @@ cmd_update() {
 
 cmd_version() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.5.0}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.7}"
     echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
 
     local REMOTE_VER=""
@@ -685,7 +685,7 @@ cmd_upgrade() {
     done
 
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.5.0}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.7}"
     echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
     echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
 
@@ -720,12 +720,12 @@ cmd_upgrade() {
     local SNAP_TAR="${SNAPSHOT_DIR}/homelab_snapshot_pre_upgrade.tar.gz"
 
     local SNAP_FILES=(".env")
-    [ -f "${APP_DIR}/docker-compose.yml" ] && SNAP_FILES+=("docker-compose.yml")
-    [ -f "${APP_DIR}/Caddyfile" ] && SNAP_FILES+=("Caddyfile")
-    [ -d "${APP_DIR}/caddy" ] && SNAP_FILES+=("caddy")
-    [ -f "${APP_DIR}/mihomo/config.yaml" ] && SNAP_FILES+=("mihomo/config.yaml")
-    [ -f "${APP_DIR}/adguard/conf/AdGuardHome.yaml" ] && SNAP_FILES+=("adguard/conf/AdGuardHome.yaml")
-    [ -d "${APP_DIR}/configs/navidrome" ] && SNAP_FILES+=("configs/navidrome")
+    [ -f "${APP_DIR}/docker-compose.yml" ] && SNAP_FILES+=("docker-compose.yml") || true
+    [ -f "${APP_DIR}/Caddyfile" ] && SNAP_FILES+=("Caddyfile") || true
+    [ -d "${APP_DIR}/caddy" ] && SNAP_FILES+=("caddy") || true
+    [ -f "${APP_DIR}/mihomo/config.yaml" ] && SNAP_FILES+=("mihomo/config.yaml") || true
+    [ -f "${APP_DIR}/adguard/conf/AdGuardHome.yaml" ] && SNAP_FILES+=("adguard/conf/AdGuardHome.yaml") || true
+    [ -d "${APP_DIR}/configs/navidrome" ] && SNAP_FILES+=("configs/navidrome") || true
 
     tar -czf "${SNAP_TAR}" -C "${APP_DIR}" "${SNAP_FILES[@]}" 2>/dev/null || tar -czf "${SNAP_TAR}" -C "${APP_DIR}" .env 2>/dev/null || true
     chmod 600 "${SNAP_TAR}" 2>/dev/null || true

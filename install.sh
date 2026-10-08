@@ -319,7 +319,7 @@ SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.6"
+HOMELAB_VERSION="2.8.7"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -471,49 +471,50 @@ load_previous_config() {
             SAMBA_PASS="${SAVED_MASTER_PASS}"
             AGH_PASS="${SAVED_MASTER_PASS}"
         fi
-        [ -n "${SAVED_SELECTED_DOH_1:-}" ] && SELECTED_DOH_1="${SAVED_SELECTED_DOH_1}"
-        [ -n "${SAVED_SELECTED_DOH_2:-}" ] && SELECTED_DOH_2="${SAVED_SELECTED_DOH_2}"
-        [ -n "${SAVED_SELECTED_DOH_3:-}" ] && SELECTED_DOH_3="${SAVED_SELECTED_DOH_3}"
-        [ -n "${SAVED_SELECTED_DOT_1:-}" ] && SELECTED_DOT_1="${SAVED_SELECTED_DOT_1}"
-        [ -n "${SAVED_SELECTED_DOT_2:-}" ] && SELECTED_DOT_2="${SAVED_SELECTED_DOT_2}"
-        [ -n "${SAVED_SELECTED_BOOTSTRAP_IPS:-}" ] && SELECTED_BOOTSTRAP_IPS="${SAVED_SELECTED_BOOTSTRAP_IPS}"
-        [ -n "${SAVED_SELECTED_BOOTSTRAP_IP_1:-}" ] && SELECTED_BOOTSTRAP_IP_1="${SAVED_SELECTED_BOOTSTRAP_IP_1}"
-        [ -n "${SAVED_LOGS_DOMAIN:-}" ] && LOGS_DOMAIN="${SAVED_LOGS_DOMAIN}"
-        [ -n "${SAVED_ENABLE_TELEGRAM:-}" ] && ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM}"
-        [ -n "${SAVED_TELEGRAM_BOT_TOKEN:-}" ] && TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN}"
-        [ -n "${SAVED_TELEGRAM_CHAT_ID:-}" ] && TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID}"
-        [ -n "${SAVED_SAVE_FSTYPE:-}" ] && SAVE_FSTYPE="${SAVED_SAVE_FSTYPE}"
-        [ -n "${SAVED_HOMELAB_VERSION:-}" ] && CURRENT_INSTALLED_VERSION="${SAVED_HOMELAB_VERSION}"
-        [ -n "${SAVED_ADMIN_USER:-}" ] && ADMIN_USER="${SAVED_ADMIN_USER}"
-        [ -n "${SAVED_SAVE_DIR:-}" ] && SAVE_DIR="${SAVED_SAVE_DIR}"
-        [ -n "${SAVED_STORAGE_MODE:-}" ] && STORAGE_MODE="${SAVED_STORAGE_MODE}"
-        [ -n "${SAVED_ENABLE_GATEWAY:-}" ] && ENABLE_GATEWAY="${SAVED_ENABLE_GATEWAY}"
-        [ -n "${SAVED_ENABLE_VAULT:-}" ] && ENABLE_VAULT="${SAVED_ENABLE_VAULT}"
-        [ -n "${SAVED_ENABLE_GITEA:-}" ] && ENABLE_GITEA="${SAVED_ENABLE_GITEA}"
-        [ -n "${SAVED_ENABLE_SAMBA:-}" ] && ENABLE_SAMBA="${SAVED_ENABLE_SAMBA}"
-        [ -n "${SAVED_ENABLE_QBIT:-}" ] && ENABLE_QBIT="${SAVED_ENABLE_QBIT}"
-        [ -n "${SAVED_ENABLE_METUBE:-}" ] && ENABLE_METUBE="${SAVED_ENABLE_METUBE}"
-        [ -n "${SAVED_METUBE_DOMAIN:-}" ] && METUBE_DOMAIN="${SAVED_METUBE_DOMAIN}"
-        [ -n "${SAVED_ENABLE_NAVIDROME:-}" ] && ENABLE_NAVIDROME="${SAVED_ENABLE_NAVIDROME}"
-        [ -n "${SAVED_MUSIC_DOMAIN:-}" ] && MUSIC_DOMAIN="${SAVED_MUSIC_DOMAIN}"
-        [ -n "${SAVED_SSL_MODE:-}" ] && SSL_MODE="${SAVED_SSL_MODE}"
-        [ -n "${SAVED_DUCKDNS_NAME:-}" ] && DUCKDNS_NAME="${SAVED_DUCKDNS_NAME}"
-        [ -n "${SAVED_DUCKDNS_TOKEN:-}" ] && DUCKDNS_TOKEN="${SAVED_DUCKDNS_TOKEN}"
-        [ -n "${SAVED_SUB_URL:-}" ] && SUB_URL="${SAVED_SUB_URL}"
-        [ -n "${SAVED_TARGET_USER:-}" ] && TARGET_USER="${SAVED_TARGET_USER}"
-        [ -n "${SAVED_SHARE_NAME:-}" ] && SHARE_NAME="${SAVED_SHARE_NAME}"
-        [ -n "${SAVED_BASE_DOMAIN:-}" ] && BASE_DOMAIN="${SAVED_BASE_DOMAIN}"
-        [ -n "${SAVED_VAULT_DOMAIN:-}" ] && VAULT_DOMAIN="${SAVED_VAULT_DOMAIN}"
-        [ -n "${SAVED_GITEA_DOMAIN:-}" ] && GITEA_DOMAIN="${SAVED_GITEA_DOMAIN}"
-        [ -n "${SAVED_ADGUARD_DOMAIN:-}" ] && ADGUARD_DOMAIN="${SAVED_ADGUARD_DOMAIN}"
-        [ -n "${SAVED_TORRENT_DOMAIN:-}" ] && TORRENT_DOMAIN="${SAVED_TORRENT_DOMAIN}"
-        [ -n "${SAVED_PROXY_DOMAIN:-}" ] && PROXY_DOMAIN="${SAVED_PROXY_DOMAIN}"
-        [ -n "${SAVED_VAULT_DATA_DIR:-}" ] && VAULT_DATA_DIR="${SAVED_VAULT_DATA_DIR}"
-        [ -n "${SAVED_GITEA_DATA_DIR:-}" ] && GITEA_DATA_DIR="${SAVED_GITEA_DATA_DIR}"
-        [ -n "${SAVED_ADGUARD_WORK_DIR:-}" ] && ADGUARD_WORK_DIR="${SAVED_ADGUARD_WORK_DIR}"
-        [ -n "${SAVED_VAULT_ADMIN_TOKEN:-}" ] && VAULT_ADMIN_TOKEN="${SAVED_VAULT_ADMIN_TOKEN}"
-        [ -n "${SAVED_SUBDIR_NAME:-}" ] && SUBDIR_NAME="${SAVED_SUBDIR_NAME}"
+        SELECTED_DOH_1="${SAVED_SELECTED_DOH_1:-$SELECTED_DOH_1}"
+        SELECTED_DOH_2="${SAVED_SELECTED_DOH_2:-$SELECTED_DOH_2}"
+        SELECTED_DOH_3="${SAVED_SELECTED_DOH_3:-$SELECTED_DOH_3}"
+        SELECTED_DOT_1="${SAVED_SELECTED_DOT_1:-$SELECTED_DOT_1}"
+        SELECTED_DOT_2="${SAVED_SELECTED_DOT_2:-$SELECTED_DOT_2}"
+        SELECTED_BOOTSTRAP_IPS="${SAVED_SELECTED_BOOTSTRAP_IPS:-$SELECTED_BOOTSTRAP_IPS}"
+        SELECTED_BOOTSTRAP_IP_1="${SAVED_SELECTED_BOOTSTRAP_IP_1:-$SELECTED_BOOTSTRAP_IP_1}"
+        LOGS_DOMAIN="${SAVED_LOGS_DOMAIN:-$LOGS_DOMAIN}"
+        ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM:-$ENABLE_TELEGRAM}"
+        TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-$TELEGRAM_BOT_TOKEN}"
+        TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-$TELEGRAM_CHAT_ID}"
+        SAVE_FSTYPE="${SAVED_SAVE_FSTYPE:-$SAVE_FSTYPE}"
+        CURRENT_INSTALLED_VERSION="${SAVED_HOMELAB_VERSION:-${CURRENT_INSTALLED_VERSION:-}}"
+        ADMIN_USER="${SAVED_ADMIN_USER:-$ADMIN_USER}"
+        SAVE_DIR="${SAVED_SAVE_DIR:-$SAVE_DIR}"
+        STORAGE_MODE="${SAVED_STORAGE_MODE:-$STORAGE_MODE}"
+        ENABLE_GATEWAY="${SAVED_ENABLE_GATEWAY:-$ENABLE_GATEWAY}"
+        ENABLE_VAULT="${SAVED_ENABLE_VAULT:-$ENABLE_VAULT}"
+        ENABLE_GITEA="${SAVED_ENABLE_GITEA:-$ENABLE_GITEA}"
+        ENABLE_SAMBA="${SAVED_ENABLE_SAMBA:-$ENABLE_SAMBA}"
+        ENABLE_QBIT="${SAVED_ENABLE_QBIT:-$ENABLE_QBIT}"
+        ENABLE_METUBE="${SAVED_ENABLE_METUBE:-$ENABLE_METUBE}"
+        METUBE_DOMAIN="${SAVED_METUBE_DOMAIN:-$METUBE_DOMAIN}"
+        ENABLE_NAVIDROME="${SAVED_ENABLE_NAVIDROME:-$ENABLE_NAVIDROME}"
+        MUSIC_DOMAIN="${SAVED_MUSIC_DOMAIN:-$MUSIC_DOMAIN}"
+        SSL_MODE="${SAVED_SSL_MODE:-$SSL_MODE}"
+        DUCKDNS_NAME="${SAVED_DUCKDNS_NAME:-$DUCKDNS_NAME}"
+        DUCKDNS_TOKEN="${SAVED_DUCKDNS_TOKEN:-$DUCKDNS_TOKEN}"
+        SUB_URL="${SAVED_SUB_URL:-$SUB_URL}"
+        TARGET_USER="${SAVED_TARGET_USER:-$TARGET_USER}"
+        SHARE_NAME="${SAVED_SHARE_NAME:-$SHARE_NAME}"
+        BASE_DOMAIN="${SAVED_BASE_DOMAIN:-$BASE_DOMAIN}"
+        VAULT_DOMAIN="${SAVED_VAULT_DOMAIN:-$VAULT_DOMAIN}"
+        GITEA_DOMAIN="${SAVED_GITEA_DOMAIN:-$GITEA_DOMAIN}"
+        ADGUARD_DOMAIN="${SAVED_ADGUARD_DOMAIN:-$ADGUARD_DOMAIN}"
+        TORRENT_DOMAIN="${SAVED_TORRENT_DOMAIN:-$TORRENT_DOMAIN}"
+        PROXY_DOMAIN="${SAVED_PROXY_DOMAIN:-$PROXY_DOMAIN}"
+        VAULT_DATA_DIR="${SAVED_VAULT_DATA_DIR:-$VAULT_DATA_DIR}"
+        GITEA_DATA_DIR="${SAVED_GITEA_DATA_DIR:-$GITEA_DATA_DIR}"
+        ADGUARD_WORK_DIR="${SAVED_ADGUARD_WORK_DIR:-$ADGUARD_WORK_DIR}"
+        VAULT_ADMIN_TOKEN="${SAVED_VAULT_ADMIN_TOKEN:-$VAULT_ADMIN_TOKEN}"
+        SUBDIR_NAME="${SAVED_SUBDIR_NAME:-$SUBDIR_NAME}"
     fi
+    return 0
 }
 
 sync_time() {
@@ -571,6 +572,7 @@ EOF_TIMESYNC
             rc-service ntpd start >/dev/null 2>&1 || true
         fi
     fi
+    return 0
 }
 
 # =============================================================================
@@ -4882,7 +4884,7 @@ norm_service() {
 
 cmd_status() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── HOMELAB APPLIANCE: СТАТУС СИСТЕМЫ И СЕРВИСОВ ───────────────${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Версия комплекса:${CLR_RESET}  ${CLR_GREEN}v${SAVED_HOMELAB_VERSION:-2.5.0}${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Версия комплекса:${CLR_RESET}  ${CLR_GREEN}v${SAVED_HOMELAB_VERSION:-2.8.7}${CLR_RESET}"
     echo -e "  ${CLR_WHITE}• Ядро / ОС:${CLR_RESET}         $(uname -srm) [$(grep -E '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '\"' || echo 'Linux')]"
     local host_uptime=""
     if [ -r /proc/uptime ]; then
@@ -5159,7 +5161,7 @@ cmd_update() {
 
 cmd_version() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.5.0}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.7}"
     echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
 
     local REMOTE_VER=""
@@ -5193,7 +5195,7 @@ cmd_upgrade() {
     done
 
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.5.0}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.7}"
     echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
     echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
 
@@ -5228,12 +5230,12 @@ cmd_upgrade() {
     local SNAP_TAR="${SNAPSHOT_DIR}/homelab_snapshot_pre_upgrade.tar.gz"
 
     local SNAP_FILES=(".env")
-    [ -f "${APP_DIR}/docker-compose.yml" ] && SNAP_FILES+=("docker-compose.yml")
-    [ -f "${APP_DIR}/Caddyfile" ] && SNAP_FILES+=("Caddyfile")
-    [ -d "${APP_DIR}/caddy" ] && SNAP_FILES+=("caddy")
-    [ -f "${APP_DIR}/mihomo/config.yaml" ] && SNAP_FILES+=("mihomo/config.yaml")
-    [ -f "${APP_DIR}/adguard/conf/AdGuardHome.yaml" ] && SNAP_FILES+=("adguard/conf/AdGuardHome.yaml")
-    [ -d "${APP_DIR}/configs/navidrome" ] && SNAP_FILES+=("configs/navidrome")
+    [ -f "${APP_DIR}/docker-compose.yml" ] && SNAP_FILES+=("docker-compose.yml") || true
+    [ -f "${APP_DIR}/Caddyfile" ] && SNAP_FILES+=("Caddyfile") || true
+    [ -d "${APP_DIR}/caddy" ] && SNAP_FILES+=("caddy") || true
+    [ -f "${APP_DIR}/mihomo/config.yaml" ] && SNAP_FILES+=("mihomo/config.yaml") || true
+    [ -f "${APP_DIR}/adguard/conf/AdGuardHome.yaml" ] && SNAP_FILES+=("adguard/conf/AdGuardHome.yaml") || true
+    [ -d "${APP_DIR}/configs/navidrome" ] && SNAP_FILES+=("configs/navidrome") || true
 
     tar -czf "${SNAP_TAR}" -C "${APP_DIR}" "${SNAP_FILES[@]}" 2>/dev/null || tar -czf "${SNAP_TAR}" -C "${APP_DIR}" .env 2>/dev/null || true
     chmod 600 "${SNAP_TAR}" 2>/dev/null || true
