@@ -44,9 +44,9 @@ prompt_configuration() {
             systemctl disable --now vaultwarden-backup.service 2>/dev/null || true
             systemctl disable --now gitea-backup.timer 2>/dev/null || true
             systemctl disable --now gitea-backup.service 2>/dev/null || true
-            rm -f /etc/systemd/system/homelab.service /etc/systemd/system/network-gateway-watchdog.* /etc/systemd/system/vaultwarden-backup.* /etc/systemd/system/gitea-backup.*
-            systemctl disable --now zapret2.service 2>/dev/null || true
-            rm -f /etc/systemd/system/zapret2.service
+            systemctl disable --now navidrome-backup.timer 2>/dev/null || true
+            systemctl disable --now navidrome-backup.service 2>/dev/null || true
+            rm -f /etc/systemd/system/homelab.service /etc/systemd/system/network-gateway-watchdog.* /etc/systemd/system/vaultwarden-backup.* /etc/systemd/system/gitea-backup.* /etc/systemd/system/navidrome-backup.*
             systemctl daemon-reload >/dev/null 2>&1 || true
         elif [ "${INIT_SYSTEM}" = "openrc" ]; then
             rc-service homelab stop 2>/dev/null || true
@@ -56,10 +56,8 @@ prompt_configuration() {
             rc-update del homelab-storage default 2>/dev/null || true
             rc-service zram-swap stop 2>/dev/null || true
             rc-update del zram-swap default 2>/dev/null || true
-            rc-service zapret2 stop 2>/dev/null || true
-            rc-update del zapret2 default 2>/dev/null || true
-            rm -f /etc/init.d/homelab /etc/init.d/homelab-storage /etc/init.d/zram-swap /etc/init.d/zapret2
-            sed -i '/backup_vaultwarden\.sh/d; /backup_gitea\.sh/d; /gateway-watchdog\.sh/d' /etc/crontabs/root 2>/dev/null || true
+            rm -f /etc/init.d/homelab /etc/init.d/homelab-storage /etc/init.d/zram-swap
+            sed -i '/backup_vaultwarden\.sh/d; /backup_gitea\.sh/d; /backup_navidrome\.sh/d; /gateway-watchdog\.sh/d' /etc/crontabs/root 2>/dev/null || true
             touch /etc/crontabs/cron.update 2>/dev/null || true
         fi
 
@@ -69,18 +67,6 @@ prompt_configuration() {
         fi
         docker stop adguardhome mihomo caddy vaultwarden gitea qbittorrent metube navidrome samba dozzle watchtower autoheal 2>/dev/null || true
         docker rm -f adguardhome mihomo caddy vaultwarden gitea qbittorrent metube navidrome samba dozzle watchtower autoheal 2>/dev/null || true
-        if [ "${INIT_SYSTEM}" = "systemd" ]; then
-            systemctl stop homelab-bot 2>/dev/null || true
-            systemctl disable homelab-bot 2>/dev/null || true
-            rm -f /etc/systemd/system/homelab-bot.service
-        elif [ "${INIT_SYSTEM}" = "openrc" ]; then
-            rc-service homelab-bot stop 2>/dev/null || true
-            rc-update del homelab-bot default 2>/dev/null || true
-            rm -f /etc/init.d/homelab-bot
-        fi
-        pkill -9 -f "homelab-bot.py" 2>/dev/null || true
-        rm -f /usr/local/bin/yt-dlp
-        rm -rf "${APP_DIR}/configs/bot" "${APP_DIR}/scripts/homelab-bot.py" /var/log/homelab-bot.* /run/homelab-bot.pid
 
         log_info "Очистка служебных файлов и конфигураций..."
         local BACKUP_CERTS="/tmp/caddy_certificates_backup_$$"
@@ -90,7 +76,7 @@ prompt_configuration() {
             cp -r "${APP_DIR}/caddy/data/caddy/certificates" "${BACKUP_CERTS}" 2>/dev/null || true
         fi
 
-        rm -rf "${APP_DIR}/adguard" "${APP_DIR}/mihomo" "${APP_DIR}/caddy" "${APP_DIR}/metube" "${APP_DIR}/vaultwarden" "${APP_DIR}/gitea" "${APP_DIR}/qbittorrent" "${APP_DIR}/configs/navidrome" "${ENV_FILE}" "/opt/zapret2"
+        rm -rf "${APP_DIR}/adguard" "${APP_DIR}/mihomo" "${APP_DIR}/caddy" "${APP_DIR}/metube" "${APP_DIR}/vaultwarden" "${APP_DIR}/gitea" "${APP_DIR}/qbittorrent" "${APP_DIR}/configs/navidrome" "${APP_DIR}/backup_*.sh" "${ENV_FILE}"
 
         if [ -d "${BACKUP_CERTS}" ]; then
             mkdir -p "${APP_DIR}/caddy/data/caddy"
@@ -105,10 +91,9 @@ prompt_configuration() {
         USER_HOME=$(eval echo ~"${TARGET_USER}" 2>/dev/null || echo "/home/${TARGET_USER}")
         rm -f "${USER_HOME}/diagnostic_report.log" 2>/dev/null || true
 
-        log_info "Очистка правил межсетевого экрана (декларативные таблицы inet homelab и zapret2 в nftables)..."
+        log_info "Очистка правил межсетевого экрана (декларативная таблица inet homelab в nftables)..."
         if command -v nft >/dev/null 2>&1; then
             nft delete table inet homelab 2>/dev/null || true
-            nft delete table inet zapret2 2>/dev/null || true
             rm -f /etc/nftables.d/homelab.nft 2>/dev/null || true
             sed -i '/include.*homelab\.nft/d' /etc/nftables.conf /etc/nftables.nft 2>/dev/null || true
         fi

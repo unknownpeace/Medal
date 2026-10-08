@@ -48,6 +48,7 @@ EOF_DIAG
     [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["gitea"]="Gitea (Git-сервер)"
     [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["samba"]="Samba (Сетевой доступ)"
     [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]    && EXPECTED_SERVICES["qbittorrent"]="qBittorrent (VueTorrent)"
+    [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]  && EXPECTED_SERVICES["metube"]="MeTube (Загрузка медиа)"
     [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["navidrome"]="Navidrome Hi-Fi (Музыка)"
     EXPECTED_SERVICES["caddy"]="Caddy Reverse Proxy"
     EXPECTED_SERVICES["dozzle"]="Dozzle (Web Log Viewer)"

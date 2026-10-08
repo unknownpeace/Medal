@@ -844,7 +844,7 @@ cmd_dump_logs() {
         echo "                         ЖУРНАЛЫ КОНТЕЙНЕРОВ DOCKER                          "
         echo "============================================================================="
 
-        local ALL_CONTAINERS=("adguardhome" "mihomo" "caddy" "dozzle" "watchtower" "autoheal" "vaultwarden" "gitea" "qbittorrent" "navidrome" "samba")
+        local ALL_CONTAINERS=("adguardhome" "mihomo" "caddy" "dozzle" "watchtower" "autoheal" "vaultwarden" "gitea" "qbittorrent" "metube" "navidrome" "samba")
         for c in "${ALL_CONTAINERS[@]}"; do
             if docker inspect "$c" >/dev/null 2>&1; then
                 local st

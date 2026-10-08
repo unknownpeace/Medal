@@ -26,34 +26,6 @@ EOF_NM
             systemctl reload NetworkManager 2>/dev/null || true
         fi
 
-        # Полная очистка и удаление любых следов Zapret (службы, процессы, таблицы nftables)
-        if [ "${INIT_SYSTEM}" = "openrc" ]; then
-            rc-service zapret2 stop >/dev/null 2>&1 || true
-            rc-update del zapret2 default >/dev/null 2>&1 || true
-            rm -f /etc/init.d/zapret2
-        elif [ "${INIT_SYSTEM}" = "systemd" ]; then
-            systemctl disable --now zapret2.service >/dev/null 2>&1 || true
-            rm -f /etc/systemd/system/zapret2.service
-            systemctl daemon-reload >/dev/null 2>&1 || true
-        fi
-        pkill -9 nfqws2 >/dev/null 2>&1 || true
-        rm -rf /opt/zapret2 /usr/local/bin/blockcheck /etc/sysctl.d/99-zapret.conf /etc/modules-load.d/zapret.conf
-        if command -v nft >/dev/null 2>&1; then
-            nft delete table inet zapret2 >/dev/null 2>&1 || true
-        fi
-
-        # Полная очистка и удаление любых следов Telegram-бота (служба, процессы, скрипт, конфиг)
-        if [ "${INIT_SYSTEM}" = "openrc" ]; then
-            rc-service homelab-bot stop >/dev/null 2>&1 || true
-            rc-update del homelab-bot default >/dev/null 2>&1 || true
-            rm -f /etc/init.d/homelab-bot
-        elif [ "${INIT_SYSTEM}" = "systemd" ]; then
-            systemctl disable --now homelab-bot.service >/dev/null 2>&1 || true
-            rm -f /etc/systemd/system/homelab-bot.service
-            systemctl daemon-reload >/dev/null 2>&1 || true
-        fi
-        pkill -9 -f "homelab-bot.py" >/dev/null 2>&1 || true
-        rm -rf "${APP_DIR}/scripts/homelab-bot.py" "${APP_DIR}/configs/bot" /var/log/homelab-bot.* /run/homelab-bot.pid /usr/local/bin/yt-dlp
 
         chattr -i /etc/resolv.conf 2>/dev/null || true
         rm -f /etc/resolv.conf
