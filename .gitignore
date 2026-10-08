@@ -1,0 +1,16 @@
+# System and OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
+
+# Environment and secrets
+.env
+*.key
+*.pem
+*.crt
+
+# Temporary and third-party tools
+zapret*
+/tmp/
+/scratch/

@@ -2904,23 +2904,7 @@ filtering:
   rewrites_enabled: true
   filters_update_interval: 24
   rewrites:${REWRITE_ENTRIES}
-filters:
-  - enabled: true
-    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
-    name: AdGuard DNS filter
-    id: 1
-  - enabled: true
-    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt
-    name: AdGuard Tracking Protection filter
-    id: 2
-  - enabled: true
-    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_6.txt
-    name: AdGuard Russian filter
-    id: 3
-  - enabled: true
-    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_3.txt
-    name: AdGuard URL Tracking Protection filter
-    id: 4
+filters: []
 whitelist_filters: []
 user_rules:
   # Блокировка канареечных доменов DoH и Apple Private Relay (предотвращение скрытого обхода шлюза)
@@ -3003,6 +2987,7 @@ proxy-groups:
     type: select
     proxies:
       - AUTO
+      - US-AUTO
       - DIRECT
     use:
       - my-sub
@@ -3011,6 +2996,18 @@ proxy-groups:
     type: url-test
     use:
       - my-sub
+    url: https://cp.cloudflare.com/generate_204
+    interval: 300
+    tolerance: 50
+    lazy: true
+
+  - name: US-AUTO
+    type: url-test
+    use:
+      - my-sub
+    proxies:
+      - AUTO
+    filter: \"(?i)\\\\b(US|USA|United States|America)\\\\b|🇺🇸|США\"
     url: https://cp.cloudflare.com/generate_204
     interval: 300
     tolerance: 50
@@ -3046,6 +3043,7 @@ proxy-groups:
   - name: AI-Services
     type: select
     proxies:
+      - US-AUTO
       - AUTO
       - PROXY
       - DIRECT
@@ -3056,6 +3054,11 @@ proxy-groups:
             PROXY_GROUPS_CONFIG="
 proxy-groups:
   - name: PROXY
+    type: select
+    proxies:
+      - DIRECT
+
+  - name: US-AUTO
     type: select
     proxies:
       - DIRECT
@@ -3078,6 +3081,7 @@ proxy-groups:
   - name: AI-Services
     type: select
     proxies:
+      - US-AUTO
       - DIRECT"
         fi
 
@@ -3341,23 +3345,37 @@ rules:
   - GEOIP,private,DIRECT,no-resolve
   - GEOIP,lan,DIRECT,no-resolve
 
-  # Торрент-пиры — напрямую на полной скорости провайдера (P2P без задержек и расхода прокси)
-  - DST-PORT,6881,DIRECT
-  - SRC-PORT,6881,DIRECT
+  # Торрент-клиенты и P2P-пиры — напрямую на полной скорости провайдера (без расхода трафика прокси)
+  - PROCESS-NAME,qbittorrent,DIRECT
+  - PROCESS-NAME,qbittorrent-nox,DIRECT
+  - PROCESS-NAME,transmission-daemon,DIRECT
+  - PROCESS-NAME,transmission-qt,DIRECT
+  - PROCESS-NAME,uTorrent,DIRECT
+  - PROCESS-NAME,BitComet,DIRECT
+  - DST-PORT,6881-6889,DIRECT
+  - SRC-PORT,6881-6889,DIRECT
+  - DST-PORT,51413,DIRECT
+  - SRC-PORT,51413,DIRECT
 
-  # Торрент-трекеры, каталоги и библиотеки (веб-страницы трекеров заблокированы РКН)
+  # Торрент-трекеры, каталоги и анонсеры (обход блокировок РКН для поиска и подключения к раздачам)
   - DOMAIN-SUFFIX,rutracker.org,PROXY
   - DOMAIN-SUFFIX,rutracker.net,PROXY
   - DOMAIN-SUFFIX,rutracker.nl,PROXY
+  - DOMAIN-SUFFIX,t-ru.org,PROXY
   - DOMAIN-SUFFIX,nnmclub.to,PROXY
   - DOMAIN-SUFFIX,nnm-club.me,PROXY
   - DOMAIN-SUFFIX,rutor.info,PROXY
   - DOMAIN-SUFFIX,rutor.is,PROXY
+  - DOMAIN-SUFFIX,opentor.org,PROXY
+  - DOMAIN-SUFFIX,open.stealth.si,PROXY
+  - DOMAIN-SUFFIX,opentrackr.org,PROXY
   - DOMAIN-SUFFIX,kinozal.tv,PROXY
   - DOMAIN-SUFFIX,flibusta.is,PROXY
   - DOMAIN-SUFFIX,flibusta.site,PROXY
   - DOMAIN-SUFFIX,libria.fun,PROXY
   - DOMAIN-SUFFIX,anilibria.top,PROXY
+  - DOMAIN-KEYWORD,announce,PROXY
+  - DOMAIN-KEYWORD,tracker,PROXY
 
   # Steam Community (заблокирован/замедлен в РФ) через PROXY, а загрузка игр — напрямую DIRECT
   - DOMAIN-SUFFIX,steamcommunity.com,PROXY
