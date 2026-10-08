@@ -319,7 +319,7 @@ SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.13"
+HOMELAB_VERSION="2.8.14"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -5182,7 +5182,12 @@ cmd_doctor() {
     fi
 
     if [[ "${SAVED_ENABLE_GATEWAY:-Y}" =~ ^[Yy]$ ]]; then
-        if command -v nft >/dev/null 2>&1 && nft list table inet homelab >/dev/null 2>&1; then
+        local nft_rules=""
+        if command -v nft >/dev/null 2>&1; then
+            nft_rules=$(nft list table inet homelab 2>/dev/null || true)
+        fi
+
+        if [ -n "$nft_rules" ]; then
             echo -e "  ${TAG_OK} nftables (таблица inet homelab):        ${CLR_GREEN}[АКТИВНА И ПРИМЕНЕНА]${CLR_RESET}"
         else
             echo -e "  ${TAG_ERR} nftables (таблица inet homelab):        ${CLR_RED}[НЕ НАЙДЕНА/ОШИБКА]${CLR_RESET}"
@@ -5236,13 +5241,13 @@ cmd_doctor() {
     fi
 
     if [[ "${SAVED_ENABLE_GATEWAY:-Y}" =~ ^[Yy]$ ]]; then
-        if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -E -q 'dport 53 redirect|redirect to :?53'; then
+        if grep -E -q 'dport 53 redirect|redirect to :?53' <<< "$nft_rules"; then
             echo -e "  ${TAG_OK} Перехват DNS в LAN (DNS Hijack):         ${CLR_GREEN}[АКТИВЕН (порт 53 -> AdGuard)]${CLR_RESET}"
         else
             echo -e "  ${TAG_WARN} Перехват DNS в LAN (DNS Hijack):         ${CLR_YELLOW}[НЕ НАСТРОЕН]${CLR_RESET}"
         fi
 
-        if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -E -q 'maxseg|tcp option maxseg'; then
+        if grep -E -q 'maxseg|tcp option maxseg' <<< "$nft_rules"; then
             echo -e "  ${TAG_OK} Оптимизация MTU (TCP MSS Clamping):      ${CLR_GREEN}[АКТИВНА (защита от дропов)]${CLR_RESET}"
         else
             echo -e "  ${TAG_WARN} Оптимизация MTU (TCP MSS Clamping):      ${CLR_YELLOW}[НЕ НАСТРОЕНА]${CLR_RESET}"
@@ -5252,7 +5257,7 @@ cmd_doctor() {
             echo -e "  ${TAG_OK} Прокси-подписка (VLESS/Trojan/SS):        ${CLR_GREEN}[АКТИВНА (my-sub -> AUTO/PROXY)]${CLR_RESET}"
         fi
 
-        if command -v nft >/dev/null 2>&1 && nft list table inet homelab 2>/dev/null | grep -E -q 'priority.*- ?10|hook forward'; then
+        if grep -E -q 'priority.*- ?10|hook forward' <<< "$nft_rules"; then
             echo -e "  ${TAG_OK} Пересылка трафика LAN/TUN (nftables FORWARD): ${CLR_GREEN}[АКТИВНА (priority -10)]${CLR_RESET}"
         else
             echo -e "  ${TAG_WARN} Пересылка трафика LAN/TUN (nftables FORWARD): ${CLR_YELLOW}[ПРОВЕРЬТЕ NFTABLES]${CLR_RESET}"
@@ -5309,7 +5314,7 @@ cmd_update() {
 
 cmd_version() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.13}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.14}"
     echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
 
     local REMOTE_VER=""
@@ -5343,7 +5348,7 @@ cmd_upgrade() {
     done
 
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.13}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.14}"
     echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
     echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
 
@@ -5620,6 +5625,16 @@ cmd_dump_logs() {
             journalctl -u network-gateway-watchdog.service -n 50 --no-pager 2>/dev/null || echo "Записей watchdog в journald не обнаружено"
         fi
 
+        echo ""
+        echo "============================================================================="
+        echo "               СИСТЕМНЫЕ СООБЩЕНИЯ ЯДРА (DMESG & OOM EVENTS)                "
+        echo "============================================================================="
+        (dmesg -T 2>/dev/null || dmesg 2>/dev/null) | tail -n 60 || echo "Сообщения dmesg недоступны"
+        if [ -f /var/log/messages ]; then
+            echo ""
+            echo "--- ПОСЛЕДНИЕ СИСТЕМНЫЕ ОШИБКИ ИЗ /var/log/messages ---"
+            grep -E -i 'oom|killed|panic|error|fatal|fail' /var/log/messages 2>/dev/null | tail -n 30 || true
+        fi
 
         echo ""
         echo "============================================================================="
@@ -5627,12 +5642,39 @@ cmd_dump_logs() {
         echo "============================================================================="
     } > "${out_file}" 2>&1
 
+    # Автоматическая санитизация секретов (JWT, пароли, токены, ключи подписок)
+    if command -v python3 >/dev/null 2>&1 && [ -f "${out_file}" ]; then
+        python3 -c "
+import re, sys
+p = sys.argv[1]
+try:
+    with open(p, 'r', encoding='utf-8', errors='replace') as f:
+        t = f.read()
+    t = re.sub(r'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}', '[JWT_REDACTED]', t)
+    t = re.sub(r'([?&](?:jwt|token|password|pass|secret|auth|api_key)=)[^&\s\"]+', r'\1[REDACTED]', t, flags=re.IGNORECASE)
+    t = re.sub(r'\"(password|passwd|token|secret|admin_token|private_key|key)\"\s*:\s*\"[^\"]+\"', r'\"\1\":\"[REDACTED]\"', t, flags=re.IGNORECASE)
+    t = re.sub(r'(vless|trojan|ss)://([a-zA-Z0-9_-]{8,})@', r'\1://[SECRET_REDACTED]@', t)
+    t = re.sub(r'\"Cookie\":\s*\[\"[^\"]+\"\]', r'\"Cookie\":[\"[REDACTED]\"]', t)
+    with open(p, 'w', encoding='utf-8') as f:
+        f.write(t)
+except Exception:
+    pass
+" "${out_file}" 2>/dev/null || true
+    fi
+
     if [ "${out_file}" != "${user_file}" ]; then
         cp -f "${out_file}" "${user_file}" 2>/dev/null || true
         chmod 644 "${user_file}" 2>/dev/null || true
         chown "${SAVED_TARGET_USER:-root}:" "${user_file}" 2>/dev/null || true
     fi
     chmod 644 "${out_file}" 2>/dev/null || true
+
+    local samba_file="${SAVED_SAVE_DIR:-/opt/homelab/save}/homelab_logs.txt"
+    if [ -d "${SAVED_SAVE_DIR:-/opt/homelab/save}" ]; then
+        cp -f "${out_file}" "${samba_file}" 2>/dev/null || true
+        chmod 666 "${samba_file}" 2>/dev/null || true
+        chown "${SAVED_TARGET_USER:-root}:" "${samba_file}" 2>/dev/null || true
+    fi
 
     local file_size
     file_size=$(du -h "${out_file}" 2>/dev/null | awk '{print $1}' || echo "N/A")
@@ -5642,6 +5684,10 @@ cmd_dump_logs() {
     if [ -f "${user_file}" ] && [ "${out_file}" != "${user_file}" ]; then
         echo -e "      • ${CLR_WHITE}${user_file}${CLR_RESET}"
     fi
+    if [ -f "${samba_file}" ]; then
+        echo -e "      • Сетевая папка (Samba): ${CLR_GREEN}\\\\${SAVED_LOCAL_IP:-IP}\\${SAVED_SHARE_NAME:-storage}\\homelab_logs.txt${CLR_RESET}"
+    fi
+    echo -e "      • ${CLR_DIM}(Приватные JWT-токены и пароли автоматически замаскированы [REDACTED])${CLR_RESET}"
     echo ""
     echo -e "  ${TAG_INFO} Чтобы просмотреть или скопировать вывод, выполните:"
     echo -e "      ${CLR_GREEN}cat ${out_file}${CLR_RESET}"
