@@ -3,12 +3,40 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Архитектура-Transparent_Gateway-0ea5e9?style=for-the-badge&logo=shield" alt="Transparent Gateway">
-  <img src="https://img.shields.io/badge/Firewall-Native_nftables-10b981?style=for-the-badge&logo=linux" alt="nftables">
+  <img src="https://img.shields.io/badge/DPI_Bypass-Zapret2_(nfqws2)-f59e0b?style=for-the-badge&logo=shield" alt="Zapret2">
   <img src="https://img.shields.io/badge/Routing-Mihomo_TUN_(Meta)-8b5cf6?style=for-the-badge&logo=fastapi" alt="Mihomo TUN">
+  <img src="https://img.shields.io/badge/Music_Streaming-Navidrome_(Spotify)-ec4899?style=for-the-badge&logo=spotify" alt="Navidrome">
   <img src="https://img.shields.io/badge/DNS-AdGuard_Home-16a34a?style=for-the-badge&logo=adguard" alt="AdGuard Home">
   <img src="https://img.shields.io/badge/Docker-Self--Healing-2563eb?style=for-the-badge&logo=docker" alt="Docker">
   <img src="https://img.shields.io/badge/Лицензия-MIT-amber?style=for-the-badge" alt="MIT License">
 </p>
+
+```text
+  ███╗   ███╗███████╗██████╗  █████╗ ██╗     
+  ████╗ ████║██╔════╝██╔══██╗██╔══██╗██║     
+  ██╔████╔██║█████╗  ██║  ██║███████║██║     
+  ██║╚██╔╝██║██╔══╝  ██║  ██║██╔══██║██║     
+  ██║ ╚═╝ ██║███████╗██████╔╝██║  ██║███████╗
+  ╚═╝     ╚═╝╚══════╝╚═════╝ ╚═╝  ╚═╝╚══════╝
+  ╔══════════════════════════════════════════════════════════════════════════╗
+  ║   HOMELAB APPLIANCE & TRANSPARENT GATEWAY ◈ RUSSIA PRO 2026 EDITION      ║
+  ╠══════════════════════════════════════════════════════════════════════════╣
+  ║  ◆ ГИБРИДНЫЙ СЕТЕВОЙ СТЕК: ZAPRET2 + MIHOMO TUN + ADGUARD HOME (CLEAN)   ║
+  ║                                                                          ║
+  ║   [ КЛИЕНТЫ LAN ] ──► [ ADGUARD :53 ] ──► [ MIHOMO TUN :1053 ]           ║
+  ║   (ТВ, ПК, Смартфоны)  CleanDNS/ZeroCache   Fake-IP / Mixed TUN / gVisor ║
+  ║           │                     │                                        ║
+  ║           │                     ▼ (Анти-Утечки)   Маршрутизация трафика: ║
+  ║           │              [ ECH / DOH DROP ]  ├─► [ US-AUTO ] AI (ChatGPT)║
+  ║           │                                  ├─► [ PROXY ] Зарубежное    ║
+  ║           │                                  └─► [ DIRECT ] РФ / Банки   ║
+  ║           ▼                                                      │       ║
+  ║   [ ZAPRET2 ENGINE ] ────────────────────────────────────────────┘       ║
+  ║   • NFQUEUE / nfqws2: Аппаратный DPI-Bypass для ВСЕХ сайтов прямо        ║
+  ║     через провайдера без VPN (YouTube 4K, Discord, Pixiv, Rutracker)!    ║
+  ║   • Работает автономно ДАЖЕ ЕСЛИ НЕ УКАЗАНА ПОДПИСКА НА ПРОКСИ!          ║
+  ╚══════════════════════════════════════════════════════════════════════════╝
+```
 
 ---
 
@@ -18,7 +46,7 @@
 
 ### 🎯 Принцип «Одного действия»
 Вам больше **не нужно** ставить VPN-клиенты, расширения или костыли на каждый телефон, ноутбук, планшет и Smart TV.
-> Достаточно **один раз** в настройках DHCP домашнего роутера указать IP-адрес этого сервера как **шлюз (Gateway)** и **DNS** — и **все устройства в вашей квартире автоматически** получают чистый интернет без рекламы, с доступом к заблокированным ресурсам и максимальной скоростью!
+> Достаточно **один раз** в настройках DHCP домашнего роутера указать IP-адрес этого сервера как **шлюз (Gateway)** и **DNS** — и **все устройства в вашей квартире автоматически** получают чистый интернет, доступ ко всем заблокированным ресурсам и максимальную скорость провайдера!
 
 ---
 
@@ -28,16 +56,18 @@
 
 | Вызов в РФ | Как это решено в комплексе |
 | :--- | :--- |
-| **Блокировка / замедление YouTube** | Автоматический сброс нестабильного QUIC (`UDP 443`) для принудительного перехода браузеров на быстрый HTTP/2 over TCP, ускоренный алгоритмом **BBRv3**, плюс прямое туннелирование CDN Google Video. Никаких «вечных колесиков» загрузки 4K. |
-| **Блокировка Discord (голосовые каналы)** | Активирован **Full-Cone NAT** (`endpoint-independent-nat: true`) в ядре Mihomo. Голосовые узлы RTC, медиа-серверы и шлюзы Discord направляются через туннель без потери UDP-пакетов. |
-| **Геоблокировки зарубежного AI** | Выделенная группа `AI-Services` с актуальными MRS-правилами: **ChatGPT (OpenAI), Claude (Anthropic), Google Gemini, Perplexity, Cursor, Copilot, Suno, Midjourney, Grok, DeepSeek, v0.dev**. |
+| **DPI-обход для ВСЕХ сайтов (YouTube 4K, Discord, Pixiv, Rutracker)** | **Универсальный режим Zapret2 (`MODE_FILTER=none`):** Аппаратная десинхронизация ТСПУ применяется ко **всему** исходящему HTTP/HTTPS трафику. Даже если вы **вообще не настраивали прокси/подписку**, сервер в одиночку открывает `pixiv.net`, `rutracker.org`, `youtube.com` (4K 60fps) и Discord прямо через провайдера без расхода платного VPS-трафика! |
+| **Автоподбор стратегий обхода под провайдера** | Встроенная команда **`homelab blockcheck`** (или просто `blockcheck`). Тестирует реакцию ТСПУ вашего конкретного провайдера (Ростелеком, Дом.ру, МТС, Билайн, Мегафон) и выводит идеальные параметры десинхронизации. |
+| **Геоблокировки зарубежного AI (ChatGPT, Claude, Gemini)** | Умный выбор узла **`US-AUTO`**: алгоритм автоматически фильтрует серверы США (`(?i)\b(US|USA|United States|America)\b|🇺🇸|США`) и выбирает узел с минимальным пингом. Никаких «Access Denied» из-за случайного европейского IP. |
+| **Свой домашний Spotify (Hi-Fi Стриминг & Офлайн в метро)** | **Идеальная триада: Navidrome + Telegram Бот (yt-dlp) + Samba NAS:** Легковесный музыкальный сервис (~40 МБ RAM). Отправляете любую ссылку боту в Telegram ➔ трек сохраняется в `/music` с обложкой и тегами (или качаете FLAC через торренты) ➔ приложения **Symfonium** (Android), **Substreamer** (iOS) и **Feishin** (ПК) обеспечивают 100% офлайн-кэш, тексты песен в такт, Android Auto / CarPlay и стриминг Hi-Fi. |
 | **Банки, Госуслуги и доставка РФ** | **100% прямой доступ (DIRECT)**. Все национальные зоны (`.ru`, `.su`, `.рф`, `.москва`), базы `category-ru` и весь диапазон российских IP-адресов идут мимо прокси на полной скорости провайдера (до 1 Гбит/с, без капч и ограничений). |
+| **Скачивание игр и P2P-торренты** | Трафик торрент-клиентов (qBittorrent, Transmission) и пиров (порты 6881-6889, 51413) изолирован и идет **напрямую**, не сжигая трафик прокси. Блокированные трекеры (RuTracker, Rutor, Flibusta) прозрачно проксируются. |
+| **Чистый DNS без ложных срабатываний** | AdGuard Home очищен от избыточных рекламных списков (`filters: []`) — вы сами решаете, что фильтровать. При этом сохранены системные правила защиты от DoH/ECH утечек и пропуск Captive Portal. |
 | **Скрытый обход DNS на Smart TV / IoT** | Нативный **DNS Hijacking** в `nftables`: любые DNS-запросы на порт 53 (даже если устройство захардкодило `8.8.8.8`) незаметно перехватываются и фильтруются AdGuard Home. |
 | **Блокировки ECH со стороны ТСПУ** | В AdGuard Home включен `block_ech: true` и правило `|*^$dnstype=HTTPS`. Предотвращает невидимый сброс TLS-соединений на сайтах Cloudflare из-за несовместимости с ТСПУ. |
 | **Обход шлюза через Apple iCloud Private Relay** | Встроенная канареечная блокировка `mask.icloud.com` и `mask-h2.icloud.com`. Техника Apple видит локальный шлюз и использует его, не переключаясь в скрытый обходной туннель. |
 | **Обход DoH в Firefox и Chrome** | Блокировка канареечного домена `use-application-dns.net`. Браузеры уважают домашний DNS и не уводят запросы мимо сервера. |
 | **Зависания страниц на PPPoE / VPN** | Автоматический **TCP MSS Clamping** (`tcp option maxseg size set rt mtu`) в `nftables`. Сегменты TCP автоматически подгоняются под MTU сети — сайты открываются мгновенно. |
-| **Скачивание игр и P2P-торренты** | Трафик торрент-пиров (порты 6881, 51413) и серверов загрузки Steam/Epic Games идёт **напрямую на полной скорости**, не расходуя трафик прокси-подписки. Блокированные трекеры (RuTracker, Rutor, Flibusta) идут через прокси. |
 
 ---
 
@@ -55,38 +85,43 @@ flowchart TD
     subgraph SERVER[" ⚡ Homelab Server (Прозрачный шлюз) "]
         NFT["🛡️ Native nftables (inet homelab)\n• TCP MSS Clamping (MTU)\n• DNS Hijack (Порт 53 Anti-Bypass)\n• Защита от петель маршрута"]
         
-        AGH["🟢 AdGuard Home (:53)\n• Блокировка рекламы и спама\n• Zero-Cache (Синхронизация Fake-IP)\n• Защита от DoH/ECH утечек"]
+        AGH["🟢 AdGuard Home (:53)\n• Zero-Cache (Синхронизация Fake-IP)\n• Защита от DoH/ECH утечек\n• Чистые фильтры без ложных банов"]
         
-        MIHOMO["🚀 Mihomo Core (:1053 TUN / Fake-IP)\n• Stack: Mixed (gVisor TCP + System UDP)\n• Full-Cone NAT (Discord / Voice / Игры)\n• Meta Rule-Sets (.mrs)"]
+        MIHOMO["🚀 Mihomo Core (:1053 TUN / Fake-IP)\n• Stack: Mixed (gVisor + System UDP)\n• Full-Cone NAT (Discord / Voice)\n• Группа US-AUTO (AI: ChatGPT, Claude)\n• Meta Rule-Sets (.mrs)"]
         
+        ZAPRET["⚡ Zapret2 (NFQUEUE / nfqws2)\n• Hardware DPI Desync Engine\n• YouTube 4K & Discord на прямом канале\n• Discord Media UDP Voice Handler"]
+
         CADDY["🔒 Caddy Web Gateway (:80 / :443)\n• Стартовый веб-портал по IP\n• Раздача Root CA сертификата\n• Локальные домены *.lan"]
 
         subgraph APPS[" 📦 Docker Compose Стек (Self-Healing) "]
+            NAVI["🎵 Navidrome\n(music.lan)"]
             VW["🔑 Vaultwarden\n(vault.lan)"]
             GIT["🐙 Gitea\n(git.lan)"]
             QBIT["📥 qBittorrent\n+ VueTorrent (torrent.lan)"]
-            METUBE["🎬 MeTube\nyt-dlp (metube.lan)"]
+            BOT["🤖 Telegram Media Bot\n(yt-dlp Audio/Video)"]
             DOZZLE["📋 Dozzle Logs\n(logs.lan)"]
-            SMB["📂 Samba NAS\n(\\IP\\storage)"]
+            SMB["📂 Samba NAS\n(\\IP\\storage & \\IP\\music)"]
             HEAL["🩺 Autoheal\n(Автоперезапуск)"]
             WT["🔄 Watchtower\n(Автообновление)"]
         end
     end
 
     subgraph INTERNET[" 🌐 Внешний интернет "]
-        DIRECT_NET["🇷🇺 Российские ресурсы (Госуслуги, Банки, VK, Ozon, Кинопоиск)\n100% НАПРЯМУЮ (Провайдерская скорость до 1 Гбит/с, 0 мс задержки)"]
-        PROXY_NET["🌍 Заблокированные ресурсы (YouTube 4K, Discord, AI, X, RuTracker)\nШИФРОВАННЫЙ ТУННЕЛЬ (VLESS / Shadowsocks / Hysteria2)"]
+        DIRECT_NET["🇷🇺 Провайдерский канал (Direct ISP до 1 Гбит/с)\n• Госуслуги, Банки, VK, Ozon, Steam, P2P Торренты\n• YouTube 4K & Discord (Десинхронизация через Zapret2)"]
+        PROXY_NET["🌍 Зарубежный прокси-туннель (VLESS / SS / Hysteria2)\n• OpenAI ChatGPT, Claude, Gemini (US-AUTO)\n• Заблокированные трекеры, X, Instagram, Резерв"]
     end
 
     TV & PC & PHONE & CONSOLE -->|DNS (UDP/TCP 53)| NFT
     NFT --> AGH
     AGH -->|Upstream :1053| MIHOMO
     
-    TV & PC & PHONE & CONSOLE -->|TCP / UDP Трафик| NFT
+    TV & PC & PHONE & CONSOLE -->|Трафик LAN| NFT
     NFT --> MIHOMO
+    NFT -.->|NFQUEUE: Direct TCP/UDP| ZAPRET
+    ZAPRET -->|Десинхронизированные пакеты| DIRECT_NET
 
-    MIHOMO -->|Правила DIRECT (.ru / GEOIP RU / Steam Games)| DIRECT_NET
-    MIHOMO -->|Правила PROXY (YouTube / Discord / AI / Trackers)| PROXY_NET
+    MIHOMO -->|DIRECT (.ru / GEOIP RU / P2P)| DIRECT_NET
+    MIHOMO -->|PROXY (US-AUTO / Blocked)| PROXY_NET
 
     PC & PHONE -->|HTTP :80 / HTTPS :443| CADDY
     CADDY --> APPS
@@ -101,14 +136,16 @@ flowchart TD
 | Служба | Адрес доступа | Назначение | Доступ / Авторизация |
 | :--- | :--- | :--- | :--- |
 | **Портал навигации** | `http://<IP-сервера>/` | Главная страница со ссылками на все службы и кнопкой скачивания Root CA | Открытый (LAN) |
+| **Navidrome Music** | `https://music.lan` | Музыкальный стриминг Hi-Fi (свой Spotify, Subsonic API, тексты песен) | `admin` / Мастер-пароль |
 | **AdGuard Home** | `https://adguard.lan` | Панель DNS-сервера, статистика блокировок, управление правилами | `admin` / Мастер-пароль |
 | **Mihomo Web UI** | `https://proxy.lan` | Премиум веб-интерфейс MetaCubeXD: мониторинг задержек, переключение прокси | Секрет (Мастер-пароль) |
 | **Vaultwarden** | `https://vault.lan` | Персональный менеджер паролей (совместим с приложениями Bitwarden) | Личная регистрация + `/admin` токен |
 | **Gitea** | `https://git.lan` | Персональный Git-сервер (SSH на порту `2222`, веб-интерфейс) | `admin` / Мастер-пароль |
 | **qBittorrent** | `https://torrent.lan` | Торрент-клиент с современным веб-интерфейсом **VueTorrent** | `admin` / Мастер-пароль |
-| **MeTube** | `https://metube.lan` | Скачивание видео/аудио с YouTube, VK, Rutube и 100+ сайтов через yt-dlp | Без пароля (LAN) |
+| **Telegram Медиа-бот** | Прямо в Telegram | Скачивание видео в `/downloads` (Samba), аудио с обложками в `/music` (Navidrome), или отправка MP3 в чат | Защита по Telegram Chat ID |
 | **Dozzle Logs** | `https://logs.lan` | Просмотр живых логов всех Docker-контейнеров в реальном времени | `admin` / Мастер-пароль |
-| **Samba (SMB3)** | `\\<IP-сервера>\storage` | Сетевая папка Windows / macOS / Android TV (авто-дискавери WSDD2) | `admin` / Мастер-пароль |
+| **Samba (Хранилище)** | `\\<IP-сервера>\storage` | Сетевая папка Windows / macOS / Android TV (авто-дискавери WSDD2) | `admin` / Мастер-пароль |
+| **Samba (Медиатека)** | `\\<IP-сервера>\music` | Прямой сетевой доступ к музыкальной медиатеке Navidrome | `admin` / Мастер-пароль |
 
 *(При выборе SSL-режима DuckDNS вместо `.lan` используются адреса вида `*.ваш-домен.duckdns.org`)*
 
@@ -181,6 +218,39 @@ sudo ./install.sh
 
 ---
 
+## 🎵 Личный Spotify: Музыкальный стриминг Navidrome
+
+Комплекс включает полноценный Hi-Fi аудио-сервер **Navidrome**, совместимый с открытым протоколом **OpenSubsonic API**. Он потребляет всего **~40 МБ ОЗУ** и превращает сервер в персональный стриминг без ограничений и платных подписок.
+
+### 🔄 Автоматический музыкальный конвейер
+1. **Загрузка через персонального Telegram-бота (yt-dlp):**
+   * Отправьте ссылку на любой трек, альбом или видео (YouTube, VK, RuTube, TikTok, SoundCloud и 100+ сайтов) боту в Telegram.
+   * Нажмите интерактивную кнопку:
+     - `[ 🎵 В Navidrome (Hi-Fi) ]` — бот автоматически извлечет аудио максимального качества, скачает обложку высокого разрешения и вошьёт ID3-теги прямо в `/music`. Navidrome мгновенно добавит его в медиатеку!
+     - `[ 🎬 Видео (MP4) ]` — скачает видео в папку `/downloads` (доступно в сетевой папке Samba `\\<IP-сервера>\storage\downloads`).
+     - `[ 📥 Аудио прямо в чат TG ]` — конвертирует и пришлет MP3 прямо в диалог Telegram.
+2. **Lossless FLAC через qBittorrent:**
+   * Качайте дискографии в FLAC с RuTracker или других трекеров прямо в сетевую папку музыки (`\\<IP-сервера>\music`).
+3. **Прямой перенос с ПК через Samba:**
+   * Откройте в проводнике Windows или Finder на Mac `\\<IP-сервера>\music` (или `\\<IP-сервера>\storage\music`) и перетащите свои любимые аудиофайлы.
+
+### 📱 Подключение мобильных и десктопных приложений
+
+Вам не нужно слушать музыку через браузер — используйте нативные приложения мирового уровня:
+
+| Платформа | Рекомендуемое приложение | Особенности и возможности |
+| :--- | :--- | :--- |
+| **Android** | 👑 **Symfonium** *(или Tempo / Substreamer)* | **100% Офлайн-кэш** треков в память телефона (для метро и самолёта), **Android Auto**, синхронизированные тексты песен (караоке в такт), 10-полосный эквалайзер, Material You дизайн. |
+| **iOS (iPhone / iPad)** | 👑 **Substreamer** *(или play:Sub / Ampli)* | Интерфейс **точь-в-точь как Spotify**, тёмная тема, поддержка **Apple CarPlay**, скачивание треков офлайн, тексты песен. |
+| **Windows / macOS / Linux** | 👑 **Feishin** *([GitHub](https://github.com/feishin/feishin))* | Премиальный десктопный плеер на движке MPV. Выглядит как Spotify/Apple Music, поддерживает медиа-клавиши клавиатуры и статус в Discord («Слушает в Navidrome»). |
+
+> **Параметры подключения в любом приложении:**  
+> • **Адрес сервера:** `https://music.lan` (или `https://music.ваш-домен.duckdns.org`)  
+> • **Логин:** `admin`  
+> • **Пароль:** ваш единый мастер-пароль
+
+---
+
 ## 🛠️ Консольная утилита `homelab`
 
 После установки вам доступна глобальная консольная утилита управления:
@@ -191,6 +261,10 @@ sudo ./install.sh
 Команды:
   status              Дашборд состояния сервера, ОЗУ, дисков, nftables и контейнеров
   doctor              Глубокая диагностика DNS (53), Mihomo TUN (1053, Meta), MSS, API
+  blockcheck [домен]  Интеллектуальный автоподбор стратегий десинхронизации ТСПУ (Zapret2)
+  upgrade [--force]   Бесшовное обновление ядра комплекса из GitHub (OTA In-Place Update)
+  rollback            Мгновенный откат к предыдущей версии из снимка восстановления
+  version             Проверка текущей версии ядра и наличия обновлений на GitHub
   restart [сервис]    Перезапуск всего комплекса или отдельного контейнера
   stop [сервис]       Остановка сервисов
   start [сервис]      Запуск сервисов
@@ -204,16 +278,43 @@ sudo ./install.sh
 
 ### Примеры использования:
 ```bash
-# Проверить здоровье всех компонентов и сетевых правил
+# Проверить наличие новых версий на GitHub
+homelab version
+
+# Бесшовно обновить ядро комплекса прямо на живом сервере
+homelab upgrade
+
+# При возникновении проблем мгновенно откатиться назад
+homelab rollback
+
+# Проверить здоровье всех компонентов, сетевых правил и nfqws2
 homelab doctor
+
+# Запустить автоподбор стратегий DPI под вашего провайдера (Zapret2 blockcheck)
+homelab blockcheck
+# или для проверки конкретного домена:
+homelab blockcheck rutracker.org
+
+# Перезапустить сервис или службу Zapret2
+homelab restart zapret
+homelab restart mihomo
 
 # Посмотреть живые логи Caddy или AdGuard
 homelab logs caddy -f
 homelab logs adguard -f
 
+# Управление Telegram-ботом загрузки медиа (yt-dlp)
+homelab bot status
+homelab bot logs
+homelab bot restart
+
 # Сделать резервную копию прямо сейчас
 homelab backup
 ```
+
+> [!TIP]
+> **Механизм бесшовного обновления (OTA In-Place Update):**
+> Команда `homelab upgrade` не переустанавливает систему с нуля. Она атомарно загружает свежий релиз, проверяет его синтаксис, создает точку восстановления (`Pre-Upgrade Snapshot`), сохраняет ваши пароли, токены и конфигурации, а затем плавно перезапускает только изменившиеся службы без обрыва домашнего интернета!
 
 ---
 
@@ -224,6 +325,7 @@ homelab backup
 
 ```text
 .
+├── VERSION                   # 🏷️ Версия релиза комплекса (например, 2.5.0)
 ├── build.sh                  # 🔨 Компилятор/бандлер (собирает src/*.sh в install.sh)
 ├── install.sh                # 🚀 Готовый автономный установщик (для развертывания в 1 команду)
 ├── README.md                 # 📖 Документация проекта
@@ -234,6 +336,7 @@ homelab backup
     ├── 03_network.sh         # Анализ сети (IP, шлюз, подсеть, интерфейс), защита дисков от затирания
     ├── 04_config.sh          # Интерактивный мастер настроек (Express / Custom / Reset), хеширование
     ├── 05_gateway.sh         # Твики ядра (sysctl, BBR), nftables (inet homelab), сторож watchdog
+    ├── 05b_zapret.sh         # Установка Zapret2 (DPI-Bypass ТСПУ, NFQUEUE, nfqws2, Discord UDP)
     ├── 06_directories.sh     # Создание каталогов, Btrfs No-COW (+C), предзагрузка MRS-правил и UI
     ├── 07_dns_bench.sh       # Параллельный DoH/DoT бенчмарк апстримов с гео-приоритетом
     ├── 08_services_conf.sh   # Генерация AdGuardHome.yaml (trusted proxies, ECH) и mihomo/config.yaml

@@ -12,7 +12,7 @@ setup_directories() {
     print_step_header "06/11" "СТРУКТУРА КАТАЛОГОВ И ОПТИМИЗАЦИЯ ХРАНИЛИЩА (ФС: ${CURRENT_FS^^})"
 
     mkdir -p "${APP_DIR}/caddy/data" "${APP_DIR}/caddy/config"
-    mkdir -p "${SAVE_DIR}/certificates" "${SAVE_DIR}/backups/vaultwarden" "${SAVE_DIR}/backups/gitea"
+    mkdir -p "${SAVE_DIR}/certificates" "${SAVE_DIR}/backups/vaultwarden" "${SAVE_DIR}/backups/gitea" "${SAVE_DIR}/backups/navidrome"
     mkdir -p "${VAULT_DATA_DIR}" "${GITEA_DATA_DIR}" "${ADGUARD_WORK_DIR}"
     chown -R "${USER_UID}:${USER_GID}" "${GITEA_DATA_DIR}" 2>/dev/null || true
 
@@ -40,11 +40,18 @@ setup_directories() {
     apply_nocow_helper "${GITEA_DATA_DIR}"
     mkdir -p "${APP_DIR}/adguard/conf" 
 
-    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
-        mkdir -p "${SAVE_DIR}/metube" "${SAVE_DIR}/metube/tmp" "${SAVE_DIR}/metube/.metube"
-        apply_nocow_helper "${SAVE_DIR}/metube"
-        apply_nocow_helper "${SAVE_DIR}/metube/tmp"
-        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/metube" 2>/dev/null || true
+    mkdir -p "${APP_DIR}/scripts"
+    mkdir -p "${SAVE_DIR}/downloads"
+    apply_nocow_helper "${SAVE_DIR}/downloads"
+    chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/downloads" 2>/dev/null || true
+    chmod 775 "${SAVE_DIR}/downloads" 2>/dev/null || true
+
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] || [[ "${ENABLE_TG_BOT:-Y}" =~ ^[Yy]$ ]]; then
+        mkdir -p "${SAVE_DIR}/music" "${APP_DIR}/configs/navidrome"
+        apply_nocow_helper "${APP_DIR}/configs/navidrome"
+        apply_nocow_helper "${SAVE_DIR}/music"
+        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/music" "${APP_DIR}/configs/navidrome" 2>/dev/null || true
+        chmod 775 "${SAVE_DIR}/music" 2>/dev/null || true
     fi
 
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then

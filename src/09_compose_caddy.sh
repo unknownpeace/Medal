@@ -33,9 +33,13 @@ configure_caddy_and_compose() {
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>📥 qBittorrent (VueTorrent)</span><a href=\"https://${TORRENT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${TORRENT_DOMAIN}</a></li>"
     fi
-    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+    if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🎬 MeTube yt-dlp</span><a href=\"https://${METUBE_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${METUBE_DOMAIN}</a></li>"
+    <li><span>🤖 Telegram Media Bot</span><span style=\"color:#a0aec0;font-size:0.9em\">Загрузчик медиа в /music и /downloads</span></li>"
+    fi
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+        IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
+    <li><span>🎵 Navidrome Music (Spotify)</span><a href=\"https://${MUSIC_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${MUSIC_DOMAIN}</a></li>"
     fi
     IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>📋 Dozzle Web Logs</span><a href=\"https://${LOGS_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${LOGS_DOMAIN}</a></li>"
@@ -144,11 +148,12 @@ EOF_CADDY
 EOF_CADDY
         fi
 
-        if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+
+        if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
-    @metube host ${METUBE_DOMAIN}
-    handle @metube {
-        reverse_proxy metube:8081
+    @music host ${MUSIC_DOMAIN}
+    handle @music {
+        reverse_proxy navidrome:4533
     }
 EOF_CADDY
         fi
@@ -224,13 +229,14 @@ ${TORRENT_DOMAIN} {
 EOF_CADDY
         fi
 
-        if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+
+        if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
-${METUBE_DOMAIN} {
+${MUSIC_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy metube:8081
+    reverse_proxy navidrome:4533
 }
 EOF_CADDY
         fi
@@ -308,8 +314,10 @@ EOF_COMPOSE
       - "ACCOUNT_${ADMIN_USER_SAFE}=${SAMBA_PASS_COMPOSE}"
       - "UID_${ADMIN_USER_SAFE}=${USER_UID}"
       - "SAMBA_VOLUME_CONFIG_${SAMBA_ENV_SHARE}=[${SHARE_NAME}]; path=/shares/${SHARE_NAME}; valid users=${ADMIN_USER_SAFE}; force user=${ADMIN_USER_SAFE}; guest ok=no; read only=no; browseable=yes; create mask=0664; directory mask=0775"
+      - "SAMBA_VOLUME_CONFIG_music=[music]; path=/shares/music; valid users=${ADMIN_USER_SAFE}; force user=${ADMIN_USER_SAFE}; guest ok=no; read only=no; browseable=yes; create mask=0664; directory mask=0775"
     volumes:
       - ${SAVE_DIR}:/shares/${SHARE_NAME}
+      - ${SAVE_DIR}/music:/shares/music
     healthcheck:
       test: ["CMD-SHELL", "smbcontrol smbd ping >/dev/null 2>&1 || exit 1"]
       interval: 30s
@@ -458,32 +466,33 @@ EOF_COMPOSE
 EOF_COMPOSE
     fi
 
-    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         cat <<EOF_COMPOSE >> "${APP_DIR}/docker-compose.yml"
-  metube:
-    image: alexta69/metube:latest
-    container_name: metube
+  navidrome:
+    image: ${NAVIDROME_IMAGE:-deluan/navidrome:latest}
+    container_name: navidrome
     restart: unless-stopped
-    dns:
-      - 77.88.8.8
-      - 1.1.1.1
-      - 8.8.8.8
+    user: "${USER_UID}:${USER_GID}"
     ports:
-      - "127.0.0.1:8081:8081"
+      - "127.0.0.1:4533:4533"
     environment:
-      - "PUID=${USER_UID}"
-      - "PGID=${USER_GID}"
-      - "UID=${USER_UID}"
-      - "GID=${USER_GID}"
-      - "ALLOW_PRIVATE_ADDRESSES=true"
-      - "DOWNLOAD_DIR=/downloads"
-      - "STATE_DIR=/downloads/.metube"
-      - "TEMP_DIR=/downloads/tmp"
-      - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["android","web"]}}}'
+      - "ND_SCANSCHEDULE=1m"
+      - "ND_LOGLEVEL=info"
+      - "ND_SESSIONTIMEOUT=48h"
+      - "ND_BASEURL="
+      - "ND_ENABLETRANSCODINGCONFIG=true"
+      - "ND_TRANSCODINGCACHESIZE=200MB"
+      - "ND_IMAGECACHESIZE=100MB"
+      - "ND_DEFAULTTHEME=Dark"
+      - "ND_ENABLESHARING=true"
+      - "ND_ENABLEDOWNLOADS=true"
+      - "ND_PROMETHEUS_ENABLED=false"
     volumes:
-      - ${SAVE_DIR}/metube:/downloads
+      - ./configs/navidrome:/data
+      - ${SAVE_DIR}/music:/music
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/ 2>/dev/null || curl -fs http://localhost:8081/ >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:4533/ping 2>/dev/null || curl -fs http://localhost:4533/ping >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

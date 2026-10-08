@@ -8,7 +8,7 @@
 # Components: AdGuard Home (Schema 34+ & RU Filters), Mihomo TUN (Smart Routing,
 #             Mixed Stack & MRS Rulesets, YouTube/Discord/AI/RU-Direct Passthrough),
 #             Vaultwarden (Argon2id), Gitea (Git-Server), Samba (WSDD2),
-#             qBittorrent (VueTorrent WebUI), MeTube (yt-dlp Anti-Throttle),
+#             qBittorrent (VueTorrent WebUI), Telegram Bot (yt-dlp Media Downloader),
 #             Caddy (Internal/DuckDNS SSL), Watchtower (Docker API 1.45+)
 # =============================================================================
 
@@ -275,6 +275,17 @@ SELECTED_DOT_1=""
 SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
+ENABLE_ZAPRET="Y"
+ENABLE_NAVIDROME="Y"
+ENABLE_TG_BOT="Y"
+TG_BOT_TOKEN=""
+TG_CHAT_ID=""
+MUSIC_DOMAIN=""
+NAVIDROME_IMAGE="deluan/navidrome:latest"
+HOMELAB_VERSION="2.7.0"
+HOMELAB_REPO="unknownpeace/Medal"
+HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
+IS_UPGRADE_MODE=0
 
 # =============================================================================
 # Module: 01_system.sh
@@ -293,21 +304,27 @@ show_banner() {
   ╚═╝     ╚═╝╚══════╝╚═════╝ ╚═╝  ╚═╝╚══════╝
 EOF_LOGO
     echo -e "${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}╭──────────────────────────────────────────────────────────────────────────╮${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET} ${CLR_WHITE}${CLR_BOLD}HOMELAB APPLIANCE & TRANSPARENT GATEWAY${CLR_RESET} ${CLR_NEON_CYAN}•${CLR_RESET} ${CLR_NEON_GREEN}${CLR_BOLD}RUSSIA PRO EDITION (2026)${CLR_RESET}   ${CLR_NEON_PURPLE}│${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}├──────────────────────────────────────────────────────────────────────────┤${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_NEON_CYAN}◈ АРХИТЕКТУРА ИНТЕЛЛЕКТУАЛЬНОЙ МАРШРУТИЗАЦИИ И ОБХОДА БЛОКИРОВОК:       ${CLR_NEON_PURPLE}│${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                                                                          ${CLR_NEON_PURPLE}│${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}   ${CLR_WHITE}[ КЛИЕНТЫ LAN ]${CLR_RESET} ──► ${CLR_NEON_CYAN}[ ADGUARD HOME :53 ]${CLR_RESET} ──► ${CLR_NEON_PURPLE}[ MIHOMO TUN :1053 ]${CLR_RESET}        ${CLR_NEON_PURPLE}│${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}    0.0.0.0/0           Кэш, Реклама, Фильтры      Fake-IP / Mixed TUN / gVisor    ${CLR_NEON_PURPLE}│${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                               │                           │              ${CLR_NEON_PURPLE}│${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                               ▼ (Трекеры/Спам)            ├─► ${CLR_NEON_GREEN}[ DIRECT ]${CLR_RESET} Госуслуги / Банки ${CLR_NEON_PURPLE}│${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                         ${CLR_RED}[ 0.0.0.0 / DROP ]${CLR_RESET}        ├─► ${CLR_NEON_GOLD}[ AUTO/PROXY ]${CLR_RESET} YouTube 4K  ${CLR_NEON_PURPLE}│${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}                                                    └─► ${CLR_NEON_PINK}[ PROXY/VPN ]${CLR_RESET} Discord & AI ${CLR_NEON_PURPLE}│${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}├──────────────────────────────────────────────────────────────────────────┤${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}⚡ СТЕК:${CLR_RESET} ${CLR_CYAN}AdGuard Home${CLR_RESET} │ ${CLR_CYAN}Mihomo TUN${CLR_RESET} │ ${CLR_CYAN}Caddy SSL${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Gitea${CLR_RESET}   ${CLR_NEON_PURPLE}│${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}⚡ СИСТЕМА:${CLR_RESET} ${CLR_GRAY}Debian 13/12 • Ubuntu 26.04/24.04 • Arch Linux • Alpine Linux v3.19+${CLR_RESET}  ${CLR_NEON_PURPLE}│${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}╰──────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}╔══════════════════════════════════════════════════════════════════════════╗${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   ${CLR_WHITE}${CLR_BOLD}HOMELAB APPLIANCE & TRANSPARENT GATEWAY${CLR_RESET} ${CLR_NEON_CYAN}◈${CLR_RESET} ${CLR_NEON_GREEN}${CLR_BOLD}RUSSIA PRO 2026${CLR_RESET}        ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}╠══════════════════════════════════════════════════════════════════════════╣${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_NEON_CYAN}◆ ГИБРИДНЫЙ СЕТЕВОЙ СТЕК: ZAPRET2 + MIHOMO TUN + ADGUARD HOME (CLEAN)    ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}                                                                          ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   ${CLR_WHITE}[ КЛИЕНТЫ LAN ]${CLR_RESET} ──► ${CLR_NEON_CYAN}[ ADGUARD :53 ]${CLR_RESET} ──► ${CLR_NEON_PURPLE}[ MIHOMO TUN :1053 ]${CLR_RESET}                 ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   (ТВ, ПК, Смартфоны)      CleanDNS/ZeroCache     Fake-IP / Mixed TUN / gVisor    ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                          │                                           ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                          ▼ (Анти-Утечки)   Маршрутизация трафика:    ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                   ${CLR_RED}[ ECH / DOH DROP ]${CLR_RESET}  ├─► ${CLR_NEON_PINK}[ US-AUTO ]${CLR_RESET} ChatGPT / Claude  ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                                            ├─► ${CLR_NEON_GOLD}[ PROXY ]${CLR_RESET} Заблокированное     ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                                            └─► ${CLR_NEON_GREEN}[ DIRECT ]${CLR_RESET} РФ / Банки / Steam ║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           ▼                                                                      ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   ${CLR_NEON_GOLD}[ ZAPRET2 ENGINE ]${CLR_RESET} ─────────────────────────────────────────────────────────────┘        ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   • NFQUEUE / nfqws2: Аппаратный DPI-Bypass для ВСЕХ сайтов (YouTube 4K, ║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}     Discord Voice, Pixiv, Rutracker) прямо через провайдера без VPN!     ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}╠══════════════════════════════════════════════════════════════════════════╣${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ЯДРО:${CLR_RESET} ${CLR_CYAN}Zapret2${CLR_RESET} │ ${CLR_CYAN}Mihomo TUN${CLR_RESET} │ ${CLR_CYAN}AdGuard Home${CLR_RESET} │ ${CLR_CYAN}nftables${CLR_RESET} │ ${CLR_CYAN}Caddy SSL${CLR_RESET} │ ${CLR_CYAN}Docker${CLR_RESET}     ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ПРИЛОЖЕНИЯ:${CLR_RESET} ${CLR_CYAN}Navidrome (Spotify)${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}qBittorrent${CLR_RESET} │ ${CLR_CYAN}TG-Бот (yt-dlp)${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Gitea${CLR_RESET} ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ СИСТЕМА:${CLR_RESET} ${CLR_GRAY}Debian • Ubuntu • Arch Linux • Alpine Linux (OpenRC & Systemd)${CLR_RESET}   ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}╚══════════════════════════════════════════════════════════════════════════╝${CLR_RESET}"
     echo ""
 }
 
@@ -427,9 +444,31 @@ load_previous_config() {
         [ -n "${SAVED_SELECTED_BOOTSTRAP_IP_1:-}" ] && SELECTED_BOOTSTRAP_IP_1="${SAVED_SELECTED_BOOTSTRAP_IP_1}"
         [ -n "${SAVED_LOGS_DOMAIN:-}" ] && LOGS_DOMAIN="${SAVED_LOGS_DOMAIN}"
         [ -n "${SAVED_ENABLE_TELEGRAM:-}" ] && ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM}"
+        [ -n "${SAVED_ENABLE_ZAPRET:-}" ] && ENABLE_ZAPRET="${SAVED_ENABLE_ZAPRET}"
         [ -n "${SAVED_TELEGRAM_BOT_TOKEN:-}" ] && TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN}"
         [ -n "${SAVED_TELEGRAM_CHAT_ID:-}" ] && TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID}"
         [ -n "${SAVED_SAVE_FSTYPE:-}" ] && SAVE_FSTYPE="${SAVED_SAVE_FSTYPE}"
+        [ -n "${SAVED_HOMELAB_VERSION:-}" ] && CURRENT_INSTALLED_VERSION="${SAVED_HOMELAB_VERSION}"
+        [ -n "${SAVED_ADMIN_USER:-}" ] && ADMIN_USER="${SAVED_ADMIN_USER}"
+        [ -n "${SAVED_SAVE_DIR:-}" ] && SAVE_DIR="${SAVED_SAVE_DIR}"
+        [ -n "${SAVED_STORAGE_MODE:-}" ] && STORAGE_MODE="${SAVED_STORAGE_MODE}"
+        [ -n "${SAVED_ENABLE_GATEWAY:-}" ] && ENABLE_GATEWAY="${SAVED_ENABLE_GATEWAY}"
+        [ -n "${SAVED_ENABLE_VAULT:-}" ] && ENABLE_VAULT="${SAVED_ENABLE_VAULT}"
+        [ -n "${SAVED_ENABLE_GITEA:-}" ] && ENABLE_GITEA="${SAVED_ENABLE_GITEA}"
+        [ -n "${SAVED_ENABLE_SAMBA:-}" ] && ENABLE_SAMBA="${SAVED_ENABLE_SAMBA}"
+        [ -n "${SAVED_ENABLE_QBIT:-}" ] && ENABLE_QBIT="${SAVED_ENABLE_QBIT}"
+        [ -n "${SAVED_ENABLE_TG_BOT:-}" ] && ENABLE_TG_BOT="${SAVED_ENABLE_TG_BOT}"
+        [ -z "${SAVED_ENABLE_TG_BOT:-}" ] && [ -n "${SAVED_ENABLE_METUBE:-}" ] && ENABLE_TG_BOT="${SAVED_ENABLE_METUBE}"
+        [ -n "${SAVED_TG_BOT_TOKEN:-}" ] && TG_BOT_TOKEN="${SAVED_TG_BOT_TOKEN}"
+        [ -n "${SAVED_TG_CHAT_ID:-}" ] && TG_CHAT_ID="${SAVED_TG_CHAT_ID}"
+        [ -n "${SAVED_ENABLE_NAVIDROME:-}" ] && ENABLE_NAVIDROME="${SAVED_ENABLE_NAVIDROME}"
+        [ -n "${SAVED_MUSIC_DOMAIN:-}" ] && MUSIC_DOMAIN="${SAVED_MUSIC_DOMAIN}"
+        [ -n "${SAVED_SSL_MODE:-}" ] && SSL_MODE="${SAVED_SSL_MODE}"
+        [ -n "${SAVED_DUCKDNS_NAME:-}" ] && DUCKDNS_NAME="${SAVED_DUCKDNS_NAME}"
+        [ -n "${SAVED_DUCKDNS_TOKEN:-}" ] && DUCKDNS_TOKEN="${SAVED_DUCKDNS_TOKEN}"
+        [ -n "${SAVED_SUB_URL:-}" ] && SUB_URL="${SAVED_SUB_URL}"
+        [ -n "${SAVED_TARGET_USER:-}" ] && TARGET_USER="${SAVED_TARGET_USER}"
+        [ -n "${SAVED_SHARE_NAME:-}" ] && SHARE_NAME="${SAVED_SHARE_NAME}"
     fi
 }
 
@@ -510,7 +549,7 @@ install_pkgs() {
 
         local ALP_PKGS=(bash python3 py3-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g \
                         util-linux util-linux-misc lsblk curl openssl ca-certificates jq nftables apache2-utils \
-                        unzip tar sqlite argon2 iputils shadow procps e2fsprogs \
+                        unzip tar sqlite argon2 iputils shadow procps e2fsprogs ffmpeg \
                         docker docker-cli-compose chrony openrc)
         run_spin "Установка системных пакетов Alpine" \
             apk add --no-cache "${ALP_PKGS[@]}"
@@ -518,7 +557,7 @@ install_pkgs() {
 
     elif [ "${DISTRO_FAMILY}" = "arch" ]; then
         local ARCH_PKGS=(python python-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g util-linux \
-                         curl openssl ca-certificates jq nftables unzip tar sqlite \
+                         curl openssl ca-certificates jq nftables unzip tar sqlite ffmpeg \
                          docker docker-compose argon2 iputils acl zram-generator)
         local MISSING_PKGS=()
         for p in "${ARCH_PKGS[@]}"; do
@@ -543,7 +582,7 @@ install_pkgs() {
             apt-get install -y --no-install-recommends \
                 systemd-timesyncd python3 python3-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g \
                 util-linux curl openssl ca-certificates jq nftables apache2-utils \
-                unzip tar sqlite3 argon2 iputils-ping
+                unzip tar sqlite3 argon2 iputils-ping ffmpeg
 
         # Установка генератора zram с безопасным fallback для Ubuntu/Debian
         apt-get install -y --no-install-recommends "${ZRAM_PKG}" 2>/dev/null || \
@@ -820,6 +859,25 @@ EOF_ZRAM_RC
             fi
         fi
     fi
+
+    # Установка и обновление автономного движка yt-dlp (standalone binary)
+    log_info "Проверка и подготовка медиа-движка yt-dlp..."
+    local YTDLP_BIN="/usr/local/bin/yt-dlp"
+    if [ ! -x "${YTDLP_BIN}" ] || ! "${YTDLP_BIN}" --version >/dev/null 2>&1; then
+        run_spin "Загрузка официального релиза yt-dlp" bash -c '
+            curl -fsSL --connect-timeout 8 -m 60 "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp" || \
+            curl -fsSL --connect-timeout 8 -m 60 "https://ghproxy.net/https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp" || \
+            curl -fsSL --connect-timeout 8 -m 60 "https://mirror.ghproxy.com/https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp"
+        '
+        chmod a+rx "${YTDLP_BIN}" 2>/dev/null || true
+    else
+        "${YTDLP_BIN}" -U >/dev/null 2>&1 || true
+    fi
+    if [ -x "${YTDLP_BIN}" ]; then
+        log_ok "yt-dlp готов к работе ($("${YTDLP_BIN}" --version 2>/dev/null || echo "v2026"))"
+    else
+        log_warn "yt-dlp будет дополнительно загружен при инициализации Telegram-бота"
+    fi
 }
 
 # =============================================================================
@@ -1093,6 +1151,13 @@ select_disk_device() {
 prompt_configuration() {
     print_step_header "03/11" "КОНФИГУРАЦИЯ И ВЫБОР РЕЖИМА УСТАНОВКИ"
 
+    if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
+        log_info "Режим бесшовного обновления ядра (In-Place Upgrade): интерактивные вопросы пропущены."
+        log_info "Все текущие параметры, учетные записи и пути к данным сохранены без изменений."
+        INSTALL_MODE=1
+        return 0
+    fi
+
     echo -e "  ${CLR_WHITE}Выберите вариант развертывания:${CLR_RESET}"
     echo -e "    ${CLR_GREEN}1) Экспресс-установка${CLR_RESET} (Всё включено, авто-настройка, *.lan) ${CLR_DIM}[Enter]${CLR_RESET}"
     echo -e "    ${CLR_YELLOW}2) Расширенная настройка${CLR_RESET} (Выбор дисков, Btrfs, LUKS2 шифрование, DuckDNS)"
@@ -1125,6 +1190,8 @@ prompt_configuration() {
             systemctl disable --now gitea-backup.timer 2>/dev/null || true
             systemctl disable --now gitea-backup.service 2>/dev/null || true
             rm -f /etc/systemd/system/homelab.service /etc/systemd/system/network-gateway-watchdog.* /etc/systemd/system/vaultwarden-backup.* /etc/systemd/system/gitea-backup.*
+            systemctl disable --now zapret2.service 2>/dev/null || true
+            rm -f /etc/systemd/system/zapret2.service
             systemctl daemon-reload >/dev/null 2>&1 || true
         elif [ "${INIT_SYSTEM}" = "openrc" ]; then
             rc-service homelab stop 2>/dev/null || true
@@ -1134,7 +1201,9 @@ prompt_configuration() {
             rc-update del homelab-storage default 2>/dev/null || true
             rc-service zram-swap stop 2>/dev/null || true
             rc-update del zram-swap default 2>/dev/null || true
-            rm -f /etc/init.d/homelab /etc/init.d/homelab-storage /etc/init.d/zram-swap
+            rc-service zapret2 stop 2>/dev/null || true
+            rc-update del zapret2 default 2>/dev/null || true
+            rm -f /etc/init.d/homelab /etc/init.d/homelab-storage /etc/init.d/zram-swap /etc/init.d/zapret2
             sed -i '/backup_vaultwarden\.sh/d; /backup_gitea\.sh/d; /gateway-watchdog\.sh/d' /etc/crontabs/root 2>/dev/null || true
             touch /etc/crontabs/cron.update 2>/dev/null || true
         fi
@@ -1143,8 +1212,17 @@ prompt_configuration() {
         if [ -d "${APP_DIR}" ]; then
             (cd "${APP_DIR}" && dc down --remove-orphans 2>/dev/null || true)
         fi
-        docker stop adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle watchtower autoheal 2>/dev/null || true
-        docker rm -f adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle watchtower autoheal 2>/dev/null || true
+        docker stop adguardhome mihomo caddy vaultwarden gitea qbittorrent metube navidrome samba dozzle watchtower autoheal 2>/dev/null || true
+        docker rm -f adguardhome mihomo caddy vaultwarden gitea qbittorrent metube navidrome samba dozzle watchtower autoheal 2>/dev/null || true
+        if [ "${INIT_SYSTEM}" = "systemd" ]; then
+            systemctl stop homelab-bot 2>/dev/null || true
+            systemctl disable homelab-bot 2>/dev/null || true
+            rm -f /etc/systemd/system/homelab-bot.service
+        elif [ "${INIT_SYSTEM}" = "openrc" ]; then
+            rc-service homelab-bot stop 2>/dev/null || true
+            rc-update del homelab-bot default 2>/dev/null || true
+            rm -f /etc/init.d/homelab-bot
+        fi
 
         log_info "Очистка служебных файлов и конфигураций..."
         local BACKUP_CERTS="/tmp/caddy_certificates_backup_$$"
@@ -1154,7 +1232,7 @@ prompt_configuration() {
             cp -r "${APP_DIR}/caddy/data/caddy/certificates" "${BACKUP_CERTS}" 2>/dev/null || true
         fi
 
-        rm -rf "${APP_DIR}/adguard" "${APP_DIR}/mihomo" "${APP_DIR}/caddy" "${APP_DIR}/metube" "${APP_DIR}/vaultwarden" "${APP_DIR}/gitea" "${APP_DIR}/qbittorrent" "${ENV_FILE}"
+        rm -rf "${APP_DIR}/adguard" "${APP_DIR}/mihomo" "${APP_DIR}/caddy" "${APP_DIR}/metube" "${APP_DIR}/vaultwarden" "${APP_DIR}/gitea" "${APP_DIR}/qbittorrent" "${APP_DIR}/configs/navidrome" "${ENV_FILE}" "/opt/zapret2"
 
         if [ -d "${BACKUP_CERTS}" ]; then
             mkdir -p "${APP_DIR}/caddy/data/caddy"
@@ -1169,9 +1247,10 @@ prompt_configuration() {
         USER_HOME=$(eval echo ~"${TARGET_USER}" 2>/dev/null || echo "/home/${TARGET_USER}")
         rm -f "${USER_HOME}/diagnostic_report.log" 2>/dev/null || true
 
-        log_info "Очистка правил межсетевого экрана (декларативная таблица inet homelab в nftables)..."
+        log_info "Очистка правил межсетевого экрана (декларативные таблицы inet homelab и zapret2 в nftables)..."
         if command -v nft >/dev/null 2>&1; then
             nft delete table inet homelab 2>/dev/null || true
+            nft delete table inet zapret2 2>/dev/null || true
             rm -f /etc/nftables.d/homelab.nft 2>/dev/null || true
             sed -i '/include.*homelab\.nft/d' /etc/nftables.conf /etc/nftables.nft 2>/dev/null || true
         fi
@@ -1197,11 +1276,13 @@ prompt_configuration() {
         SAVE_FSTYPE=$(findmnt -n -o FSTYPE -T "${SAVE_DIR}" 2>/dev/null || df -T "${SAVE_DIR}" 2>/dev/null | awk 'NR==2{print $2}' || echo "ext4")
 
         ENABLE_GATEWAY="${SAVED_ENABLE_GATEWAY:-Y}"
+        ENABLE_ZAPRET="${SAVED_ENABLE_ZAPRET:-Y}"
         ENABLE_VAULT="${SAVED_ENABLE_VAULT:-Y}"
         ENABLE_GITEA="${SAVED_ENABLE_GITEA:-Y}"
         ENABLE_SAMBA="${SAVED_ENABLE_SAMBA:-Y}"
         ENABLE_QBIT="${SAVED_ENABLE_QBIT:-Y}"
-        ENABLE_METUBE="${SAVED_ENABLE_METUBE:-Y}"
+        ENABLE_TG_BOT="${SAVED_ENABLE_TG_BOT:-${SAVED_ENABLE_METUBE:-Y}}"
+        ENABLE_NAVIDROME="${SAVED_ENABLE_NAVIDROME:-Y}"
         SSL_MODE="${SAVED_SSL_MODE:-1}"
 
         echo ""
@@ -1245,12 +1326,21 @@ prompt_configuration() {
         GITEA_DOMAIN="git.lan"
         ADGUARD_DOMAIN="adguard.lan"
         TORRENT_DOMAIN="torrent.lan"
-        METUBE_DOMAIN="metube.lan"
+        MUSIC_DOMAIN="music.lan"
         PROXY_DOMAIN="proxy.lan"
         LOGS_DOMAIN="logs.lan"
         ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM:-N}"
         TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
         TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
+        if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]] && [ -z "${TELEGRAM_BOT_TOKEN}" ]; then
+            prompt_read "  [?] Telegram Bot Token (для скачивания медиа) [Enter - пропустить]: " INPUT_TG_TOKEN
+            TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-}
+            if [ -n "${TELEGRAM_BOT_TOKEN}" ]; then
+                prompt_read "  [?] Telegram Chat ID владельца: " INPUT_TG_CHAT
+                TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-}
+                [ -n "${TELEGRAM_CHAT_ID}" ] && ENABLE_TELEGRAM="Y"
+            fi
+        fi
     else
         local ROOT_FSTYPE
         ROOT_FSTYPE=$(findmnt -n -o FSTYPE / 2>/dev/null || df -T / 2>/dev/null | awk 'NR==2{print $2}' || echo "ext4")
@@ -1503,6 +1593,9 @@ EOF_UNLOCK
         prompt_read "  [?] Установить сетевой шлюз (AdGuard + Mihomo TUN)? [Y/n] [${SAVED_ENABLE_GATEWAY:-Y}]: " ENABLE_GATEWAY
         ENABLE_GATEWAY=$(normalize_yn "${ENABLE_GATEWAY:-${SAVED_ENABLE_GATEWAY:-Y}}" "Y")
 
+        prompt_read "  [?] Активировать Zapret2 (DPI-Bypass ТСПУ для YouTube и Discord)? [Y/n] [${SAVED_ENABLE_ZAPRET:-Y}]: " ENABLE_ZAPRET
+        ENABLE_ZAPRET=$(normalize_yn "${ENABLE_ZAPRET:-${SAVED_ENABLE_ZAPRET:-Y}}" "Y")
+
         prompt_read "  [?] Установить Vaultwarden (Менеджер паролей)? [Y/n] [${SAVED_ENABLE_VAULT:-Y}]: " ENABLE_VAULT
         ENABLE_VAULT=$(normalize_yn "${ENABLE_VAULT:-${SAVED_ENABLE_VAULT:-Y}}" "Y")
 
@@ -1515,8 +1608,11 @@ EOF_UNLOCK
         prompt_read "  [?] Установить qBittorrent + VueTorrent (Торренты/Загрузки)? [Y/n] [${SAVED_ENABLE_QBIT:-Y}]: " ENABLE_QBIT
         ENABLE_QBIT=$(normalize_yn "${ENABLE_QBIT:-${SAVED_ENABLE_QBIT:-Y}}" "Y")
 
-        prompt_read "  [?] Установить MeTube (Web-загрузчик yt-dlp)? [Y/n] [${SAVED_ENABLE_METUBE:-Y}]: " ENABLE_METUBE
-        ENABLE_METUBE=$(normalize_yn "${ENABLE_METUBE:-${SAVED_ENABLE_METUBE:-Y}}" "Y")
+        prompt_read "  [?] Установить Telegram-бота (Медиа-загрузчик yt-dlp в TG, Navidrome и Samba)? [Y/n] [${SAVED_ENABLE_TG_BOT:-${SAVED_ENABLE_METUBE:-Y}}]: " ENABLE_TG_BOT
+        ENABLE_TG_BOT=$(normalize_yn "${ENABLE_TG_BOT:-${SAVED_ENABLE_TG_BOT:-${SAVED_ENABLE_METUBE:-Y}}}" "Y")
+
+        prompt_read "  [?] Установить Navidrome (Hi-Fi Музыкальный стриминг, аналог Spotify)? [Y/n] [${SAVED_ENABLE_NAVIDROME:-Y}]: " ENABLE_NAVIDROME
+        ENABLE_NAVIDROME=$(normalize_yn "${ENABLE_NAVIDROME:-${SAVED_ENABLE_NAVIDROME:-Y}}" "Y")
 
         echo ""
         echo -e "  ${CLR_CYAN}--- Настройка SSL сертификатов ---${CLR_RESET}"
@@ -1543,7 +1639,7 @@ EOF_UNLOCK
             GITEA_DOMAIN="git.${BASE_DOMAIN}"
             ADGUARD_DOMAIN="adguard.${BASE_DOMAIN}"
             TORRENT_DOMAIN="torrent.${BASE_DOMAIN}"
-            METUBE_DOMAIN="metube.${BASE_DOMAIN}"
+            MUSIC_DOMAIN="music.${BASE_DOMAIN}"
             PROXY_DOMAIN="proxy.${BASE_DOMAIN}"
             LOGS_DOMAIN="logs.${BASE_DOMAIN}"
 
@@ -1558,7 +1654,7 @@ EOF_UNLOCK
             GITEA_DOMAIN="git.lan"
             ADGUARD_DOMAIN="adguard.lan"
             TORRENT_DOMAIN="torrent.lan"
-            METUBE_DOMAIN="metube.lan"
+            MUSIC_DOMAIN="music.lan"
             PROXY_DOMAIN="proxy.lan"
             LOGS_DOMAIN="logs.lan"
         fi
@@ -1606,24 +1702,50 @@ EOF_UNLOCK
         fi
 
         echo ""
-        echo -e "  ${CLR_CYAN}--- Telegram-оповещения (Сбои и Бэкапы) ---${CLR_RESET}"
-        prompt_read "  [?] Настроить Telegram-оповещения? [y/N] [${SAVED_ENABLE_TELEGRAM:-N}]: " INPUT_ENABLE_TG
-        ENABLE_TELEGRAM=$(normalize_yn "${INPUT_ENABLE_TG:-${SAVED_ENABLE_TELEGRAM:-N}}" "N")
-        if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
+        echo -e "  ${CLR_CYAN}--- Telegram Интеграция (Медиа-бот и оповещения) ---${CLR_RESET}"
+        if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
+            echo -e "  ${CLR_WHITE}Для работы Telegram-бота и системных оповещений укажите токен и Chat ID.${CLR_RESET}"
+            echo -e "  ${CLR_DIM}(Токен от @BotFather, а ваш личный Chat ID — от @userinfobot)${CLR_RESET}"
             prompt_read "  [?] Telegram Bot Token [${SAVED_TELEGRAM_BOT_TOKEN:-}]: " INPUT_TG_TOKEN
             TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-${SAVED_TELEGRAM_BOT_TOKEN:-}}
-            prompt_read "  [?] Telegram Chat ID [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT
+            prompt_read "  [?] Telegram Chat ID владельца [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT
             TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-${SAVED_TELEGRAM_CHAT_ID:-}}
             if [ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]; then
-                log_ok "Telegram-оповещения настроены"
+                log_ok "Telegram-бот и оповещения успешно настроены"
+                ENABLE_TELEGRAM="Y"
             else
-                log_warn "Токен или Chat ID не заполнены, оповещения отключены"
+                log_warn "Токен или Chat ID не заполнены. Бот будет ожидать настройки в ${ENV_FILE}"
                 ENABLE_TELEGRAM="N"
             fi
         else
-            ENABLE_TELEGRAM="N"
-            TELEGRAM_BOT_TOKEN=""
-            TELEGRAM_CHAT_ID=""
+            prompt_read "  [?] Настроить Telegram-оповещения (Сбои и Бэкапы)? [y/N] [${SAVED_ENABLE_TELEGRAM:-N}]: " INPUT_ENABLE_TG
+            ENABLE_TELEGRAM=$(normalize_yn "${INPUT_ENABLE_TG:-${SAVED_ENABLE_TELEGRAM:-N}}" "N")
+            if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
+                prompt_read "  [?] Telegram Bot Token [${SAVED_TELEGRAM_BOT_TOKEN:-}]: " INPUT_TG_TOKEN
+                TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-${SAVED_TELEGRAM_BOT_TOKEN:-}}
+                prompt_read "  [?] Telegram Chat ID [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT
+                TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-${SAVED_TELEGRAM_CHAT_ID:-}}
+                if [ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]; then
+                    log_ok "Telegram-оповещения настроены"
+                else
+                    log_warn "Токен или Chat ID не заполнены, оповещения отключены"
+                    ENABLE_TELEGRAM="N"
+                fi
+            else
+                ENABLE_TELEGRAM="N"
+                TELEGRAM_BOT_TOKEN=""
+                TELEGRAM_CHAT_ID=""
+            fi
+        fi
+    fi
+
+    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^metube$'; then
+        log_info "Миграция MeTube: остановка и удаление устаревшего контейнера..."
+        docker stop metube 2>/dev/null || true
+        docker rm -f metube 2>/dev/null || true
+        if [ -d "${SAVE_DIR}/metube" ]; then
+            mkdir -p "${SAVE_DIR}/downloads"
+            find "${SAVE_DIR}/metube" -mindepth 1 -maxdepth 1 ! -name '.metube' ! -name 'tmp' -exec mv -n {} "${SAVE_DIR}/downloads/" \; 2>/dev/null || true
         fi
     fi
 
@@ -1652,11 +1774,14 @@ EOF_UNLOCK
         printf "SAVED_ROUTER_GATEWAY=%q\n" "${ROUTER_GATEWAY}"
         printf "SAVED_LAN_SUBNET=%q\n" "${LAN_SUBNET}"
         printf "SAVED_ENABLE_GATEWAY=%q\n" "${ENABLE_GATEWAY}"
+        printf "SAVED_ENABLE_ZAPRET=%q\n" "${ENABLE_ZAPRET}"
         printf "SAVED_ENABLE_VAULT=%q\n" "${ENABLE_VAULT}"
         printf "SAVED_ENABLE_GITEA=%q\n" "${ENABLE_GITEA}"
         printf "SAVED_ENABLE_SAMBA=%q\n" "${ENABLE_SAMBA}"
         printf "SAVED_ENABLE_QBIT=%q\n" "${ENABLE_QBIT}"
-        printf "SAVED_ENABLE_METUBE=%q\n" "${ENABLE_METUBE}"
+        printf "SAVED_ENABLE_TG_BOT=%q\n" "${ENABLE_TG_BOT}"
+        printf "SAVED_ENABLE_NAVIDROME=%q\n" "${ENABLE_NAVIDROME}"
+        printf "SAVED_MUSIC_DOMAIN=%q\n" "${MUSIC_DOMAIN}"
         printf "SAVED_SSL_MODE=%q\n" "${SSL_MODE}"
         printf "SAVED_DUCKDNS_NAME=%q\n" "${DUCKDNS_NAME}"
         printf "SAVED_DUCKDNS_TOKEN=%q\n" "${DUCKDNS_TOKEN}"
@@ -1686,6 +1811,7 @@ EOF_UNLOCK
         printf "SAVED_ENABLE_TELEGRAM=%q\n" "${ENABLE_TELEGRAM}"
         printf "SAVED_TELEGRAM_BOT_TOKEN=%q\n" "${TELEGRAM_BOT_TOKEN}"
         printf "SAVED_TELEGRAM_CHAT_ID=%q\n" "${TELEGRAM_CHAT_ID}"
+        printf "SAVED_HOMELAB_VERSION=%q\n" "${HOMELAB_VERSION}"
     } > "${ENV_FILE}"
     chmod 600 "${ENV_FILE}"
     chown root:root "${ENV_FILE}" 2>/dev/null || true
@@ -2106,7 +2232,8 @@ EOF_WD_TMR
     fi
 
     log_info "Регистрация локальных доменов в /etc/hosts..."
-    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${METUBE_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}"; do
+    sed -i '/metube/d' /etc/hosts 2>/dev/null || true
+    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${MUSIC_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}"; do
         if [ -n "${DOMAIN}" ]; then
             local ESCAPED_DOMAIN
             ESCAPED_DOMAIN=$(printf '%s\n' "${DOMAIN}" | sed -e 's/[]\/$*.^[]/\\&/g')
@@ -2173,6 +2300,165 @@ EOF_NOTIFY
 }
 
 # ==============================================================================
+# МОДУЛЬ 05b: УСТАНОВКА И НАСТРОЙКА ZAPRET2 (DPI-BYPASS ТСПУ ДЛЯ YOUTUBE И DISCORD)
+# ==============================================================================
+
+setup_zapret2() {
+    print_step_header "05b/11" "ИНТЕГРАЦИЯ И АКТИВАЦИЯ ZAPRET2 (DPI-BYPASS ТСПУ)"
+
+    if [[ ! "${ENABLE_ZAPRET:-Y}" =~ ^[Yy]$ ]]; then
+        log_info "Zapret2 DPI-Bypass отключен пользователем в конфигурации (пропуск)"
+        return 0
+    fi
+
+    log_info "Подготовка подсистемы Zapret2 (DPI Desynchronization Engine)..."
+
+    # 1. Загрузка необходимых модулей ядра Linux (NFQUEUE / Conntrack)
+    modprobe nfnetlink_queue 2>/dev/null || true
+    modprobe nft_queue 2>/dev/null || true
+    mkdir -p /etc/modules-load.d
+    echo -e "nfnetlink_queue\nnft_queue" > /etc/modules-load.d/zapret.conf 2>/dev/null || true
+    grep -q '^nfnetlink_queue$' /etc/modules 2>/dev/null || echo "nfnetlink_queue" >> /etc/modules 2>/dev/null || true
+    grep -q '^nft_queue$' /etc/modules 2>/dev/null || echo "nft_queue" >> /etc/modules 2>/dev/null || true
+
+    # Либеральный режим Conntrack для предотвращения отбрасывания пакетов с измененным TCP Seq/ACK
+    sysctl -w net.netfilter.nf_conntrack_tcp_be_liberal=1 >/dev/null 2>&1 || true
+    mkdir -p /etc/sysctl.d
+    echo "net.netfilter.nf_conntrack_tcp_be_liberal = 1" > /etc/sysctl.d/99-zapret.conf 2>/dev/null || true
+
+    local ZAPRET_DIR="/opt/zapret2"
+    mkdir -p "${ZAPRET_DIR}"
+
+    # 2. Динамическое определение последней версии релиза zapret2 на GitHub
+    log_info "Поиск последнего релиза zapret2 на GitHub..."
+    local LATEST_TAG=""
+    LATEST_TAG=$(curl -sSI -m 10 "https://github.com/bol-van/zapret2/releases/latest" 2>/dev/null | grep -i '^location:' | tr -d '\r' | awk -F'/' '{print $NF}' || true)
+    LATEST_TAG="${LATEST_TAG:-v1.0.5.2}"
+    local TAR_URL="https://github.com/bol-van/zapret2/releases/download/${LATEST_TAG}/zapret2-${LATEST_TAG}.tar.gz"
+
+    log_info "Загрузка официального дистрибутива Zapret2 (${LATEST_TAG})..."
+    local TMP_TAR="/tmp/zapret2_${LATEST_TAG}.tar.gz"
+    local DOWNLOAD_OK=0
+
+    if curl -fsSL -m 60 "${TAR_URL}" -o "${TMP_TAR}" 2>/dev/null; then
+        DOWNLOAD_OK=1
+    elif command -v wget >/dev/null 2>&1 && wget -q --timeout=60 "${TAR_URL}" -O "${TMP_TAR}" 2>/dev/null; then
+        DOWNLOAD_OK=1
+    fi
+
+    if [ $DOWNLOAD_OK -eq 1 ] && [ -s "${TMP_TAR}" ]; then
+        run_spin "Распаковка дистрибутива Zapret2" bash -c "tar -xzf '${TMP_TAR}' -C '/tmp/' && cp -rf /tmp/zapret2-${LATEST_TAG#v}/* '${ZAPRET_DIR}/' 2>/dev/null || cp -rf /tmp/zapret2-*/* '${ZAPRET_DIR}/' 2>/dev/null && rm -rf /tmp/zapret2-*"
+        rm -f "${TMP_TAR}"
+    elif [ -d "zapret2-${LATEST_TAG#v}" ]; then
+        log_info "Использование локально предзагруженного архива zapret2..."
+        cp -rf "zapret2-${LATEST_TAG#v}/"* "${ZAPRET_DIR}/" 2>/dev/null || true
+    fi
+
+    # 3. Автоматический выбор архитектурных бинарников (nfqws2, ip2net, mdig)
+    if [ -x "${ZAPRET_DIR}/install_bin.sh" ]; then
+        run_spin "Компоновка исполняемых файлов (nfqws2 / ${SYSTEM_ARCH})" bash -c "cd '${ZAPRET_DIR}' && ./install_bin.sh"
+    fi
+
+    # 4. Формирование боевой конфигурации /opt/zapret2/config
+    cat <<'EOF_ZCONFIG' > "${ZAPRET_DIR}/config"
+# Zapret2 production configuration (Russia Pro 2026 - Universal DPI Bypass)
+FWTYPE=nftables
+POSTNAT=1
+NFQWS2_ENABLE=1
+NFQWS2_PORTS_TCP=80,443
+NFQWS2_PORTS_UDP=443
+NFQWS2_TCP_PKT_OUT=20
+NFQWS2_TCP_PKT_IN=10
+NFQWS2_UDP_PKT_OUT=5
+NFQWS2_UDP_PKT_IN=3
+DESYNC_MARK=0x40000000
+DESYNC_MARK_POSTNAT=0x20000000
+
+# Универсальные стратегии десинхронизации ТСПУ для ВСЕХ сайтов (YouTube 4K, Discord, Pixiv, Rutracker и др.)
+NFQWS2_OPT="
+--filter-tcp=80 --filter-l7=http <HOSTLIST> --payload=http_req --lua-desync=fake:blob=fake_default_http:tcp_md5 --lua-desync=multisplit:pos=method+2 --new
+--filter-tcp=443 --filter-l7=tls <HOSTLIST> --payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_md5:tcp_seq=-10000 --lua-desync=multidisorder:pos=1,midsld --new
+--filter-udp=443 --filter-l7=quic <HOSTLIST_NOAUTO> --payload=quic_initial --lua-desync=fake:blob=fake_default_quic:repeats=6
+"
+
+# Режим 'none' активирует десинхронизацию ТСПУ для ВСЕХ исходящих соединений (без ограничений списком доменов)
+MODE_FILTER=none
+FLOWOFFLOAD=donttouch
+INIT_APPLY_FW=1
+DISABLE_IPV6=1
+FILTER_TTL_EXPIRED_ICMP=1
+EOF_ZCONFIG
+
+    # 5. Активация кастомного скрипта обхода замедления Discord медиа/голосовых пакетов
+    mkdir -p "${ZAPRET_DIR}/init.d/sysv/custom.d"
+    if [ -f "${ZAPRET_DIR}/init.d/custom.d.examples.linux/50-discord-media" ]; then
+        cp "${ZAPRET_DIR}/init.d/custom.d.examples.linux/50-discord-media" "${ZAPRET_DIR}/init.d/sysv/custom.d/50-discord-media"
+        chmod 755 "${ZAPRET_DIR}/init.d/sysv/custom.d/50-discord-media" 2>/dev/null || true
+    fi
+
+    # 6. Интеграция службы и запуск в Init-системе (OpenRC / systemd)
+    if [ "${INIT_SYSTEM}" = "openrc" ]; then
+        cat << 'EOF_OPENRC_ZAPRET' > /etc/init.d/zapret2
+#!/sbin/openrc-run
+# Zapret2 OpenRC service wrapper with explicit base path
+ZAPRET_BASE="/opt/zapret2"
+ZAPRET_INIT="${ZAPRET_BASE}/init.d/sysv/zapret2"
+
+extra_commands="start_fw stop_fw restart_fw start_daemons stop_daemons restart_daemons reload_ifsets list_ifsets list_table"
+description="Zapret2 DPI Desynchronization Daemon (nfqws2)"
+
+depend() {
+    rc-service -e networking && need networking
+}
+start() {
+    "${ZAPRET_INIT}" start
+}
+stop() {
+    "${ZAPRET_INIT}" stop
+}
+restart() {
+    "${ZAPRET_INIT}" restart
+}
+start_fw() {
+    "${ZAPRET_INIT}" start_fw
+}
+stop_fw() {
+    "${ZAPRET_INIT}" stop_fw
+}
+restart_fw() {
+    "${ZAPRET_INIT}" restart_fw
+}
+start_daemons() {
+    "${ZAPRET_INIT}" start_daemons
+}
+stop_daemons() {
+    "${ZAPRET_INIT}" stop_daemons
+}
+restart_daemons() {
+    "${ZAPRET_INIT}" restart_daemons
+}
+reload_ifsets() {
+    "${ZAPRET_INIT}" reload_ifsets
+}
+EOF_OPENRC_ZAPRET
+        chmod 755 /etc/init.d/zapret2
+        rc-update add zapret2 default >/dev/null 2>&1 || true
+        rc-service zapret2 restart >/dev/null 2>&1 || rc-service zapret2 start >/dev/null 2>&1 || true
+    elif [ "${INIT_SYSTEM}" = "systemd" ]; then
+        if [ -f "${ZAPRET_DIR}/init.d/systemd/zapret2.service" ]; then
+            cp "${ZAPRET_DIR}/init.d/systemd/zapret2.service" /etc/systemd/system/zapret2.service
+            systemctl daemon-reload >/dev/null 2>&1 || true
+            systemctl enable --now zapret2.service >/dev/null 2>&1 || systemctl restart zapret2.service >/dev/null 2>&1 || true
+        fi
+    fi
+
+    # Глобальный симлинк для прямого вызова утилиты blockcheck
+    ln -sf /usr/local/bin/homelab /usr/local/bin/blockcheck 2>/dev/null || true
+
+    log_ok "Zapret2 успешно развернут и активирован (DPI-Bypass: nfqws2, все сайты, YouTube 4K, Pixiv, Discord)"
+}
+
+# ==============================================================================
 # МОДУЛЬ 06: СТРУКТУРА КАТАЛОГОВ И ОПТИМИЗАЦИЯ ХРАНИЛИЩА (NO-COW / BTRFS)
 # ==============================================================================
 
@@ -2185,7 +2471,7 @@ setup_directories() {
     print_step_header "06/11" "СТРУКТУРА КАТАЛОГОВ И ОПТИМИЗАЦИЯ ХРАНИЛИЩА (ФС: ${CURRENT_FS^^})"
 
     mkdir -p "${APP_DIR}/caddy/data" "${APP_DIR}/caddy/config"
-    mkdir -p "${SAVE_DIR}/certificates" "${SAVE_DIR}/backups/vaultwarden" "${SAVE_DIR}/backups/gitea"
+    mkdir -p "${SAVE_DIR}/certificates" "${SAVE_DIR}/backups/vaultwarden" "${SAVE_DIR}/backups/gitea" "${SAVE_DIR}/backups/navidrome"
     mkdir -p "${VAULT_DATA_DIR}" "${GITEA_DATA_DIR}" "${ADGUARD_WORK_DIR}"
     chown -R "${USER_UID}:${USER_GID}" "${GITEA_DATA_DIR}" 2>/dev/null || true
 
@@ -2213,11 +2499,18 @@ setup_directories() {
     apply_nocow_helper "${GITEA_DATA_DIR}"
     mkdir -p "${APP_DIR}/adguard/conf" 
 
-    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
-        mkdir -p "${SAVE_DIR}/metube" "${SAVE_DIR}/metube/tmp" "${SAVE_DIR}/metube/.metube"
-        apply_nocow_helper "${SAVE_DIR}/metube"
-        apply_nocow_helper "${SAVE_DIR}/metube/tmp"
-        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/metube" 2>/dev/null || true
+    mkdir -p "${APP_DIR}/scripts"
+    mkdir -p "${SAVE_DIR}/downloads"
+    apply_nocow_helper "${SAVE_DIR}/downloads"
+    chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/downloads" 2>/dev/null || true
+    chmod 775 "${SAVE_DIR}/downloads" 2>/dev/null || true
+
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] || [[ "${ENABLE_TG_BOT:-Y}" =~ ^[Yy]$ ]]; then
+        mkdir -p "${SAVE_DIR}/music" "${APP_DIR}/configs/navidrome"
+        apply_nocow_helper "${APP_DIR}/configs/navidrome"
+        apply_nocow_helper "${SAVE_DIR}/music"
+        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/music" "${APP_DIR}/configs/navidrome" 2>/dev/null || true
+        chmod 775 "${SAVE_DIR}/music" 2>/dev/null || true
     fi
 
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
@@ -2826,8 +3119,8 @@ configure_gateway_services() {
         [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${TORRENT_DOMAIN}
       answer: ${LOCAL_IP}"
-        [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
-    - domain: ${METUBE_DOMAIN}
+        [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
+    - domain: ${MUSIC_DOMAIN}
       answer: ${LOCAL_IP}"
 
         local PTR_UPSTREAMS_YAML="    - 127.0.0.1:1053"
@@ -3452,6 +3745,12 @@ rules:
   - DOMAIN-SUFFIX,canva.com,PROXY
   - DOMAIN-SUFFIX,soundcloud.com,PROXY
   - DOMAIN-SUFFIX,spotify.com,PROXY
+  # Платформы контента, арта и медиа (Pixiv, Booth, Fanbox)
+  - DOMAIN-SUFFIX,pixiv.net,PROXY
+  - DOMAIN-SUFFIX,pximg.net,PROXY
+  - DOMAIN-SUFFIX,pixiv.org,PROXY
+  - DOMAIN-SUFFIX,booth.pm,PROXY
+  - DOMAIN-SUFFIX,fanbox.cc,PROXY
   - RULE-SET,meta_site,PROXY
   - RULE-SET,twitter_site,PROXY
 
@@ -3527,9 +3826,13 @@ configure_caddy_and_compose() {
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>📥 qBittorrent (VueTorrent)</span><a href=\"https://${TORRENT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${TORRENT_DOMAIN}</a></li>"
     fi
-    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+    if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🎬 MeTube yt-dlp</span><a href=\"https://${METUBE_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${METUBE_DOMAIN}</a></li>"
+    <li><span>🤖 Telegram Media Bot</span><span style=\"color:#a0aec0;font-size:0.9em\">Загрузчик медиа в /music и /downloads</span></li>"
+    fi
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+        IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
+    <li><span>🎵 Navidrome Music (Spotify)</span><a href=\"https://${MUSIC_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${MUSIC_DOMAIN}</a></li>"
     fi
     IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>📋 Dozzle Web Logs</span><a href=\"https://${LOGS_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${LOGS_DOMAIN}</a></li>"
@@ -3638,11 +3941,12 @@ EOF_CADDY
 EOF_CADDY
         fi
 
-        if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+
+        if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
-    @metube host ${METUBE_DOMAIN}
-    handle @metube {
-        reverse_proxy metube:8081
+    @music host ${MUSIC_DOMAIN}
+    handle @music {
+        reverse_proxy navidrome:4533
     }
 EOF_CADDY
         fi
@@ -3718,13 +4022,14 @@ ${TORRENT_DOMAIN} {
 EOF_CADDY
         fi
 
-        if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+
+        if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
-${METUBE_DOMAIN} {
+${MUSIC_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy metube:8081
+    reverse_proxy navidrome:4533
 }
 EOF_CADDY
         fi
@@ -3802,8 +4107,10 @@ EOF_COMPOSE
       - "ACCOUNT_${ADMIN_USER_SAFE}=${SAMBA_PASS_COMPOSE}"
       - "UID_${ADMIN_USER_SAFE}=${USER_UID}"
       - "SAMBA_VOLUME_CONFIG_${SAMBA_ENV_SHARE}=[${SHARE_NAME}]; path=/shares/${SHARE_NAME}; valid users=${ADMIN_USER_SAFE}; force user=${ADMIN_USER_SAFE}; guest ok=no; read only=no; browseable=yes; create mask=0664; directory mask=0775"
+      - "SAMBA_VOLUME_CONFIG_music=[music]; path=/shares/music; valid users=${ADMIN_USER_SAFE}; force user=${ADMIN_USER_SAFE}; guest ok=no; read only=no; browseable=yes; create mask=0664; directory mask=0775"
     volumes:
       - ${SAVE_DIR}:/shares/${SHARE_NAME}
+      - ${SAVE_DIR}/music:/shares/music
     healthcheck:
       test: ["CMD-SHELL", "smbcontrol smbd ping >/dev/null 2>&1 || exit 1"]
       interval: 30s
@@ -3952,32 +4259,33 @@ EOF_COMPOSE
 EOF_COMPOSE
     fi
 
-    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         cat <<EOF_COMPOSE >> "${APP_DIR}/docker-compose.yml"
-  metube:
-    image: alexta69/metube:latest
-    container_name: metube
+  navidrome:
+    image: ${NAVIDROME_IMAGE:-deluan/navidrome:latest}
+    container_name: navidrome
     restart: unless-stopped
-    dns:
-      - 77.88.8.8
-      - 1.1.1.1
-      - 8.8.8.8
+    user: "${USER_UID}:${USER_GID}"
     ports:
-      - "127.0.0.1:8081:8081"
+      - "127.0.0.1:4533:4533"
     environment:
-      - "PUID=${USER_UID}"
-      - "PGID=${USER_GID}"
-      - "UID=${USER_UID}"
-      - "GID=${USER_GID}"
-      - "ALLOW_PRIVATE_ADDRESSES=true"
-      - "DOWNLOAD_DIR=/downloads"
-      - "STATE_DIR=/downloads/.metube"
-      - "TEMP_DIR=/downloads/tmp"
-      - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["android","web"]}}}'
+      - "ND_SCANSCHEDULE=1m"
+      - "ND_LOGLEVEL=info"
+      - "ND_SESSIONTIMEOUT=48h"
+      - "ND_BASEURL="
+      - "ND_ENABLETRANSCODINGCONFIG=true"
+      - "ND_TRANSCODINGCACHESIZE=200MB"
+      - "ND_IMAGECACHESIZE=100MB"
+      - "ND_DEFAULTTHEME=Dark"
+      - "ND_ENABLESHARING=true"
+      - "ND_ENABLEDOWNLOADS=true"
+      - "ND_PROMETHEUS_ENABLED=false"
     volumes:
-      - ${SAVE_DIR}/metube:/downloads
+      - ./configs/navidrome:/data
+      - ${SAVE_DIR}/music:/music
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/ 2>/dev/null || curl -fs http://localhost:8081/ >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:4533/ping 2>/dev/null || curl -fs http://localhost:4533/ping >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -4280,6 +4588,74 @@ EOF_GITEA_BKP_TMR
         fi
     fi
 
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+        cat <<'EOF_NAVI_BKP' > "${APP_DIR}/backup_navidrome.sh"
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -f /opt/homelab/.env ]; then
+    # shellcheck disable=SC1091
+    source /opt/homelab/.env
+fi
+SAVE_DIR="${SAVED_SAVE_DIR:-/opt/homelab/save}"
+BACKUP_DIR="${SAVE_DIR}/backups/navidrome"
+DB_SRC="/opt/homelab/configs/navidrome/navidrome.db"
+DATE_TAG=$(date +"%Y%m%d_%H%M%S")
+DUMP_NAME="navidrome_backup_${DATE_TAG}.sql.gz"
+
+mkdir -p "${BACKUP_DIR}"
+
+if [ -f "${DB_SRC}" ]; then
+    TEMP_FILE=$(mktemp)
+    if ! python3 -c "import sqlite3, sys; s = sqlite3.connect(sys.argv[1]); b = sqlite3.connect(sys.argv[2]); s.backup(b); b.close(); s.close()" "${DB_SRC}" "${TEMP_FILE}" 2>/dev/null; then
+        sqlite3 "${DB_SRC}" ".backup '${TEMP_FILE}'" 2>/dev/null || cp -f "${DB_SRC}" "${TEMP_FILE}"
+    fi
+    gzip -c "${TEMP_FILE}" > "${BACKUP_DIR}/${DUMP_NAME}"
+    rm -f "${TEMP_FILE}"
+    chown -R "${SAVED_TARGET_USER:-root}:${USER_GID:-0}" "${BACKUP_DIR}" 2>/dev/null || true
+    chmod 640 "${BACKUP_DIR}"/navidrome_backup_*.sql.gz 2>/dev/null || true
+    chmod 750 "${BACKUP_DIR}" 2>/dev/null || true
+    find "${BACKUP_DIR}" -type f -name "navidrome_backup_*.sql.gz" -mtime +14 -delete 2>/dev/null || true
+    BKP_SIZE=$(du -h "${BACKUP_DIR}/${DUMP_NAME}" 2>/dev/null | awk '{print $1}')
+    /usr/local/bin/homelab-notify "Резервное копирование" "Успешно создан ночной бэкап Navidrome (${BKP_SIZE})" "OK" 2>/dev/null || true
+fi
+EOF_NAVI_BKP
+        chmod 750 "${APP_DIR}/backup_navidrome.sh"
+
+        if [ "${INIT_SYSTEM}" = "systemd" ]; then
+            cat <<EOF_NAVI_BKP_SVC > /etc/systemd/system/navidrome-backup.service
+[Unit]
+Description=Navidrome Music Database Backup
+After=network.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=${APP_DIR}/backup_navidrome.sh
+EOF_NAVI_BKP_SVC
+
+            cat <<EOF_NAVI_BKP_TMR > /etc/systemd/system/navidrome-backup.timer
+[Unit]
+Description=Daily Navidrome Database Backup Timer
+
+[Timer]
+OnCalendar=*-*-* 03:45:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF_NAVI_BKP_TMR
+
+            systemctl daemon-reload >/dev/null 2>&1 || true
+            systemctl enable --now navidrome-backup.timer >/dev/null 2>&1 || true
+        elif [ "${INIT_SYSTEM}" = "openrc" ]; then
+            mkdir -p /etc/crontabs
+            if ! grep -q 'backup_navidrome.sh' /etc/crontabs/root 2>/dev/null; then
+                echo "45 3 * * * ${APP_DIR}/backup_navidrome.sh >/dev/null 2>&1" >> /etc/crontabs/root
+            fi
+            touch /etc/crontabs/cron.update 2>/dev/null || true
+        fi
+    fi
+
     cd "${APP_DIR}"
 
     run_spin "Загрузка Docker-образов стека" bash -c '
@@ -4333,6 +4709,29 @@ for p in set(db_paths):
         [ $GITEA_READY -eq 0 ] && log_warn "Не удалось инициализировать админа Gitea (контейнер запускается в фоновом режиме)"
     fi
 
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+        log_info "Автоматическая инициализация администратора Navidrome (${ADMIN_USER})..."
+        local NAVIDROME_READY=0
+        for i in {1..30}; do
+            if docker inspect -f '{{.State.Status}}' navidrome 2>/dev/null | grep -q "running"; then
+                local RES_CREATE
+                RES_CREATE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:4533/api/user" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"userName\":\"${ADMIN_USER}\",\"username\":\"${ADMIN_USER}\",\"name\":\"${ADMIN_USER}\",\"password\":\"${MASTER_PASS}\",\"isAdmin\":true}" 2>/dev/null || echo "000")
+                if [ "${RES_CREATE}" = "200" ] || [ "${RES_CREATE}" = "201" ]; then
+                    log_ok "Администратор Navidrome (${ADMIN_USER}) успешно создан с мастер-паролем"
+                    NAVIDROME_READY=1
+                    break
+                elif [ "${RES_CREATE}" = "400" ] || [ "${RES_CREATE}" = "409" ] || [ "${RES_CREATE}" = "403" ]; then
+                    NAVIDROME_READY=1
+                    break
+                fi
+            fi
+            sleep 2
+        done
+        [ $NAVIDROME_READY -eq 1 ] && log_ok "Navidrome готов к работе (порт 4533 / ${MUSIC_DOMAIN})"
+    fi
+
     if [ "$SSL_MODE" = "1" ]; then
         log_info "Экспорт локального корневого сертификата CA Caddy..."
         local CADDY_ROOT_CERT="${APP_DIR}/caddy/data/caddy/pki/authorities/local/root.crt"
@@ -4349,6 +4748,508 @@ for p in set(db_paths):
         done
     fi
 
+    if [[ "${ENABLE_TG_BOT:-Y}" =~ ^[Yy]$ ]]; then
+        log_info "Настройка и запуск службы Telegram-бота (Медиа-загрузчик yt-dlp)..."
+        mkdir -p "${APP_DIR}/scripts"
+
+        cat << 'EOF_TG_BOT' > "${APP_DIR}/scripts/homelab-bot.py"
+#!/usr/bin/env python3
+# ==============================================================================
+# Homelab Media Telegram Bot (2026 Native Daemon)
+# Zero external pip dependencies: Python 3 stdlib + standalone yt-dlp + ffmpeg + curl
+# Features:
+# - Video download to ${SAVE_DIR}/downloads (MP4) -> Samba
+# - Music extract to ${SAVE_DIR}/music (Hi-Fi MP3 with Cover Art & Tags) -> Navidrome
+# - Direct audio send to Telegram Chat (<= 50MB) via Bot API
+# - Server status (/status), help (/help), and security check by TELEGRAM_CHAT_ID
+# ==============================================================================
+
+import os
+import sys
+import time
+import re
+import json
+import urllib.request
+import urllib.parse
+import urllib.error
+import subprocess
+import threading
+import logging
+import shutil
+import uuid
+
+ENV_PATH = "/opt/homelab/.env"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+
+URL_CACHE = {}  # {url_id: {"url": str, "ts": float}}
+URL_REGEX = re.compile(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
+
+def parse_env():
+    conf = {
+        "BOT_TOKEN": "",
+        "CHAT_ID": "",
+        "SAVE_DIR": "/opt/homelab/save",
+        "LOCAL_IP": "127.0.0.1",
+        "ADMIN_USER": "admin",
+        "VERSION": "2.7.0"
+    }
+    if os.path.exists(ENV_PATH):
+        try:
+            with open(ENV_PATH, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip("'\"")
+                    v = v.replace("\\n", "\n").replace("\\t", "\t")
+                    if k in ("SAVED_TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN"):
+                        conf["BOT_TOKEN"] = v
+                    elif k in ("SAVED_TELEGRAM_CHAT_ID", "TELEGRAM_CHAT_ID"):
+                        conf["CHAT_ID"] = str(v)
+                    elif k in ("SAVED_SAVE_DIR", "SAVE_DIR"):
+                        conf["SAVE_DIR"] = v
+                    elif k in ("SAVED_LOCAL_IP", "LOCAL_IP"):
+                        conf["LOCAL_IP"] = v
+                    elif k in ("SAVED_ADMIN_USER", "ADMIN_USER"):
+                        conf["ADMIN_USER"] = v
+                    elif k in ("SAVED_HOMELAB_VERSION", "HOMELAB_VERSION"):
+                        conf["VERSION"] = v
+        except Exception as e:
+            logging.error(f"Error parsing {ENV_PATH}: {e}")
+    if not conf["BOT_TOKEN"] and os.environ.get("TELEGRAM_BOT_TOKEN"):
+        conf["BOT_TOKEN"] = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not conf["CHAT_ID"] and os.environ.get("TELEGRAM_CHAT_ID"):
+        conf["CHAT_ID"] = str(os.environ.get("TELEGRAM_CHAT_ID"))
+    return conf
+
+def tg_call(token, method, payload=None, timeout=30):
+    url = f"https://api.telegram.org/bot{token}/{method}"
+    data = None
+    headers = {"Content-Type": "application/json"}
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def send_msg(token, chat_id, text, reply_markup=None):
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
+    }
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    return tg_call(token, "sendMessage", payload, timeout=15)
+
+def edit_msg(token, chat_id, message_id, text, reply_markup=None):
+    payload = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
+    }
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    return tg_call(token, "editMessageText", payload, timeout=15)
+
+def answer_cb(token, query_id, text=None):
+    payload = {"callback_query_id": query_id}
+    if text:
+        payload["text"] = text
+    return tg_call(token, "answerCallbackQuery", payload, timeout=10)
+
+def find_ytdlp():
+    for p in ["/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"]:
+        if os.path.exists(p) and os.access(p, os.X_OK):
+            return p
+    return "yt-dlp"
+
+def get_server_status(conf):
+    uptime_str = "N/A"
+    try:
+        uptime_str = subprocess.check_output(["uptime", "-p"], stderr=subprocess.DEV_NULL).decode().strip()
+    except Exception:
+        pass
+
+    ram_str = "N/A"
+    try:
+        out = subprocess.check_output(["free", "-h"], stderr=subprocess.DEV_NULL).decode()
+        for line in out.splitlines():
+            if line.startswith("Mem:"):
+                parts = line.split()
+                ram_str = f"{parts[2]} / {parts[1]}"
+    except Exception:
+        pass
+
+    disk_str = "N/A"
+    save_dir = conf.get("SAVE_DIR", "/opt/homelab/save")
+    try:
+        out = subprocess.check_output(["df", "-h", save_dir], stderr=subprocess.DEV_NULL).decode()
+        lines = out.splitlines()
+        if len(lines) >= 2:
+            parts = lines[1].split()
+            disk_str = f"{parts[2]} / {parts[1]} (свободно {parts[3]})"
+    except Exception:
+        pass
+
+    ytdlp_ver = "N/A"
+    try:
+        ytdlp_ver = subprocess.check_output([find_ytdlp(), "--version"], stderr=subprocess.DEV_NULL).decode().strip()
+    except Exception:
+        pass
+
+    containers_active = 0
+    try:
+        out = subprocess.check_output(["docker", "ps", "-q"], stderr=subprocess.DEV_NULL).decode().strip()
+        if out:
+            containers_active = len(out.splitlines())
+    except Exception:
+        pass
+
+    msg = (
+        f"🖥 <b>Homelab Appliance v{conf.get('VERSION', '2.7.0')}</b>\n"
+        f"────────────────────────────\n"
+        f"• <b>Аптайм:</b> {uptime_str}\n"
+        f"• <b>ОЗУ:</b> {ram_str}\n"
+        f"• <b>Диск ({save_dir}):</b> {disk_str}\n"
+        f"• <b>Docker контейнеры:</b> {containers_active} активных\n"
+        f"• <b>yt-dlp:</b> {ytdlp_ver}\n"
+        f"• <b>IP адрес:</b> {conf.get('LOCAL_IP', '127.0.0.1')}\n"
+        f"────────────────────────────\n"
+        f"🎵 Музыка: <a href='https://music.lan'>music.lan</a> (Navidrome)\n"
+        f"📂 Samba: <code>\\\\{conf.get('LOCAL_IP')}\\storage</code>\n"
+    )
+    return msg
+
+def clean_url_cache():
+    now = time.time()
+    expired = [k for k, v in URL_CACHE.items() if now - v["ts"] > 86400]
+    for k in expired:
+        URL_CACHE.pop(k, None)
+
+def worker_download_video(token, chat_id, message_id, url, conf):
+    save_dir = conf.get("SAVE_DIR", "/opt/homelab/save")
+    dl_dir = os.path.join(save_dir, "downloads")
+    os.makedirs(dl_dir, exist_ok=True)
+    edit_msg(token, chat_id, message_id, "⏳ <b>[1/2] Скачивание видео в MP4...</b>\nПожалуйста, подождите.")
+    
+    cmd = [
+        find_ytdlp(),
+        "--no-warnings",
+        "--no-playlist",
+        "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "--merge-output-format", "mp4",
+        "-o", os.path.join(dl_dir, "%(title)s.%(ext)s"),
+        url
+    ]
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=600)
+        if res.returncode == 0:
+            edit_msg(token, chat_id, message_id,
+                f"✅ <b>Видео успешно сохранено!</b>\n\n"
+                f"📁 <b>Каталог:</b> <code>{dl_dir}</code>\n"
+                f"💻 <b>Samba NAS:</b> <code>\\\\{conf.get('LOCAL_IP')}\\storage\\downloads</code>"
+            )
+        else:
+            err = res.stderr[-400:] if res.stderr else "Неизвестная ошибка"
+            edit_msg(token, chat_id, message_id, f"❌ <b>Ошибка при скачивании видео:</b>\n<pre>{err}</pre>")
+    except Exception as e:
+        edit_msg(token, chat_id, message_id, f"❌ <b>Исключение:</b> {str(e)}")
+
+def worker_download_music(token, chat_id, message_id, url, conf):
+    save_dir = conf.get("SAVE_DIR", "/opt/homelab/save")
+    music_dir = os.path.join(save_dir, "music")
+    os.makedirs(music_dir, exist_ok=True)
+    edit_msg(token, chat_id, message_id, "⏳ <b>[1/2] Извлечение аудио Hi-Fi, обложки и тегов...</b>\nОбработка через ffmpeg...")
+    
+    cmd = [
+        find_ytdlp(),
+        "--no-warnings",
+        "--no-playlist",
+        "-x",
+        "--audio-format", "mp3",
+        "--audio-quality", "0",
+        "--embed-metadata",
+        "--embed-thumbnail",
+        "-o", os.path.join(music_dir, "%(artist,uploader)s/%(album,title)s/%(title)s.%(ext)s"),
+        url
+    ]
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=600)
+        if res.returncode == 0:
+            edit_msg(token, chat_id, message_id,
+                f"✅ <b>Трек успешно добавлен в библиотеку!</b>\n\n"
+                f"🎵 <b>Каталог Navidrome:</b> <code>{music_dir}</code>\n"
+                f"🎧 <b>Стриминг:</b> Трек уже готов к воспроизведению в Symfonium, Substreamer и Feishin!"
+            )
+        else:
+            err = res.stderr[-400:] if res.stderr else "Неизвестная ошибка"
+            edit_msg(token, chat_id, message_id, f"❌ <b>Ошибка при сохранении музыки:</b>\n<pre>{err}</pre>")
+    except Exception as e:
+        edit_msg(token, chat_id, message_id, f"❌ <b>Исключение:</b> {str(e)}")
+
+def worker_download_tg(token, chat_id, message_id, url, conf):
+    work_id = uuid.uuid4().hex[:8]
+    tmp_dir = f"/tmp/homelab_tg_{work_id}"
+    os.makedirs(tmp_dir, exist_ok=True)
+    save_dir = conf.get("SAVE_DIR", "/opt/homelab/save")
+    music_dir = os.path.join(save_dir, "music")
+
+    edit_msg(token, chat_id, message_id, "⏳ <b>[1/3] Загрузка и конвертация аудио в MP3...</b>")
+    cmd = [
+        find_ytdlp(),
+        "--no-warnings",
+        "--no-playlist",
+        "-x",
+        "--audio-format", "mp3",
+        "--audio-quality", "0",
+        "--embed-metadata",
+        "--embed-thumbnail",
+        "-o", os.path.join(tmp_dir, "%(title)s.%(ext)s"),
+        url
+    ]
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=600)
+        if res.returncode != 0:
+            err = res.stderr[-400:] if res.stderr else "Неизвестная ошибка"
+            edit_msg(token, chat_id, message_id, f"❌ <b>Ошибка при загрузке:</b>\n<pre>{err}</pre>")
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return
+
+        files = [os.path.join(tmp_dir, f) for f in os.listdir(tmp_dir) if f.lower().endswith(".mp3")]
+        if not files:
+            files = [os.path.join(tmp_dir, f) for f in os.listdir(tmp_dir) if os.path.isfile(os.path.join(tmp_dir, f))]
+        
+        if not files:
+            edit_msg(token, chat_id, message_id, "❌ Файл аудио не найден после конвертации.")
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return
+
+        target_file = files[0]
+        size_bytes = os.path.getsize(target_file)
+        size_mb = size_bytes / (1024 * 1024)
+
+        if size_bytes > 50 * 1024 * 1024:
+            dest_name = os.path.basename(target_file)
+            os.makedirs(music_dir, exist_ok=True)
+            dest_path = os.path.join(music_dir, dest_name)
+            shutil.move(target_file, dest_path)
+            edit_msg(token, chat_id, message_id,
+                f"⚠️ <b>Размер файла ({size_mb:.1f} МБ) превышает лимит Telegram (50 МБ).</b>\n\n"
+                f"Файл сохранен на сервере в <code>/music/{dest_name}</code> и доступен в Navidrome!"
+            )
+        else:
+            edit_msg(token, chat_id, message_id, f"📤 <b>[2/3] Отправка файла ({size_mb:.1f} МБ) в Telegram...</b>")
+            title = os.path.splitext(os.path.basename(target_file))[0]
+            curl_cmd = [
+                "curl", "-s", "-S",
+                "-F", f"chat_id={chat_id}",
+                "-F", f"audio=@{target_file}",
+                "-F", f"title={title}",
+                "-F", "caption=🎵 Скачано через Homelab Bot",
+                f"https://api.telegram.org/bot{token}/sendAudio"
+            ]
+            up_res = subprocess.run(curl_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=180)
+            if up_res.returncode == 0 and '"ok":true' in up_res.stdout:
+                edit_msg(token, chat_id, message_id, f"✅ <b>Аудио успешно отправлено в чат!</b>")
+            else:
+                edit_msg(token, chat_id, message_id, f"❌ <b>Ошибка при передаче аудио:</b>\n<pre>{up_res.stdout[-300:]}</pre>")
+    except Exception as e:
+        edit_msg(token, chat_id, message_id, f"❌ <b>Исключение:</b> {str(e)}")
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+def handle_update(upd, conf):
+    token = conf["BOT_TOKEN"]
+    owner_chat = str(conf["CHAT_ID"]).strip()
+
+    if "callback_query" in upd:
+        cq = upd["callback_query"]
+        cq_id = cq["id"]
+        from_id = str(cq.get("from", {}).get("id", ""))
+        chat_id = str(cq.get("message", {}).get("chat", {}).get("id", ""))
+        msg_id = cq.get("message", {}).get("message_id")
+        data = cq.get("data", "")
+
+        if owner_chat and from_id != owner_chat and chat_id != owner_chat:
+            answer_cb(token, cq_id, "⛔ Доступ запрещен (чужой чат)")
+            return
+
+        parts = data.split(":", 1)
+        if len(parts) == 2:
+            act, uid = parts[0], parts[1]
+            cached = URL_CACHE.get(uid)
+            if not cached:
+                answer_cb(token, cq_id, "Ссылка устарела. Отправьте ее повторно.")
+                return
+            
+            url = cached["url"]
+            answer_cb(token, cq_id, "Задача принята в обработку...")
+            
+            if act == "vid":
+                threading.Thread(target=worker_download_video, args=(token, chat_id, msg_id, url, conf), daemon=True).start()
+            elif act == "mus":
+                threading.Thread(target=worker_download_music, args=(token, chat_id, msg_id, url, conf), daemon=True).start()
+            elif act == "tg":
+                threading.Thread(target=worker_download_tg, args=(token, chat_id, msg_id, url, conf), daemon=True).start()
+        return
+
+    if "message" in upd:
+        msg = upd["message"]
+        chat_id = str(msg.get("chat", {}).get("id", ""))
+        from_id = str(msg.get("from", {}).get("id", ""))
+        text = msg.get("text", "").strip()
+
+        if owner_chat and from_id != owner_chat and chat_id != owner_chat:
+            send_msg(token, chat_id, "⛔ <b>Доступ запрещен.</b>\nЭтот сервер Homelab привязан к другому пользователю.")
+            return
+
+        if text in ("/start", "/help"):
+            welcome = (
+                "👋 <b>Привет! Я персональный Homelab Медиа-бот.</b>\n\n"
+                "Отправьте мне ссылку на видео или трек (YouTube, VK, RuTube, TikTok, SoundCloud и др.), "
+                "и выберите нужный формат:\n\n"
+                "• 🎬 <b>Видео (MP4)</b> — сохранение в папку <code>/downloads</code> (Samba)\n"
+                "• 🎵 <b>Музыка (Hi-Fi)</b> — извлечение аудио с обложкой и тегами в <code>/music</code> (Navidrome)\n"
+                "• 📥 <b>В чат TG</b> — прямая отправка MP3 файла сюда в диалог\n\n"
+                "<b>Команды:</b>\n"
+                "/status — Состояние сервера, RAM, диска и Docker\n"
+                "/ping — Проверка отклика бота\n"
+                "/help — Справка"
+            )
+            send_msg(token, chat_id, welcome)
+            return
+
+        if text == "/status":
+            send_msg(token, chat_id, get_server_status(conf))
+            return
+
+        if text == "/ping":
+            send_msg(token, chat_id, "Pong! 🏓 Бот работает в штатном режиме.")
+            return
+
+        urls = URL_REGEX.findall(text)
+        if urls:
+            url = urls[0]
+            clean_url_cache()
+            uid = uuid.uuid4().hex[:8]
+            URL_CACHE[uid] = {"url": url, "ts": time.time()}
+
+            kbd = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🎬 Видео (MP4)", "callback_data": f"vid:{uid}"},
+                        {"text": "🎵 В Navidrome (Hi-Fi)", "callback_data": f"mus:{uid}"}
+                    ],
+                    [
+                        {"text": "📥 Аудио прямо в чат TG", "callback_data": f"tg:{uid}"}
+                    ]
+                ]
+            }
+            send_msg(token, chat_id, f"🔗 <b>Ссылка получена!</b>\n<code>{url[:60]}...</code>\n\nВыберите действие:", reply_markup=kbd)
+        elif text:
+            send_msg(token, chat_id, "💡 Отправьте мне ссылку на видео или аудио для скачивания, либо используйте команду /status.")
+
+def main():
+    logging.info("Starting Homelab Telegram Media Bot Daemon...")
+    last_env_check = 0
+    conf = parse_env()
+    offset = 0
+
+    while True:
+        now = time.time()
+        if now - last_env_check > 30:
+            last_env_check = now
+            conf = parse_env()
+
+        token = conf.get("BOT_TOKEN")
+        if not token:
+            logging.warning("TELEGRAM_BOT_TOKEN is not configured in .env. Waiting 30s...")
+            time.sleep(30)
+            continue
+
+        try:
+            res = tg_call(token, "getUpdates", {"offset": offset, "timeout": 25}, timeout=35)
+            if res.get("ok"):
+                for upd in res.get("result", []):
+                    offset = upd["update_id"] + 1
+                    try:
+                        handle_update(upd, conf)
+                    except Exception as err:
+                        logging.error(f"Error handling update: {err}")
+            else:
+                logging.warning(f"Telegram API response: {res}")
+                time.sleep(5)
+        except Exception as e:
+            logging.error(f"Polling loop exception: {e}")
+            time.sleep(5)
+
+if __name__ == "__main__":
+    main()
+EOF_TG_BOT
+        chmod 750 "${APP_DIR}/scripts/homelab-bot.py"
+
+        if [ "${INIT_SYSTEM}" = "systemd" ]; then
+            cat <<EOF_BOT_SVC > /etc/systemd/system/homelab-bot.service
+[Unit]
+Description=Homelab Telegram Media Bot Daemon
+After=network.target docker.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${APP_DIR}
+ExecStart=/usr/bin/python3 ${APP_DIR}/scripts/homelab-bot.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF_BOT_SVC
+            systemctl daemon-reload >/dev/null 2>&1 || true
+            systemctl enable homelab-bot.service >/dev/null 2>&1 || true
+            systemctl restart homelab-bot.service >/dev/null 2>&1 || true
+            log_ok "Служба Telegram-бота активирована (systemd: homelab-bot.service)"
+        elif [ "${INIT_SYSTEM}" = "openrc" ]; then
+            cat <<EOF_BOT_RC > /etc/init.d/homelab-bot
+#!/sbin/openrc-run
+name="homelab-bot"
+description="Homelab Telegram Media Bot Daemon"
+command="/usr/bin/python3"
+command_args="${APP_DIR}/scripts/homelab-bot.py"
+command_background="yes"
+pidfile="/run/homelab-bot.pid"
+output_log="/var/log/homelab-bot.log"
+error_log="/var/log/homelab-bot.err"
+
+depend() {
+    need net
+    after firewall
+}
+EOF_BOT_RC
+            chmod 755 /etc/init.d/homelab-bot
+            rc-update add homelab-bot default >/dev/null 2>&1 || true
+            rc-service homelab-bot restart >/dev/null 2>&1 || rc-service homelab-bot start >/dev/null 2>&1 || true
+            log_ok "Служба Telegram-бота активирована (OpenRC: homelab-bot)"
+        fi
+    fi
+
     log_info "Установка консольной утилиты управления комплексом (/usr/local/bin/homelab)..."
     cat << 'EOF_HOMELAB_CLI' > /usr/local/bin/homelab
 #!/usr/bin/env bash
@@ -4362,6 +5263,7 @@ if [ -f "${APP_DIR}/.env" ]; then
     # shellcheck disable=SC1091
     source "${APP_DIR}/.env"
 fi
+HOMELAB_RAW_URL="https://raw.githubusercontent.com/unknownpeace/Medal/main"
 
 CLR_RESET="\033[0m"
 CLR_BOLD="\033[1m"
@@ -4405,6 +5307,7 @@ norm_service() {
 
 cmd_status() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── HOMELAB APPLIANCE: СТАТУС СИСТЕМЫ И СЕРВИСОВ ───────────────${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Версия комплекса:${CLR_RESET}  ${CLR_GREEN}v${SAVED_HOMELAB_VERSION:-2.5.0}${CLR_RESET}"
     echo -e "  ${CLR_WHITE}• Ядро / ОС:${CLR_RESET}         $(uname -srm) [$(grep -E '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '\"' || echo 'Linux')]"
     echo -e "  ${CLR_WHITE}• Аптайм хоста:${CLR_RESET}      $(uptime -p 2>/dev/null || uptime | awk '{print $3,$4}' | tr -d ',')"
     local ram_usage
@@ -4419,6 +5322,16 @@ cmd_status() {
         FW_STATUS="${CLR_GREEN}nftables (таблица inet homelab)${CLR_RESET}"
     fi
     echo -e "  ${CLR_WHITE}• Фаервол / NAT:${CLR_RESET}     ${FW_STATUS}"
+
+    local BOT_STATUS="${CLR_DIM}не настроен${CLR_RESET}"
+    if [ -f /etc/systemd/system/homelab-bot.service ] || [ -f /etc/init.d/homelab-bot ]; then
+        if pgrep -f "homelab-bot.py" >/dev/null 2>&1; then
+            BOT_STATUS="${CLR_GREEN}Активен (Telegram Media Bot)${CLR_RESET}"
+        else
+            BOT_STATUS="${CLR_YELLOW}Остановлен / Ожидает токен в .env${CLR_RESET}"
+        fi
+    fi
+    echo -e "  ${CLR_WHITE}• Telegram-бот:${CLR_RESET}      ${BOT_STATUS}"
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
     echo ""
 
@@ -4426,7 +5339,7 @@ cmd_status() {
     printf "  %-18s %-12s %-14s %-10s\n" "СЕРВИС" "СТАТУС" "ЗДОРОВЬЕ" "ПАМЯТЬ"
     echo -e "  ─────────────────────────────────────────────────────────────"
     
-    local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "metube" "samba" "dozzle" "watchtower" "autoheal")
+    local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "navidrome" "samba" "dozzle" "watchtower" "autoheal")
     for c in "${CONTAINERS[@]}"; do
         if docker inspect "$c" >/dev/null 2>&1; then
             local state
@@ -4452,6 +5365,16 @@ cmd_status() {
 
 cmd_restart() {
     local target="${1:-}"
+    if [ "$target" = "zapret" ] || [ "$target" = "zapret2" ]; then
+        echo -e "  ${TAG_INFO} Перезапуск службы Zapret2 DPI-Bypass..."
+        if command -v rc-service >/dev/null 2>&1; then
+            rc-service zapret2 restart 2>/dev/null || rc-service zapret2 start 2>/dev/null || true
+        elif command -v systemctl >/dev/null 2>&1; then
+            systemctl restart zapret2.service 2>/dev/null || true
+        fi
+        echo -e "  ${TAG_OK} Служба Zapret2 перезапущена"
+        return 0
+    fi
     if [ -n "$target" ]; then
         target=$(norm_service "$target")
         shift || true
@@ -4524,9 +5447,14 @@ cmd_backup() {
         "${APP_DIR}/backup_gitea.sh"
         echo -e "  ${TAG_OK} Бэкап Gitea завершен"
     fi
+    if [ -x "${APP_DIR}/backup_navidrome.sh" ]; then
+        echo -e "  ${TAG_INFO} Бэкап Navidrome..."
+        "${APP_DIR}/backup_navidrome.sh"
+        echo -e "  ${TAG_OK} Бэкап Navidrome завершен"
+    fi
     echo ""
     echo -e "  ${CLR_CYAN}Файлы бэкапов в хранилище (${SAVED_SAVE_DIR:-/opt/homelab/save}/backups):${CLR_RESET}"
-    find "${SAVED_SAVE_DIR:-/opt/homelab/save}/backups" -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.db.gz" \) 2>/dev/null | while read -r f; do
+    find "${SAVED_SAVE_DIR:-/opt/homelab/save}/backups" -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.db.gz" -o -name "*.sql.gz" \) 2>/dev/null | while read -r f; do
         printf "    ${CLR_GREEN}•${CLR_RESET} %-45s ${CLR_YELLOW}[%s]${CLR_RESET}\n" "$(basename "$f")" "$(du -h "$f" 2>/dev/null | awk '{print $1}')"
     done
 }
@@ -4630,6 +5558,31 @@ cmd_doctor() {
         if [ -f /opt/homelab/adguard/conf/AdGuardHome.yaml ] && grep -q 'anonymize_client_ip: false' /opt/homelab/adguard/conf/AdGuardHome.yaml 2>/dev/null; then
             echo -e "  ${TAG_OK} Идентификация клиентов LAN (AdGuard):     ${CLR_GREEN}[АКТИВНА (полные IP и имена устройств)]${CLR_RESET}"
         fi
+
+        if [[ "${SAVED_ENABLE_ZAPRET:-Y}" =~ ^[Yy]$ ]]; then
+            if pgrep -x nfqws2 >/dev/null 2>&1 || pidof nfqws2 >/dev/null 2>&1; then
+                echo -e "  ${TAG_OK} Zapret2 DPI-Bypass (демон nfqws2):       ${CLR_GREEN}[АКТИВЕН И ОБРАБАТЫВАЕТ ТРАФИК]${CLR_RESET}"
+            else
+                echo -e "  ${TAG_WARN} Zapret2 DPI-Bypass (демон nfqws2):       ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
+            fi
+            if command -v nft >/dev/null 2>&1 && nft list table inet zapret2 >/dev/null 2>&1; then
+                echo -e "  ${TAG_OK} nftables (таблица inet zapret2):         ${CLR_GREEN}[АКТИВНА И ПРИМЕНЕНА]${CLR_RESET}"
+            fi
+        fi
+    fi
+
+    if [ -x /usr/local/bin/yt-dlp ] || command -v yt-dlp >/dev/null 2>&1; then
+        local YV
+        YV=$(yt-dlp --version 2>/dev/null || /usr/local/bin/yt-dlp --version 2>/dev/null || echo "v2026")
+        echo -e "  ${TAG_OK} Медиа-загрузчик yt-dlp (standalone):     ${CLR_GREEN}[ГОТОВ (${YV})]${CLR_RESET}"
+    fi
+
+    if [ -f /etc/systemd/system/homelab-bot.service ] || [ -f /etc/init.d/homelab-bot ]; then
+        if pgrep -f "homelab-bot.py" >/dev/null 2>&1; then
+            echo -e "  ${TAG_OK} Telegram Медиа-бот (homelab-bot):         ${CLR_GREEN}[АКТИВЕН И СЛУШАЕТ ЧАТ]${CLR_RESET}"
+        else
+            echo -e "  ${TAG_WARN} Telegram Медиа-бот (homelab-bot):         ${CLR_YELLOW}[ОСТАНОВЛЕН / ОЖИДАЕТ НАСТРОЙКИ В .env]${CLR_RESET}"
+        fi
     fi
 
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
@@ -4643,6 +5596,207 @@ cmd_update() {
     echo -e "  ${TAG_INFO} Очистка неиспользуемых устаревших слоёв..."
     docker image prune -f >/dev/null 2>&1 || true
     echo -e "  ${TAG_OK} Стек Homelab успешно обновлен до последних версий!"
+}
+
+cmd_blockcheck() {
+    local ZAPRET_DIR="/opt/zapret2"
+    if [ ! -f "${ZAPRET_DIR}/blockcheck2.sh" ]; then
+        echo -e "  ${TAG_ERR} Утилита blockcheck2.sh не найдена в ${ZAPRET_DIR}!"
+        echo -e "  Убедитесь, что модуль Zapret2 установлен."
+        return 1
+    fi
+
+    echo -e "${CLR_NEON_CYAN}${CLR_BOLD}╭── ИНТЕЛЛЕКТУАЛЬНЫЙ ПОДБОР СТРАТЕГИЙ DPI (ZAPRET2 BLOCKCHECK) ─${CLR_RESET}"
+    echo -e "  ${TAG_INFO} Подготовка к тестированию десинхронизации ТСПУ вашего провайдера..."
+    echo -e "  ${CLR_YELLOW}Внимание:${CLR_RESET} Для чистого замера DPI служба Zapret2 будет временно остановлена,"
+    echo -e "  а по окончании теста — автоматически запущена обратно с сохранением всех настроек."
+    echo ""
+
+    local RESTART_ZP=0
+    if pgrep -x nfqws2 >/dev/null 2>&1 || pgrep -f "nfqws2" >/dev/null 2>&1; then
+        RESTART_ZP=1
+        echo -e "  ${TAG_INFO} Временная приостановка nfqws2 для прямого замера DPI..."
+        if command -v rc-service >/dev/null 2>&1 && rc-service zapret2 status >/dev/null 2>&1; then
+            rc-service zapret2 stop >/dev/null 2>&1 || true
+        elif command -v systemctl >/dev/null 2>&1 && systemctl is-active zapret2.service >/dev/null 2>&1; then
+            systemctl stop zapret2.service >/dev/null 2>&1 || true
+        elif [ -x "${ZAPRET_DIR}/init.d/sysv/zapret2" ]; then
+            "${ZAPRET_DIR}/init.d/sysv/zapret2" stop >/dev/null 2>&1 || true
+        fi
+    fi
+
+    (
+        cd "${ZAPRET_DIR}"
+        chmod +x blockcheck2.sh 2>/dev/null || true
+        ./blockcheck2.sh "$@"
+    )
+    local RET=$?
+
+    if [ $RESTART_ZP -eq 1 ]; then
+        echo ""
+        echo -e "  ${TAG_INFO} Автоматический перезапуск службы Zapret2..."
+        if command -v rc-service >/dev/null 2>&1; then
+            rc-service zapret2 start >/dev/null 2>&1 || rc-service zapret2 restart >/dev/null 2>&1 || true
+        elif command -v systemctl >/dev/null 2>&1; then
+            systemctl start zapret2.service >/dev/null 2>&1 || systemctl restart zapret2.service >/dev/null 2>&1 || true
+        elif [ -x "${ZAPRET_DIR}/init.d/sysv/zapret2" ]; then
+            "${ZAPRET_DIR}/init.d/sysv/zapret2" start >/dev/null 2>&1 || true
+        fi
+        echo -e "  ${TAG_OK} Служба Zapret2 возвращена в исходное рабочее состояние."
+    fi
+
+    echo -e "${CLR_NEON_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+    return $RET
+}
+
+cmd_version() {
+    echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.5.0}"
+    echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
+
+    local REMOTE_VER=""
+    if command -v curl >/dev/null 2>&1; then
+        REMOTE_VER=$(curl -fsSL -m 4 "${HOMELAB_RAW_URL}/VERSION" 2>/dev/null | tr -d ' \r\n' || true)
+    elif command -v wget >/dev/null 2>&1; then
+        REMOTE_VER=$(wget -qO- --timeout=4 "${HOMELAB_RAW_URL}/VERSION" 2>/dev/null | tr -d ' \r\n' || true)
+    fi
+
+    if [ -n "${REMOTE_VER}" ]; then
+        echo -e "  ${TAG_INFO} Последняя версия на GitHub:  ${CLR_WHITE}v${REMOTE_VER}${CLR_RESET}"
+        if [ "${REMOTE_VER}" != "${CUR_VER}" ]; then
+            echo ""
+            echo -e "  ${CLR_YELLOW}⚡ ДОСТУПНО ОБНОВЛЕНИЕ!${CLR_RESET} Вы можете обновить комплекс без потери данных:"
+            echo -e "      ${CLR_GREEN}homelab upgrade${CLR_RESET}"
+        else
+            echo -e "  ${TAG_OK} У вас установлена самая актуальная версия комплекса."
+        fi
+    else
+        echo -e "  ${TAG_WARN} Не удалось проверить последнюю версию (нет связи с GitHub)"
+    fi
+    echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+}
+
+cmd_upgrade() {
+    local FORCE=0
+    for a in "$@"; do
+        if [ "$a" = "--force" ] || [ "$a" = "-f" ]; then
+            FORCE=1
+        fi
+    done
+
+    echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.5.0}"
+    echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
+    echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
+
+    local REMOTE_VER=""
+    if command -v curl >/dev/null 2>&1; then
+        REMOTE_VER=$(curl -fsSL -m 5 "${HOMELAB_RAW_URL}/VERSION" 2>/dev/null | tr -d ' \r\n' || true)
+    elif command -v wget >/dev/null 2>&1; then
+        REMOTE_VER=$(wget -qO- --timeout=5 "${HOMELAB_RAW_URL}/VERSION" 2>/dev/null | tr -d ' \r\n' || true)
+    fi
+
+    if [ -z "${REMOTE_VER}" ]; then
+        echo -e "  ${TAG_WARN} Не удалось получить информацию о версии с GitHub."
+        if [ $FORCE -eq 0 ]; then
+            echo -e "  Для принудительного обновления выполните: ${CLR_GREEN}homelab upgrade --force${CLR_RESET}"
+            echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+            return 1
+        fi
+        REMOTE_VER="latest"
+    fi
+
+    if [ "${REMOTE_VER}" = "${CUR_VER}" ] && [ $FORCE -eq 0 ]; then
+        echo -e "  ${TAG_OK} У вас уже установлена актуальная версия ${CLR_WHITE}v${CUR_VER}${CLR_RESET}."
+        echo -e "  Для принудительной переустановки: ${CLR_GREEN}homelab upgrade --force${CLR_RESET}"
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+        return 0
+    fi
+
+    echo -e "  ${CLR_YELLOW}⚡ Обновление: v${CUR_VER} ➔ v${REMOTE_VER}${CLR_RESET}"
+    echo -e "  ${TAG_INFO} [1/4] Создание снимка восстановления (Pre-Upgrade Snapshot)..."
+    local SNAPSHOT_DIR="${APP_DIR}/backups/snapshots"
+    mkdir -p "${SNAPSHOT_DIR}"
+    local SNAP_TAR="${SNAPSHOT_DIR}/homelab_snapshot_pre_upgrade.tar.gz"
+
+    tar -czf "${SNAP_TAR}" \
+        -C "${APP_DIR}" \
+        .env compose.yaml Caddyfile \
+        2>/dev/null || true
+    [ -d "${APP_DIR}/mihomo" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" mihomo/config.yaml 2>/dev/null || true
+    [ -d "${APP_DIR}/adguard/conf" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" adguard/conf/AdGuardHome.yaml 2>/dev/null || true
+    [ -d "${APP_DIR}/configs/navidrome" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" configs/navidrome 2>/dev/null || true
+    [ -f "/opt/zapret2/config" ] && tar -rf "${SNAP_TAR}" -C "/opt" zapret2/config 2>/dev/null || true
+    chmod 600 "${SNAP_TAR}" 2>/dev/null || true
+    echo -e "  ${TAG_OK} Снимок конфигураций сохранен в: ${SNAP_TAR}"
+
+    echo -e "  ${TAG_INFO} [2/4] Загрузка нового установщика с GitHub..."
+    local TMP_UPGRADE="/tmp/homelab_upgrade_installer.sh"
+    rm -f "${TMP_UPGRADE}"
+
+    local DL_OK=0
+    if curl -fsSL -m 40 "${HOMELAB_RAW_URL}/install.sh" -o "${TMP_UPGRADE}" 2>/dev/null; then
+        DL_OK=1
+    elif command -v wget >/dev/null 2>&1 && wget -q --timeout=40 "${HOMELAB_RAW_URL}/install.sh" -O "${TMP_UPGRADE}" 2>/dev/null; then
+        DL_OK=1
+    fi
+
+    if [ $DL_OK -eq 0 ] || [ ! -s "${TMP_UPGRADE}" ]; then
+        echo -e "  ${TAG_ERR} Сбой загрузки пакета обновления. Текущий сервер не изменен."
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+        return 1
+    fi
+
+    echo -e "  ${TAG_INFO} [3/4] Проверка синтаксиса и целостности скрипта..."
+    if ! bash -n "${TMP_UPGRADE}" >/dev/null 2>&1; then
+        echo -e "  ${TAG_ERR} Обнаружена синтаксическая ошибка в коде обновления! Откат."
+        rm -f "${TMP_UPGRADE}"
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+        return 1
+    fi
+    chmod +x "${TMP_UPGRADE}"
+
+    echo -e "  ${TAG_INFO} [4/4] Бесшовный накат обновления (In-Place Upgrade)..."
+    if bash "${TMP_UPGRADE}" --upgrade; then
+        rm -f "${TMP_UPGRADE}"
+        echo ""
+        echo -e "  ${CLR_GREEN}${CLR_BOLD}✔  КОМПЛЕКС УСПЕШНО ОБНОВЛЕН ДО v${REMOTE_VER}!${CLR_RESET}"
+        echo -e "  Все пользовательские данные, базы и учетные записи сохранены."
+        echo -e "  В случае необходимости отката: ${CLR_GREEN}homelab rollback${CLR_RESET}"
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+        return 0
+    else
+        echo -e "  ${TAG_ERR} В процессе обновления произошла ошибка!"
+        echo -e "  Для отката к исходному состоянию выполните: ${CLR_GREEN}homelab rollback${CLR_RESET}"
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+        return 1
+    fi
+}
+
+cmd_rollback() {
+    local SNAP_TAR="${APP_DIR}/backups/snapshots/homelab_snapshot_pre_upgrade.tar.gz"
+    echo -e "${CLR_CYAN}${CLR_BOLD}╭── ОТКАТ К ПРЕДЫДУЩЕЙ ВЕРСИИ (ROLLBACK SNAPSHOT) ────────────${CLR_RESET}"
+    if [ ! -f "${SNAP_TAR}" ]; then
+        echo -e "  ${TAG_ERR} Снимок восстановления не найден: ${SNAP_TAR}"
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+        return 1
+    fi
+
+    echo -e "  ${TAG_INFO} Восстановление конфигураций из снимка..."
+    tar -xzf "${SNAP_TAR}" -C "${APP_DIR}" 2>/dev/null || true
+    [ -f "${APP_DIR}/zapret2/config" ] && cp -f "${APP_DIR}/zapret2/config" "/opt/zapret2/config" 2>/dev/null || true
+
+    echo -e "  ${TAG_INFO} Перезапуск сервисов после отката..."
+    (cd "${APP_DIR}" && dc_cmd up -d) >/dev/null 2>&1 || true
+
+    if command -v rc-service >/dev/null 2>&1 && rc-service zapret2 status >/dev/null 2>&1; then
+        rc-service zapret2 restart >/dev/null 2>&1 || true
+    elif command -v systemctl >/dev/null 2>&1 && systemctl is-active zapret2.service >/dev/null 2>&1; then
+        systemctl restart zapret2.service >/dev/null 2>&1 || true
+    fi
+
+    echo -e "  ${TAG_OK} Откат завершен: конфигурация успешно возвращена к предыдущему состоянию."
+    echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
 }
 
 cmd_notify() {
@@ -4698,7 +5852,7 @@ cmd_dump_logs() {
         echo "                         ЖУРНАЛЫ КОНТЕЙНЕРОВ DOCKER                          "
         echo "============================================================================="
 
-        local ALL_CONTAINERS=("adguardhome" "mihomo" "caddy" "dozzle" "watchtower" "autoheal" "vaultwarden" "gitea" "qbittorrent" "metube" "samba")
+        local ALL_CONTAINERS=("adguardhome" "mihomo" "caddy" "dozzle" "watchtower" "autoheal" "vaultwarden" "gitea" "qbittorrent" "navidrome" "samba")
         for c in "${ALL_CONTAINERS[@]}"; do
             if docker inspect "$c" >/dev/null 2>&1; then
                 local st
@@ -4719,6 +5873,16 @@ cmd_dump_logs() {
             grep -E 'gateway-watchdog|homelab' /var/log/messages 2>/dev/null | tail -n 50 || echo "Записей watchdog в syslog не обнаружено"
         elif command -v journalctl >/dev/null 2>&1; then
             journalctl -u network-gateway-watchdog.service -n 50 --no-pager 2>/dev/null || echo "Записей watchdog в journald не обнаружено"
+        fi
+
+        echo ""
+        echo "============================================================================="
+        echo "                  ЖУРНАЛ TELEGRAM-БОТА (HOMELAB-BOT)                         "
+        echo "============================================================================="
+        if [ -f /var/log/homelab-bot.log ]; then
+            tail -n 100 /var/log/homelab-bot.log 2>/dev/null || echo "Лог бота пуст"
+        elif command -v journalctl >/dev/null 2>&1; then
+            journalctl -u homelab-bot.service -n 100 --no-pager 2>/dev/null || echo "Записей бота в journald не обнаружено"
         fi
         echo ""
         echo "============================================================================="
@@ -4747,6 +5911,59 @@ cmd_dump_logs() {
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
 }
 
+cmd_bot() {
+    local action="${1:-status}"
+    shift || true
+    case "$action" in
+        status)
+            echo -e "  ${TAG_INFO} Статус службы Homelab Telegram Bot:"
+            if command -v systemctl >/dev/null 2>&1; then
+                systemctl status homelab-bot.service --no-pager 2>/dev/null || echo "Служба homelab-bot не активна"
+            elif command -v rc-service >/dev/null 2>&1; then
+                rc-service homelab-bot status 2>/dev/null || echo "Служба homelab-bot не активна"
+            fi
+            ;;
+        start)
+            echo -e "  ${TAG_INFO} Запуск службы Telegram-бота..."
+            if command -v systemctl >/dev/null 2>&1; then
+                systemctl start homelab-bot.service
+            elif command -v rc-service >/dev/null 2>&1; then
+                rc-service homelab-bot start
+            fi
+            echo -e "  ${TAG_OK} Служба запущена"
+            ;;
+        stop)
+            echo -e "  ${TAG_INFO} Остановка службы Telegram-бота..."
+            if command -v systemctl >/dev/null 2>&1; then
+                systemctl stop homelab-bot.service
+            elif command -v rc-service >/dev/null 2>&1; then
+                rc-service homelab-bot stop
+            fi
+            echo -e "  ${TAG_OK} Служба остановлена"
+            ;;
+        restart)
+            echo -e "  ${TAG_INFO} Перезапуск службы Telegram-бота..."
+            if command -v systemctl >/dev/null 2>&1; then
+                systemctl restart homelab-bot.service
+            elif command -v rc-service >/dev/null 2>&1; then
+                rc-service homelab-bot restart
+            fi
+            echo -e "  ${TAG_OK} Служба перезапущена"
+            ;;
+        logs)
+            echo -e "  ${TAG_INFO} Просмотр журналов Telegram-бота:"
+            if command -v journalctl >/dev/null 2>&1; then
+                journalctl -u homelab-bot.service "$@" --no-pager
+            elif [ -f /var/log/homelab-bot.log ]; then
+                tail "$@" /var/log/homelab-bot.log
+            fi
+            ;;
+        *)
+            echo -e "Использование: ${CLR_GREEN}homelab bot [status|start|stop|restart|logs]${CLR_RESET}"
+            ;;
+    esac
+}
+
 cmd_help() {
     echo -e "${CLR_CYAN}${CLR_BOLD}Утилита управления комплексом Homelab & Transparent Gateway${CLR_RESET}"
     echo ""
@@ -4759,10 +5976,15 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}start [сервис]${CLR_RESET}      Запустить сервисы стека"
     echo -e "  ${CLR_WHITE}logs [сервис] [-f]${CLR_RESET}  Просмотр журналов логов (с ключом -f для реалтайма)"
     echo -e "  ${CLR_WHITE}dump-logs [файл]${CLR_RESET}    Собрать логи всех сервисов и системы в единый файл"
+    echo -e "  ${CLR_WHITE}bot [действие]${CLR_RESET}      Управление Telegram-ботом медиа (start|stop|restart|logs|status)"
     echo -e "  ${CLR_WHITE}doctor${CLR_RESET}              Комплексная самодиагностика DNS, TUN, NAT и прав"
+    echo -e "  ${CLR_WHITE}blockcheck [домен]${CLR_RESET}  Тестирование и автоподбор стратегий обхода ТСПУ (Zapret2)"
     echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
     echo -e "  ${CLR_WHITE}notify [текст]${CLR_RESET}      Отправить тестовое оповещение в Telegram"
     echo -e "  ${CLR_WHITE}update${CLR_RESET}              Обновление всех Docker-образов стека"
+    echo -e "  ${CLR_WHITE}upgrade [--force]${CLR_RESET}   Бесшовный апгрейд ядра комплекса из GitHub (OTA)"
+    echo -e "  ${CLR_WHITE}rollback${CLR_RESET}            Откат к предыдущей версии из снимка восстановления"
+    echo -e "  ${CLR_WHITE}version${CLR_RESET}             Проверить установленную версию и обновления на GitHub"
     echo -e "  ${CLR_WHITE}unlock${CLR_RESET}              Ручная разблокировка шифрованного диска LUKS"
     echo -e "  ${CLR_WHITE}help${CLR_RESET}                Показать эту справку"
     echo ""
@@ -4775,8 +5997,13 @@ case "${1:-status}" in
     start) shift; cmd_start "$@" ;;
     logs) shift; cmd_logs "$@" ;;
     dump|dump-logs|export-logs|collect|report) shift; cmd_dump_logs "$@" ;;
+    bot|tg-bot) shift; cmd_bot "$@" ;;
     backup) cmd_backup ;;
     doctor|check) cmd_doctor ;;
+    blockcheck|check-dpi|test-dpi) shift; cmd_blockcheck "$@" ;;
+    upgrade|self-update|ota) shift; cmd_upgrade "$@" ;;
+    rollback|revert) cmd_rollback ;;
+    version|-v|--version|check-update) cmd_version ;;
     notify|test-notify) shift; cmd_notify "$@" ;;
     update) cmd_update ;;
     unlock)
@@ -4874,7 +6101,7 @@ EOF_DIAG
     [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["gitea"]="Gitea (Git-сервер)"
     [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["samba"]="Samba (Сетевой доступ)"
     [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]    && EXPECTED_SERVICES["qbittorrent"]="qBittorrent (VueTorrent)"
-    [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]  && EXPECTED_SERVICES["metube"]="MeTube (yt-dlp)"
+    [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["navidrome"]="Navidrome Hi-Fi (Музыка)"
     EXPECTED_SERVICES["caddy"]="Caddy Reverse Proxy"
     EXPECTED_SERVICES["dozzle"]="Dozzle (Web Log Viewer)"
     EXPECTED_SERVICES["watchtower"]="Watchtower (Автообновления)"
@@ -4940,6 +6167,20 @@ EOF_DIAG
         fi
         echo -e "    ${TAG_OK} Фаервол и NAT:            ${CLR_GREEN}[${FW_STATUS}]${CLR_RESET}"
         echo "Firewall status: ${FW_STATUS}" >> "${DIAG_LOG}"
+    fi
+
+    if [[ "${ENABLE_ZAPRET}" =~ ^[Yy]$ ]]; then
+        local ZP_RUNNING=0
+        if pgrep -x nfqws2 >/dev/null 2>&1 || pgrep -f "nfqws2" >/dev/null 2>&1; then
+            ZP_RUNNING=1
+        fi
+        if [ "$ZP_RUNNING" -eq 1 ]; then
+            echo -e "    ${TAG_OK} Zapret2 DPI-Bypass (nfqws2): ${CLR_GREEN}[РАБОТАЕТ]${CLR_RESET}"
+            echo "Zapret2 DPI-Bypass: RUNNING (nfqws2)" >> "${DIAG_LOG}"
+        else
+            echo -e "    ${TAG_WARN} Zapret2 DPI-Bypass (nfqws2): ${CLR_YELLOW}[ОСТАНОВЛЕН / СБОЙ]${CLR_RESET}"
+            echo "Zapret2 DPI-Bypass: NOT RUNNING" >> "${DIAG_LOG}"
+        fi
     fi
 
     local DNS_TEST=0
@@ -5031,6 +6272,9 @@ show_summary_dashboard() {
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Секрет API панели управления:${CLR_RESET}    ${CLR_NEON_GOLD}${MIHOMO_SECRET}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Госуслуги, банки и сервисы РФ:${CLR_RESET}   ${CLR_NEON_GREEN}100% ПРЯМОЙ ДОСТУП (DIRECT, без капч и задержек)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Маршрутизация YouTube & Media:${CLR_RESET}  ${CLR_NEON_GREEN}АКТИВНА (Туннелирование -> AUTO / PROXY)${CLR_RESET}"
+        if [[ "${ENABLE_ZAPRET}" =~ ^[Yy]$ ]]; then
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Zapret2 DPI-Bypass:${CLR_RESET}          ${CLR_NEON_GREEN}АКТИВЕН (nfqws2: YouTube 4K/Discord/Pixiv/DPI для ВСЕХ сайтов)${CLR_RESET}"
+        fi
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Защита от перехвата и утечек:${CLR_RESET}    ${CLR_NEON_GREEN}АКТИВНА (nftables DNS Hijack -> порт 53)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Автоматический TCP MSS Clamp:${CLR_RESET}    ${CLR_NEON_GREEN}АКТИВЕН (защита от зависания пакетов на MTU)${CLR_RESET}"
         if [ -n "${SELECTED_DOH_1:-}" ]; then
@@ -5057,8 +6301,12 @@ show_summary_dashboard() {
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ qBittorrent (VueTorrent):${CLR_RESET}        ${CLR_NEON_CYAN}https://${TORRENT_DOMAIN}${CLR_RESET}"
     fi
-    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ MeTube (Медиа-загрузчик yt-dlp):${CLR_RESET} ${CLR_NEON_CYAN}https://${METUBE_DOMAIN}${CLR_RESET}"
+    if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Telegram Медиа-бот (yt-dlp):${CLR_RESET}        ${CLR_NEON_GREEN}АКТИВЕН (@бот в TG для /music и /downloads)${CLR_RESET}"
+    fi
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Navidrome (Hi-Fi Музыка / Spotify):${CLR_RESET}   ${CLR_NEON_CYAN}https://${MUSIC_DOMAIN}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_DIM}    (Клиенты: Symfonium для Android / Substreamer для iOS / Feishin для ПК)${CLR_RESET}"
     fi
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Dozzle (Логи контейнеров):${CLR_RESET}       ${CLR_NEON_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_DIM}(Авторизация: ${ADMIN_USER})${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
@@ -5070,8 +6318,10 @@ show_summary_dashboard() {
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Токен Vaultwarden /admin:${CLR_RESET}       ${CLR_NEON_GOLD}${VAULT_ADMIN_TOKEN}${CLR_RESET}"
     fi
-    if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Telegram-оповещения:${CLR_RESET}            ${CLR_NEON_GREEN}АКТИВНЫ (Chat ID: ${TELEGRAM_CHAT_ID})${CLR_RESET}"
+    if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]] || [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
+        local TG_ST="АКТИВНЫ"
+        [ -z "${TELEGRAM_BOT_TOKEN:-}" ] && TG_ST="ОЖИДАЮТ ТОКЕН В .env"
+        echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Telegram Бот и Оповещения:${CLR_RESET}        ${CLR_NEON_GREEN}${TG_ST} (Chat ID: ${TELEGRAM_CHAT_ID:-не указан})${CLR_RESET}"
     fi
     echo -e "  ${CLR_NEON_GOLD}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
@@ -5087,7 +6337,10 @@ show_summary_dashboard() {
 
     if [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_BLUE}╭── СЕТЕВОЕ ХРАНИЛИЩЕ SAMBA (WINDOWS / MAC / LINUX) ─────────────────────────╮${CLR_RESET}"
-        printf "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_WHITE}📁 Сетевой адрес папки:${CLR_RESET}            ${CLR_NEON_GREEN}\\\\\\\\%s\\\\%s${CLR_RESET}\n" "${LOCAL_IP}" "${SHARE_NAME}"
+        printf "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_WHITE}📁 Общая папка хранилища:${CLR_RESET}          ${CLR_NEON_GREEN}\\\\\\\\%s\\\\%s${CLR_RESET}\n" "${LOCAL_IP}" "${SHARE_NAME}"
+        if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+            printf "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_WHITE}🎵 Музыкальная медиатека:${CLR_RESET}          ${CLR_NEON_GREEN}\\\\\\\\%s\\\\music${CLR_RESET}\n" "${LOCAL_IP}"
+        fi
         echo -e "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_WHITE}📁 Учетная запись / Пароль:${CLR_RESET}        ${ADMIN_USER} / ${SAMBA_PASS}"
         echo -e "  ${CLR_NEON_BLUE}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
         echo ""
@@ -5127,17 +6380,32 @@ show_summary_dashboard() {
     echo -e "  ${CLR_NEON_CYAN}╭── ЕДИНАЯ КОНСОЛЬНАЯ УТИЛИТА УПРАВЛЕНИЯ (HOMELAB CLI) ───────────────────────╮${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Статус и дашборд:${CLR_RESET}            ${CLR_NEON_GREEN}homelab status${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Полная самодиагностика:${CLR_RESET}      ${CLR_NEON_GREEN}homelab doctor${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Автоподбор стратегий DPI:${CLR_RESET}     ${CLR_NEON_GREEN}homelab blockcheck${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журналы сервисов в реалтайме:${CLR_RESET} ${CLR_NEON_GREEN}homelab logs [сервис] -f${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Экспорт всех логов в файл:${CLR_RESET}   ${CLR_NEON_GREEN}homelab dump-logs${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Перезапуск стека/сервиса:${CLR_RESET}    ${CLR_NEON_GREEN}homelab restart [сервис]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Горячий бэкап баз данных:${CLR_RESET}    ${CLR_NEON_GREEN}homelab backup${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Тестовое оповещение в TG:${CLR_RESET}    ${CLR_NEON_GREEN}homelab notify [текст]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Безопасный апдейт образов:${CLR_RESET}   ${CLR_NEON_GREEN}homelab update${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Бесшовный апгрейд ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab upgrade${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Проверка версии и обновлений:${CLR_RESET} ${CLR_NEON_GREEN}homelab version${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 }
 
 main() {
+    for arg in "$@"; do
+        case "$arg" in
+            --upgrade|--update-core|-u)
+                IS_UPGRADE_MODE=1
+                ;;
+            --version|-v)
+                echo "Homelab Appliance & Transparent Gateway version: ${HOMELAB_VERSION}"
+                exit 0
+                ;;
+        esac
+    done
+
     show_banner
     check_privileges
     detect_hardware_capabilities
@@ -5150,6 +6418,7 @@ main() {
     prompt_configuration
     setup_credentials
     setup_gateway_networking
+    setup_zapret2
     setup_directories
     benchmark_dns_servers
     configure_gateway_services

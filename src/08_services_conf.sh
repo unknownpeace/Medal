@@ -27,8 +27,8 @@ configure_gateway_services() {
         [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${TORRENT_DOMAIN}
       answer: ${LOCAL_IP}"
-        [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
-    - domain: ${METUBE_DOMAIN}
+        [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
+    - domain: ${MUSIC_DOMAIN}
       answer: ${LOCAL_IP}"
 
         local PTR_UPSTREAMS_YAML="    - 127.0.0.1:1053"
@@ -653,6 +653,12 @@ rules:
   - DOMAIN-SUFFIX,canva.com,PROXY
   - DOMAIN-SUFFIX,soundcloud.com,PROXY
   - DOMAIN-SUFFIX,spotify.com,PROXY
+  # Платформы контента, арта и медиа (Pixiv, Booth, Fanbox)
+  - DOMAIN-SUFFIX,pixiv.net,PROXY
+  - DOMAIN-SUFFIX,pximg.net,PROXY
+  - DOMAIN-SUFFIX,pixiv.org,PROXY
+  - DOMAIN-SUFFIX,booth.pm,PROXY
+  - DOMAIN-SUFFIX,fanbox.cc,PROXY
   - RULE-SET,meta_site,PROXY
   - RULE-SET,twitter_site,PROXY
 

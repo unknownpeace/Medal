@@ -48,7 +48,7 @@ EOF_DIAG
     [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["gitea"]="Gitea (Git-сервер)"
     [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["samba"]="Samba (Сетевой доступ)"
     [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]    && EXPECTED_SERVICES["qbittorrent"]="qBittorrent (VueTorrent)"
-    [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]  && EXPECTED_SERVICES["metube"]="MeTube (yt-dlp)"
+    [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["navidrome"]="Navidrome Hi-Fi (Музыка)"
     EXPECTED_SERVICES["caddy"]="Caddy Reverse Proxy"
     EXPECTED_SERVICES["dozzle"]="Dozzle (Web Log Viewer)"
     EXPECTED_SERVICES["watchtower"]="Watchtower (Автообновления)"
@@ -114,6 +114,20 @@ EOF_DIAG
         fi
         echo -e "    ${TAG_OK} Фаервол и NAT:            ${CLR_GREEN}[${FW_STATUS}]${CLR_RESET}"
         echo "Firewall status: ${FW_STATUS}" >> "${DIAG_LOG}"
+    fi
+
+    if [[ "${ENABLE_ZAPRET}" =~ ^[Yy]$ ]]; then
+        local ZP_RUNNING=0
+        if pgrep -x nfqws2 >/dev/null 2>&1 || pgrep -f "nfqws2" >/dev/null 2>&1; then
+            ZP_RUNNING=1
+        fi
+        if [ "$ZP_RUNNING" -eq 1 ]; then
+            echo -e "    ${TAG_OK} Zapret2 DPI-Bypass (nfqws2): ${CLR_GREEN}[РАБОТАЕТ]${CLR_RESET}"
+            echo "Zapret2 DPI-Bypass: RUNNING (nfqws2)" >> "${DIAG_LOG}"
+        else
+            echo -e "    ${TAG_WARN} Zapret2 DPI-Bypass (nfqws2): ${CLR_YELLOW}[ОСТАНОВЛЕН / СБОЙ]${CLR_RESET}"
+            echo "Zapret2 DPI-Bypass: NOT RUNNING" >> "${DIAG_LOG}"
+        fi
     fi
 
     local DNS_TEST=0
@@ -205,6 +219,9 @@ show_summary_dashboard() {
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Секрет API панели управления:${CLR_RESET}    ${CLR_NEON_GOLD}${MIHOMO_SECRET}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Госуслуги, банки и сервисы РФ:${CLR_RESET}   ${CLR_NEON_GREEN}100% ПРЯМОЙ ДОСТУП (DIRECT, без капч и задержек)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Маршрутизация YouTube & Media:${CLR_RESET}  ${CLR_NEON_GREEN}АКТИВНА (Туннелирование -> AUTO / PROXY)${CLR_RESET}"
+        if [[ "${ENABLE_ZAPRET}" =~ ^[Yy]$ ]]; then
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Zapret2 DPI-Bypass:${CLR_RESET}          ${CLR_NEON_GREEN}АКТИВЕН (nfqws2: YouTube 4K/Discord/Pixiv/DPI для ВСЕХ сайтов)${CLR_RESET}"
+        fi
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Защита от перехвата и утечек:${CLR_RESET}    ${CLR_NEON_GREEN}АКТИВНА (nftables DNS Hijack -> порт 53)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Автоматический TCP MSS Clamp:${CLR_RESET}    ${CLR_NEON_GREEN}АКТИВЕН (защита от зависания пакетов на MTU)${CLR_RESET}"
         if [ -n "${SELECTED_DOH_1:-}" ]; then
@@ -231,8 +248,12 @@ show_summary_dashboard() {
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ qBittorrent (VueTorrent):${CLR_RESET}        ${CLR_NEON_CYAN}https://${TORRENT_DOMAIN}${CLR_RESET}"
     fi
-    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ MeTube (Медиа-загрузчик yt-dlp):${CLR_RESET} ${CLR_NEON_CYAN}https://${METUBE_DOMAIN}${CLR_RESET}"
+    if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Telegram Медиа-бот (yt-dlp):${CLR_RESET}        ${CLR_NEON_GREEN}АКТИВЕН (@бот в TG для /music и /downloads)${CLR_RESET}"
+    fi
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Navidrome (Hi-Fi Музыка / Spotify):${CLR_RESET}   ${CLR_NEON_CYAN}https://${MUSIC_DOMAIN}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_DIM}    (Клиенты: Symfonium для Android / Substreamer для iOS / Feishin для ПК)${CLR_RESET}"
     fi
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Dozzle (Логи контейнеров):${CLR_RESET}       ${CLR_NEON_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_DIM}(Авторизация: ${ADMIN_USER})${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
@@ -244,8 +265,10 @@ show_summary_dashboard() {
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Токен Vaultwarden /admin:${CLR_RESET}       ${CLR_NEON_GOLD}${VAULT_ADMIN_TOKEN}${CLR_RESET}"
     fi
-    if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Telegram-оповещения:${CLR_RESET}            ${CLR_NEON_GREEN}АКТИВНЫ (Chat ID: ${TELEGRAM_CHAT_ID})${CLR_RESET}"
+    if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]] || [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
+        local TG_ST="АКТИВНЫ"
+        [ -z "${TELEGRAM_BOT_TOKEN:-}" ] && TG_ST="ОЖИДАЮТ ТОКЕН В .env"
+        echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Telegram Бот и Оповещения:${CLR_RESET}        ${CLR_NEON_GREEN}${TG_ST} (Chat ID: ${TELEGRAM_CHAT_ID:-не указан})${CLR_RESET}"
     fi
     echo -e "  ${CLR_NEON_GOLD}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
@@ -261,7 +284,10 @@ show_summary_dashboard() {
 
     if [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_BLUE}╭── СЕТЕВОЕ ХРАНИЛИЩЕ SAMBA (WINDOWS / MAC / LINUX) ─────────────────────────╮${CLR_RESET}"
-        printf "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_WHITE}📁 Сетевой адрес папки:${CLR_RESET}            ${CLR_NEON_GREEN}\\\\\\\\%s\\\\%s${CLR_RESET}\n" "${LOCAL_IP}" "${SHARE_NAME}"
+        printf "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_WHITE}📁 Общая папка хранилища:${CLR_RESET}          ${CLR_NEON_GREEN}\\\\\\\\%s\\\\%s${CLR_RESET}\n" "${LOCAL_IP}" "${SHARE_NAME}"
+        if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+            printf "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_WHITE}🎵 Музыкальная медиатека:${CLR_RESET}          ${CLR_NEON_GREEN}\\\\\\\\%s\\\\music${CLR_RESET}\n" "${LOCAL_IP}"
+        fi
         echo -e "  ${CLR_NEON_BLUE}│${CLR_RESET}  ${CLR_WHITE}📁 Учетная запись / Пароль:${CLR_RESET}        ${ADMIN_USER} / ${SAMBA_PASS}"
         echo -e "  ${CLR_NEON_BLUE}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
         echo ""
@@ -301,17 +327,32 @@ show_summary_dashboard() {
     echo -e "  ${CLR_NEON_CYAN}╭── ЕДИНАЯ КОНСОЛЬНАЯ УТИЛИТА УПРАВЛЕНИЯ (HOMELAB CLI) ───────────────────────╮${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Статус и дашборд:${CLR_RESET}            ${CLR_NEON_GREEN}homelab status${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Полная самодиагностика:${CLR_RESET}      ${CLR_NEON_GREEN}homelab doctor${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Автоподбор стратегий DPI:${CLR_RESET}     ${CLR_NEON_GREEN}homelab blockcheck${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журналы сервисов в реалтайме:${CLR_RESET} ${CLR_NEON_GREEN}homelab logs [сервис] -f${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Экспорт всех логов в файл:${CLR_RESET}   ${CLR_NEON_GREEN}homelab dump-logs${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Перезапуск стека/сервиса:${CLR_RESET}    ${CLR_NEON_GREEN}homelab restart [сервис]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Горячий бэкап баз данных:${CLR_RESET}    ${CLR_NEON_GREEN}homelab backup${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Тестовое оповещение в TG:${CLR_RESET}    ${CLR_NEON_GREEN}homelab notify [текст]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Безопасный апдейт образов:${CLR_RESET}   ${CLR_NEON_GREEN}homelab update${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Бесшовный апгрейд ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab upgrade${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Проверка версии и обновлений:${CLR_RESET} ${CLR_NEON_GREEN}homelab version${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 }
 
 main() {
+    for arg in "$@"; do
+        case "$arg" in
+            --upgrade|--update-core|-u)
+                IS_UPGRADE_MODE=1
+                ;;
+            --version|-v)
+                echo "Homelab Appliance & Transparent Gateway version: ${HOMELAB_VERSION}"
+                exit 0
+                ;;
+        esac
+    done
+
     show_banner
     check_privileges
     detect_hardware_capabilities
@@ -324,6 +365,7 @@ main() {
     prompt_configuration
     setup_credentials
     setup_gateway_networking
+    setup_zapret2
     setup_directories
     benchmark_dns_servers
     configure_gateway_services

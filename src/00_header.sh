@@ -8,7 +8,7 @@
 # Components: AdGuard Home (Schema 34+ & RU Filters), Mihomo TUN (Smart Routing,
 #             Mixed Stack & MRS Rulesets, YouTube/Discord/AI/RU-Direct Passthrough),
 #             Vaultwarden (Argon2id), Gitea (Git-Server), Samba (WSDD2),
-#             qBittorrent (VueTorrent WebUI), MeTube (yt-dlp Anti-Throttle),
+#             qBittorrent (VueTorrent WebUI), Telegram Bot (yt-dlp Media Downloader),
 #             Caddy (Internal/DuckDNS SSL), Watchtower (Docker API 1.45+)
 # =============================================================================
 
@@ -275,3 +275,14 @@ SELECTED_DOT_1=""
 SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
+ENABLE_ZAPRET="Y"
+ENABLE_NAVIDROME="Y"
+ENABLE_TG_BOT="Y"
+TG_BOT_TOKEN=""
+TG_CHAT_ID=""
+MUSIC_DOMAIN=""
+NAVIDROME_IMAGE="deluan/navidrome:latest"
+HOMELAB_VERSION="2.7.0"
+HOMELAB_REPO="unknownpeace/Medal"
+HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
+IS_UPGRADE_MODE=0

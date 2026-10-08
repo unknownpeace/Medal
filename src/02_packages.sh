@@ -18,7 +18,7 @@ install_pkgs() {
 
         local ALP_PKGS=(bash python3 py3-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g \
                         util-linux util-linux-misc lsblk curl openssl ca-certificates jq nftables apache2-utils \
-                        unzip tar sqlite argon2 iputils shadow procps e2fsprogs \
+                        unzip tar sqlite argon2 iputils shadow procps e2fsprogs ffmpeg \
                         docker docker-cli-compose chrony openrc)
         run_spin "Установка системных пакетов Alpine" \
             apk add --no-cache "${ALP_PKGS[@]}"
@@ -26,7 +26,7 @@ install_pkgs() {
 
     elif [ "${DISTRO_FAMILY}" = "arch" ]; then
         local ARCH_PKGS=(python python-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g util-linux \
-                         curl openssl ca-certificates jq nftables unzip tar sqlite \
+                         curl openssl ca-certificates jq nftables unzip tar sqlite ffmpeg \
                          docker docker-compose argon2 iputils acl zram-generator)
         local MISSING_PKGS=()
         for p in "${ARCH_PKGS[@]}"; do
@@ -51,7 +51,7 @@ install_pkgs() {
             apt-get install -y --no-install-recommends \
                 systemd-timesyncd python3 python3-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g \
                 util-linux curl openssl ca-certificates jq nftables apache2-utils \
-                unzip tar sqlite3 argon2 iputils-ping
+                unzip tar sqlite3 argon2 iputils-ping ffmpeg
 
         # Установка генератора zram с безопасным fallback для Ubuntu/Debian
         apt-get install -y --no-install-recommends "${ZRAM_PKG}" 2>/dev/null || \
@@ -327,5 +327,24 @@ EOF_ZRAM_RC
                 log_ok "Аварийный Swapfile успешно подключен (/swapfile, 1.5 ГБ)"
             fi
         fi
+    fi
+
+    # Установка и обновление автономного движка yt-dlp (standalone binary)
+    log_info "Проверка и подготовка медиа-движка yt-dlp..."
+    local YTDLP_BIN="/usr/local/bin/yt-dlp"
+    if [ ! -x "${YTDLP_BIN}" ] || ! "${YTDLP_BIN}" --version >/dev/null 2>&1; then
+        run_spin "Загрузка официального релиза yt-dlp" bash -c '
+            curl -fsSL --connect-timeout 8 -m 60 "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp" || \
+            curl -fsSL --connect-timeout 8 -m 60 "https://ghproxy.net/https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp" || \
+            curl -fsSL --connect-timeout 8 -m 60 "https://mirror.ghproxy.com/https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp"
+        '
+        chmod a+rx "${YTDLP_BIN}" 2>/dev/null || true
+    else
+        "${YTDLP_BIN}" -U >/dev/null 2>&1 || true
+    fi
+    if [ -x "${YTDLP_BIN}" ]; then
+        log_ok "yt-dlp готов к работе ($("${YTDLP_BIN}" --version 2>/dev/null || echo "v2026"))"
+    else
+        log_warn "yt-dlp будет дополнительно загружен при инициализации Telegram-бота"
     fi
 }

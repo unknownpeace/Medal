@@ -6,6 +6,13 @@
 prompt_configuration() {
     print_step_header "03/11" "КОНФИГУРАЦИЯ И ВЫБОР РЕЖИМА УСТАНОВКИ"
 
+    if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
+        log_info "Режим бесшовного обновления ядра (In-Place Upgrade): интерактивные вопросы пропущены."
+        log_info "Все текущие параметры, учетные записи и пути к данным сохранены без изменений."
+        INSTALL_MODE=1
+        return 0
+    fi
+
     echo -e "  ${CLR_WHITE}Выберите вариант развертывания:${CLR_RESET}"
     echo -e "    ${CLR_GREEN}1) Экспресс-установка${CLR_RESET} (Всё включено, авто-настройка, *.lan) ${CLR_DIM}[Enter]${CLR_RESET}"
     echo -e "    ${CLR_YELLOW}2) Расширенная настройка${CLR_RESET} (Выбор дисков, Btrfs, LUKS2 шифрование, DuckDNS)"
@@ -38,6 +45,8 @@ prompt_configuration() {
             systemctl disable --now gitea-backup.timer 2>/dev/null || true
             systemctl disable --now gitea-backup.service 2>/dev/null || true
             rm -f /etc/systemd/system/homelab.service /etc/systemd/system/network-gateway-watchdog.* /etc/systemd/system/vaultwarden-backup.* /etc/systemd/system/gitea-backup.*
+            systemctl disable --now zapret2.service 2>/dev/null || true
+            rm -f /etc/systemd/system/zapret2.service
             systemctl daemon-reload >/dev/null 2>&1 || true
         elif [ "${INIT_SYSTEM}" = "openrc" ]; then
             rc-service homelab stop 2>/dev/null || true
@@ -47,7 +56,9 @@ prompt_configuration() {
             rc-update del homelab-storage default 2>/dev/null || true
             rc-service zram-swap stop 2>/dev/null || true
             rc-update del zram-swap default 2>/dev/null || true
-            rm -f /etc/init.d/homelab /etc/init.d/homelab-storage /etc/init.d/zram-swap
+            rc-service zapret2 stop 2>/dev/null || true
+            rc-update del zapret2 default 2>/dev/null || true
+            rm -f /etc/init.d/homelab /etc/init.d/homelab-storage /etc/init.d/zram-swap /etc/init.d/zapret2
             sed -i '/backup_vaultwarden\.sh/d; /backup_gitea\.sh/d; /gateway-watchdog\.sh/d' /etc/crontabs/root 2>/dev/null || true
             touch /etc/crontabs/cron.update 2>/dev/null || true
         fi
@@ -56,8 +67,17 @@ prompt_configuration() {
         if [ -d "${APP_DIR}" ]; then
             (cd "${APP_DIR}" && dc down --remove-orphans 2>/dev/null || true)
         fi
-        docker stop adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle watchtower autoheal 2>/dev/null || true
-        docker rm -f adguardhome mihomo caddy vaultwarden gitea qbittorrent metube samba dozzle watchtower autoheal 2>/dev/null || true
+        docker stop adguardhome mihomo caddy vaultwarden gitea qbittorrent metube navidrome samba dozzle watchtower autoheal 2>/dev/null || true
+        docker rm -f adguardhome mihomo caddy vaultwarden gitea qbittorrent metube navidrome samba dozzle watchtower autoheal 2>/dev/null || true
+        if [ "${INIT_SYSTEM}" = "systemd" ]; then
+            systemctl stop homelab-bot 2>/dev/null || true
+            systemctl disable homelab-bot 2>/dev/null || true
+            rm -f /etc/systemd/system/homelab-bot.service
+        elif [ "${INIT_SYSTEM}" = "openrc" ]; then
+            rc-service homelab-bot stop 2>/dev/null || true
+            rc-update del homelab-bot default 2>/dev/null || true
+            rm -f /etc/init.d/homelab-bot
+        fi
 
         log_info "Очистка служебных файлов и конфигураций..."
         local BACKUP_CERTS="/tmp/caddy_certificates_backup_$$"
@@ -67,7 +87,7 @@ prompt_configuration() {
             cp -r "${APP_DIR}/caddy/data/caddy/certificates" "${BACKUP_CERTS}" 2>/dev/null || true
         fi
 
-        rm -rf "${APP_DIR}/adguard" "${APP_DIR}/mihomo" "${APP_DIR}/caddy" "${APP_DIR}/metube" "${APP_DIR}/vaultwarden" "${APP_DIR}/gitea" "${APP_DIR}/qbittorrent" "${ENV_FILE}"
+        rm -rf "${APP_DIR}/adguard" "${APP_DIR}/mihomo" "${APP_DIR}/caddy" "${APP_DIR}/metube" "${APP_DIR}/vaultwarden" "${APP_DIR}/gitea" "${APP_DIR}/qbittorrent" "${APP_DIR}/configs/navidrome" "${ENV_FILE}" "/opt/zapret2"
 
         if [ -d "${BACKUP_CERTS}" ]; then
             mkdir -p "${APP_DIR}/caddy/data/caddy"
@@ -82,9 +102,10 @@ prompt_configuration() {
         USER_HOME=$(eval echo ~"${TARGET_USER}" 2>/dev/null || echo "/home/${TARGET_USER}")
         rm -f "${USER_HOME}/diagnostic_report.log" 2>/dev/null || true
 
-        log_info "Очистка правил межсетевого экрана (декларативная таблица inet homelab в nftables)..."
+        log_info "Очистка правил межсетевого экрана (декларативные таблицы inet homelab и zapret2 в nftables)..."
         if command -v nft >/dev/null 2>&1; then
             nft delete table inet homelab 2>/dev/null || true
+            nft delete table inet zapret2 2>/dev/null || true
             rm -f /etc/nftables.d/homelab.nft 2>/dev/null || true
             sed -i '/include.*homelab\.nft/d' /etc/nftables.conf /etc/nftables.nft 2>/dev/null || true
         fi
@@ -110,11 +131,13 @@ prompt_configuration() {
         SAVE_FSTYPE=$(findmnt -n -o FSTYPE -T "${SAVE_DIR}" 2>/dev/null || df -T "${SAVE_DIR}" 2>/dev/null | awk 'NR==2{print $2}' || echo "ext4")
 
         ENABLE_GATEWAY="${SAVED_ENABLE_GATEWAY:-Y}"
+        ENABLE_ZAPRET="${SAVED_ENABLE_ZAPRET:-Y}"
         ENABLE_VAULT="${SAVED_ENABLE_VAULT:-Y}"
         ENABLE_GITEA="${SAVED_ENABLE_GITEA:-Y}"
         ENABLE_SAMBA="${SAVED_ENABLE_SAMBA:-Y}"
         ENABLE_QBIT="${SAVED_ENABLE_QBIT:-Y}"
-        ENABLE_METUBE="${SAVED_ENABLE_METUBE:-Y}"
+        ENABLE_TG_BOT="${SAVED_ENABLE_TG_BOT:-${SAVED_ENABLE_METUBE:-Y}}"
+        ENABLE_NAVIDROME="${SAVED_ENABLE_NAVIDROME:-Y}"
         SSL_MODE="${SAVED_SSL_MODE:-1}"
 
         echo ""
@@ -158,12 +181,21 @@ prompt_configuration() {
         GITEA_DOMAIN="git.lan"
         ADGUARD_DOMAIN="adguard.lan"
         TORRENT_DOMAIN="torrent.lan"
-        METUBE_DOMAIN="metube.lan"
+        MUSIC_DOMAIN="music.lan"
         PROXY_DOMAIN="proxy.lan"
         LOGS_DOMAIN="logs.lan"
         ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM:-N}"
         TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
         TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
+        if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]] && [ -z "${TELEGRAM_BOT_TOKEN}" ]; then
+            prompt_read "  [?] Telegram Bot Token (для скачивания медиа) [Enter - пропустить]: " INPUT_TG_TOKEN
+            TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-}
+            if [ -n "${TELEGRAM_BOT_TOKEN}" ]; then
+                prompt_read "  [?] Telegram Chat ID владельца: " INPUT_TG_CHAT
+                TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-}
+                [ -n "${TELEGRAM_CHAT_ID}" ] && ENABLE_TELEGRAM="Y"
+            fi
+        fi
     else
         local ROOT_FSTYPE
         ROOT_FSTYPE=$(findmnt -n -o FSTYPE / 2>/dev/null || df -T / 2>/dev/null | awk 'NR==2{print $2}' || echo "ext4")
@@ -416,6 +448,9 @@ EOF_UNLOCK
         prompt_read "  [?] Установить сетевой шлюз (AdGuard + Mihomo TUN)? [Y/n] [${SAVED_ENABLE_GATEWAY:-Y}]: " ENABLE_GATEWAY
         ENABLE_GATEWAY=$(normalize_yn "${ENABLE_GATEWAY:-${SAVED_ENABLE_GATEWAY:-Y}}" "Y")
 
+        prompt_read "  [?] Активировать Zapret2 (DPI-Bypass ТСПУ для YouTube и Discord)? [Y/n] [${SAVED_ENABLE_ZAPRET:-Y}]: " ENABLE_ZAPRET
+        ENABLE_ZAPRET=$(normalize_yn "${ENABLE_ZAPRET:-${SAVED_ENABLE_ZAPRET:-Y}}" "Y")
+
         prompt_read "  [?] Установить Vaultwarden (Менеджер паролей)? [Y/n] [${SAVED_ENABLE_VAULT:-Y}]: " ENABLE_VAULT
         ENABLE_VAULT=$(normalize_yn "${ENABLE_VAULT:-${SAVED_ENABLE_VAULT:-Y}}" "Y")
 
@@ -428,8 +463,11 @@ EOF_UNLOCK
         prompt_read "  [?] Установить qBittorrent + VueTorrent (Торренты/Загрузки)? [Y/n] [${SAVED_ENABLE_QBIT:-Y}]: " ENABLE_QBIT
         ENABLE_QBIT=$(normalize_yn "${ENABLE_QBIT:-${SAVED_ENABLE_QBIT:-Y}}" "Y")
 
-        prompt_read "  [?] Установить MeTube (Web-загрузчик yt-dlp)? [Y/n] [${SAVED_ENABLE_METUBE:-Y}]: " ENABLE_METUBE
-        ENABLE_METUBE=$(normalize_yn "${ENABLE_METUBE:-${SAVED_ENABLE_METUBE:-Y}}" "Y")
+        prompt_read "  [?] Установить Telegram-бота (Медиа-загрузчик yt-dlp в TG, Navidrome и Samba)? [Y/n] [${SAVED_ENABLE_TG_BOT:-${SAVED_ENABLE_METUBE:-Y}}]: " ENABLE_TG_BOT
+        ENABLE_TG_BOT=$(normalize_yn "${ENABLE_TG_BOT:-${SAVED_ENABLE_TG_BOT:-${SAVED_ENABLE_METUBE:-Y}}}" "Y")
+
+        prompt_read "  [?] Установить Navidrome (Hi-Fi Музыкальный стриминг, аналог Spotify)? [Y/n] [${SAVED_ENABLE_NAVIDROME:-Y}]: " ENABLE_NAVIDROME
+        ENABLE_NAVIDROME=$(normalize_yn "${ENABLE_NAVIDROME:-${SAVED_ENABLE_NAVIDROME:-Y}}" "Y")
 
         echo ""
         echo -e "  ${CLR_CYAN}--- Настройка SSL сертификатов ---${CLR_RESET}"
@@ -456,7 +494,7 @@ EOF_UNLOCK
             GITEA_DOMAIN="git.${BASE_DOMAIN}"
             ADGUARD_DOMAIN="adguard.${BASE_DOMAIN}"
             TORRENT_DOMAIN="torrent.${BASE_DOMAIN}"
-            METUBE_DOMAIN="metube.${BASE_DOMAIN}"
+            MUSIC_DOMAIN="music.${BASE_DOMAIN}"
             PROXY_DOMAIN="proxy.${BASE_DOMAIN}"
             LOGS_DOMAIN="logs.${BASE_DOMAIN}"
 
@@ -471,7 +509,7 @@ EOF_UNLOCK
             GITEA_DOMAIN="git.lan"
             ADGUARD_DOMAIN="adguard.lan"
             TORRENT_DOMAIN="torrent.lan"
-            METUBE_DOMAIN="metube.lan"
+            MUSIC_DOMAIN="music.lan"
             PROXY_DOMAIN="proxy.lan"
             LOGS_DOMAIN="logs.lan"
         fi
@@ -519,24 +557,50 @@ EOF_UNLOCK
         fi
 
         echo ""
-        echo -e "  ${CLR_CYAN}--- Telegram-оповещения (Сбои и Бэкапы) ---${CLR_RESET}"
-        prompt_read "  [?] Настроить Telegram-оповещения? [y/N] [${SAVED_ENABLE_TELEGRAM:-N}]: " INPUT_ENABLE_TG
-        ENABLE_TELEGRAM=$(normalize_yn "${INPUT_ENABLE_TG:-${SAVED_ENABLE_TELEGRAM:-N}}" "N")
-        if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
+        echo -e "  ${CLR_CYAN}--- Telegram Интеграция (Медиа-бот и оповещения) ---${CLR_RESET}"
+        if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
+            echo -e "  ${CLR_WHITE}Для работы Telegram-бота и системных оповещений укажите токен и Chat ID.${CLR_RESET}"
+            echo -e "  ${CLR_DIM}(Токен от @BotFather, а ваш личный Chat ID — от @userinfobot)${CLR_RESET}"
             prompt_read "  [?] Telegram Bot Token [${SAVED_TELEGRAM_BOT_TOKEN:-}]: " INPUT_TG_TOKEN
             TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-${SAVED_TELEGRAM_BOT_TOKEN:-}}
-            prompt_read "  [?] Telegram Chat ID [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT
+            prompt_read "  [?] Telegram Chat ID владельца [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT
             TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-${SAVED_TELEGRAM_CHAT_ID:-}}
             if [ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]; then
-                log_ok "Telegram-оповещения настроены"
+                log_ok "Telegram-бот и оповещения успешно настроены"
+                ENABLE_TELEGRAM="Y"
             else
-                log_warn "Токен или Chat ID не заполнены, оповещения отключены"
+                log_warn "Токен или Chat ID не заполнены. Бот будет ожидать настройки в ${ENV_FILE}"
                 ENABLE_TELEGRAM="N"
             fi
         else
-            ENABLE_TELEGRAM="N"
-            TELEGRAM_BOT_TOKEN=""
-            TELEGRAM_CHAT_ID=""
+            prompt_read "  [?] Настроить Telegram-оповещения (Сбои и Бэкапы)? [y/N] [${SAVED_ENABLE_TELEGRAM:-N}]: " INPUT_ENABLE_TG
+            ENABLE_TELEGRAM=$(normalize_yn "${INPUT_ENABLE_TG:-${SAVED_ENABLE_TELEGRAM:-N}}" "N")
+            if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
+                prompt_read "  [?] Telegram Bot Token [${SAVED_TELEGRAM_BOT_TOKEN:-}]: " INPUT_TG_TOKEN
+                TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-${SAVED_TELEGRAM_BOT_TOKEN:-}}
+                prompt_read "  [?] Telegram Chat ID [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT
+                TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-${SAVED_TELEGRAM_CHAT_ID:-}}
+                if [ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]; then
+                    log_ok "Telegram-оповещения настроены"
+                else
+                    log_warn "Токен или Chat ID не заполнены, оповещения отключены"
+                    ENABLE_TELEGRAM="N"
+                fi
+            else
+                ENABLE_TELEGRAM="N"
+                TELEGRAM_BOT_TOKEN=""
+                TELEGRAM_CHAT_ID=""
+            fi
+        fi
+    fi
+
+    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^metube$'; then
+        log_info "Миграция MeTube: остановка и удаление устаревшего контейнера..."
+        docker stop metube 2>/dev/null || true
+        docker rm -f metube 2>/dev/null || true
+        if [ -d "${SAVE_DIR}/metube" ]; then
+            mkdir -p "${SAVE_DIR}/downloads"
+            find "${SAVE_DIR}/metube" -mindepth 1 -maxdepth 1 ! -name '.metube' ! -name 'tmp' -exec mv -n {} "${SAVE_DIR}/downloads/" \; 2>/dev/null || true
         fi
     fi
 
@@ -565,11 +629,14 @@ EOF_UNLOCK
         printf "SAVED_ROUTER_GATEWAY=%q\n" "${ROUTER_GATEWAY}"
         printf "SAVED_LAN_SUBNET=%q\n" "${LAN_SUBNET}"
         printf "SAVED_ENABLE_GATEWAY=%q\n" "${ENABLE_GATEWAY}"
+        printf "SAVED_ENABLE_ZAPRET=%q\n" "${ENABLE_ZAPRET}"
         printf "SAVED_ENABLE_VAULT=%q\n" "${ENABLE_VAULT}"
         printf "SAVED_ENABLE_GITEA=%q\n" "${ENABLE_GITEA}"
         printf "SAVED_ENABLE_SAMBA=%q\n" "${ENABLE_SAMBA}"
         printf "SAVED_ENABLE_QBIT=%q\n" "${ENABLE_QBIT}"
-        printf "SAVED_ENABLE_METUBE=%q\n" "${ENABLE_METUBE}"
+        printf "SAVED_ENABLE_TG_BOT=%q\n" "${ENABLE_TG_BOT}"
+        printf "SAVED_ENABLE_NAVIDROME=%q\n" "${ENABLE_NAVIDROME}"
+        printf "SAVED_MUSIC_DOMAIN=%q\n" "${MUSIC_DOMAIN}"
         printf "SAVED_SSL_MODE=%q\n" "${SSL_MODE}"
         printf "SAVED_DUCKDNS_NAME=%q\n" "${DUCKDNS_NAME}"
         printf "SAVED_DUCKDNS_TOKEN=%q\n" "${DUCKDNS_TOKEN}"
@@ -599,6 +666,7 @@ EOF_UNLOCK
         printf "SAVED_ENABLE_TELEGRAM=%q\n" "${ENABLE_TELEGRAM}"
         printf "SAVED_TELEGRAM_BOT_TOKEN=%q\n" "${TELEGRAM_BOT_TOKEN}"
         printf "SAVED_TELEGRAM_CHAT_ID=%q\n" "${TELEGRAM_CHAT_ID}"
+        printf "SAVED_HOMELAB_VERSION=%q\n" "${HOMELAB_VERSION}"
     } > "${ENV_FILE}"
     chmod 600 "${ENV_FILE}"
     chown root:root "${ENV_FILE}" 2>/dev/null || true
