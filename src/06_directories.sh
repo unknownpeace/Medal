@@ -43,14 +43,14 @@ setup_directories() {
     mkdir -p "${APP_DIR}/scripts"
     mkdir -p "${SAVE_DIR}/downloads"
     apply_nocow_helper "${SAVE_DIR}/downloads"
-    chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/downloads" 2>/dev/null || true
-    chmod 775 "${SAVE_DIR}/downloads" 2>/dev/null || true
+    chown -R "${USER_UID:-1000}:${USER_GID:-1000}" "${SAVE_DIR}/downloads" 2>/dev/null || true
+    chmod -R 777 "${SAVE_DIR}/downloads" 2>/dev/null || true
 
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] || [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
         mkdir -p "${SAVE_DIR}/music"
         apply_nocow_helper "${SAVE_DIR}/music"
-        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/music" 2>/dev/null || true
-        chmod 775 "${SAVE_DIR}/music" 2>/dev/null || true
+        chown -R "${USER_UID:-1000}:${USER_GID:-1000}" "${SAVE_DIR}/music" 2>/dev/null || true
+        chmod -R 777 "${SAVE_DIR}/music" 2>/dev/null || true
     fi
 
     if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
@@ -63,14 +63,15 @@ setup_directories() {
                 echo '{}' > "${YTDL_CONF}"
             fi
         fi
-        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
-        chmod 775 "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
+        chown -R "${USER_UID:-1000}:${USER_GID:-1000}" "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
+        chmod 777 "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
     fi
 
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         mkdir -p "${APP_DIR}/configs/navidrome"
         apply_nocow_helper "${APP_DIR}/configs/navidrome"
-        chown -R "${USER_UID}:${USER_GID}" "${APP_DIR}/configs/navidrome" 2>/dev/null || true
+        chown -R "${USER_UID:-1000}:${USER_GID:-1000}" "${APP_DIR}/configs/navidrome" 2>/dev/null || true
+        chmod 775 "${APP_DIR}/configs/navidrome" 2>/dev/null || true
     fi
 
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
@@ -197,7 +198,8 @@ EOF_QBIT_CONF
         chown -R "${USER_UID}:${USER_GID}" "${APP_DIR}/qbittorrent" 2>/dev/null || true
     fi
 
-    chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}" 2>/dev/null || true
+    chown -R "${USER_UID:-1000}:${USER_GID:-1000}" "${SAVE_DIR}" 2>/dev/null || true
+    chmod 755 "${SAVE_DIR}" 2>/dev/null || true
 
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
         mkdir -p "${APP_DIR}/mihomo/ui" "${APP_DIR}/mihomo/providers"

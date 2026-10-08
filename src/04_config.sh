@@ -54,6 +54,8 @@ save_configuration() {
         printf "SAVED_ENABLE_TELEGRAM=%q\n" "${ENABLE_TELEGRAM}"
         printf "SAVED_TELEGRAM_BOT_TOKEN=%q\n" "${TELEGRAM_BOT_TOKEN}"
         printf "SAVED_TELEGRAM_CHAT_ID=%q\n" "${TELEGRAM_CHAT_ID}"
+        printf "SAVED_USER_UID=%q\n" "${USER_UID}"
+        printf "SAVED_USER_GID=%q\n" "${USER_GID}"
         printf "SAVED_HOMELAB_VERSION=%q\n" "${HOMELAB_VERSION}"
     } > "${ENV_FILE}"
     chmod 600 "${ENV_FILE}"
@@ -128,6 +130,8 @@ prompt_configuration() {
         ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM:-N}"
         TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
         TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
+        USER_UID="${SAVED_USER_UID:-${USER_UID:-1000}}"
+        USER_GID="${SAVED_USER_GID:-${USER_GID:-1000}}"
 
         local ROOT_DEV
         ROOT_DEV=$(df -P / 2>/dev/null | awk 'NR==2{print $1}' || echo "/dev/root")

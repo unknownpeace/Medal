@@ -249,8 +249,8 @@ STORAGE_DEP_LINE=""
 
 REAL_USER="${SUDO_USER:-$(awk -F: '$3 >= 1000 && $3 < 60000 {print $1; exit}' /etc/passwd 2>/dev/null || echo "homelab")}"
 TARGET_USER="${REAL_USER:-homelab}"
-USER_UID=""
-USER_GID=""
+USER_UID="${USER_UID:-1000}"
+USER_GID="${USER_GID:-1000}"
 SAVE_FSTYPE=""
 
 DEFAULT_IFACE=""
@@ -319,7 +319,7 @@ SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.10"
+HOMELAB_VERSION="2.8.11"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -350,7 +350,7 @@ EOF_LOGO
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   (ТВ, ПК, Смартфоны)      CleanDNS/ZeroCache     Fake-IP / Mixed TUN / gVisor    ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                          │                                           ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                          ▼ (Анти-Утечки)   Маршрутизация трафика:    ${CLR_NEON_PURPLE}║${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                   ${CLR_RED}[ ECH / DOH DROP ]${CLR_RESET}  ├─► ${CLR_NEON_PINK}[ US-AUTO ]${CLR_RESET} ChatGPT / Claude  ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                   ${CLR_RED}[ ECH / DOH DROP ]${CLR_RESET}  ├─► ${CLR_NEON_PINK}[ AI-Services ]${CLR_RESET} ChatGPT / Claude ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                                            ├─► ${CLR_NEON_GOLD}[ PROXY ]${CLR_RESET} YT, Discord, Блоки  ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                                            └─► ${CLR_NEON_GREEN}[ DIRECT ]${CLR_RESET} РФ / Банки / Steam ║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           ▼                                                                      ${CLR_NEON_PURPLE}║${CLR_RESET}"
@@ -513,6 +513,8 @@ load_previous_config() {
         ADGUARD_WORK_DIR="${SAVED_ADGUARD_WORK_DIR:-$ADGUARD_WORK_DIR}"
         VAULT_ADMIN_TOKEN="${SAVED_VAULT_ADMIN_TOKEN:-$VAULT_ADMIN_TOKEN}"
         SUBDIR_NAME="${SAVED_SUBDIR_NAME:-$SUBDIR_NAME}"
+        USER_UID="${SAVED_USER_UID:-${USER_UID:-1000}}"
+        USER_GID="${SAVED_USER_GID:-${USER_GID:-1000}}"
     fi
     return 0
 }
@@ -1236,6 +1238,8 @@ save_configuration() {
         printf "SAVED_ENABLE_TELEGRAM=%q\n" "${ENABLE_TELEGRAM}"
         printf "SAVED_TELEGRAM_BOT_TOKEN=%q\n" "${TELEGRAM_BOT_TOKEN}"
         printf "SAVED_TELEGRAM_CHAT_ID=%q\n" "${TELEGRAM_CHAT_ID}"
+        printf "SAVED_USER_UID=%q\n" "${USER_UID}"
+        printf "SAVED_USER_GID=%q\n" "${USER_GID}"
         printf "SAVED_HOMELAB_VERSION=%q\n" "${HOMELAB_VERSION}"
     } > "${ENV_FILE}"
     chmod 600 "${ENV_FILE}"
@@ -1310,6 +1314,8 @@ prompt_configuration() {
         ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM:-N}"
         TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
         TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
+        USER_UID="${SAVED_USER_UID:-${USER_UID:-1000}}"
+        USER_GID="${SAVED_USER_GID:-${USER_GID:-1000}}"
 
         local ROOT_DEV
         ROOT_DEV=$(df -P / 2>/dev/null | awk 'NR==2{print $1}' || echo "/dev/root")
@@ -2437,14 +2443,14 @@ setup_directories() {
     mkdir -p "${APP_DIR}/scripts"
     mkdir -p "${SAVE_DIR}/downloads"
     apply_nocow_helper "${SAVE_DIR}/downloads"
-    chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/downloads" 2>/dev/null || true
-    chmod 775 "${SAVE_DIR}/downloads" 2>/dev/null || true
+    chown -R "${USER_UID:-1000}:${USER_GID:-1000}" "${SAVE_DIR}/downloads" 2>/dev/null || true
+    chmod -R 777 "${SAVE_DIR}/downloads" 2>/dev/null || true
 
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] || [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
         mkdir -p "${SAVE_DIR}/music"
         apply_nocow_helper "${SAVE_DIR}/music"
-        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/music" 2>/dev/null || true
-        chmod 775 "${SAVE_DIR}/music" 2>/dev/null || true
+        chown -R "${USER_UID:-1000}:${USER_GID:-1000}" "${SAVE_DIR}/music" 2>/dev/null || true
+        chmod -R 777 "${SAVE_DIR}/music" 2>/dev/null || true
     fi
 
     if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
@@ -2457,14 +2463,15 @@ setup_directories() {
                 echo '{}' > "${YTDL_CONF}"
             fi
         fi
-        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
-        chmod 775 "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
+        chown -R "${USER_UID:-1000}:${USER_GID:-1000}" "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
+        chmod 777 "${SAVE_DIR}/downloads/.metube" "${SAVE_DIR}/downloads/tmp" 2>/dev/null || true
     fi
 
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         mkdir -p "${APP_DIR}/configs/navidrome"
         apply_nocow_helper "${APP_DIR}/configs/navidrome"
-        chown -R "${USER_UID}:${USER_GID}" "${APP_DIR}/configs/navidrome" 2>/dev/null || true
+        chown -R "${USER_UID:-1000}:${USER_GID:-1000}" "${APP_DIR}/configs/navidrome" 2>/dev/null || true
+        chmod 775 "${APP_DIR}/configs/navidrome" 2>/dev/null || true
     fi
 
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
@@ -2591,7 +2598,8 @@ EOF_QBIT_CONF
         chown -R "${USER_UID}:${USER_GID}" "${APP_DIR}/qbittorrent" 2>/dev/null || true
     fi
 
-    chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}" 2>/dev/null || true
+    chown -R "${USER_UID:-1000}:${USER_GID:-1000}" "${SAVE_DIR}" 2>/dev/null || true
+    chmod 755 "${SAVE_DIR}" 2>/dev/null || true
 
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
         mkdir -p "${APP_DIR}/mihomo/ui" "${APP_DIR}/mihomo/providers"
@@ -3356,7 +3364,6 @@ proxy-groups:
     type: select
     proxies:
       - AUTO
-      - US-AUTO
       - DIRECT
     use:
       - my-sub
@@ -3370,49 +3377,9 @@ proxy-groups:
     tolerance: 50
     lazy: true
 
-  - name: US-AUTO
-    type: url-test
-    use:
-      - my-sub
-    proxies:
-      - AUTO
-    filter: \"(?i)\\\\b(US|USA|United States|America)\\\\b|🇺🇸|США\"
-    url: https://cp.cloudflare.com/generate_204
-    interval: 300
-    tolerance: 50
-    lazy: true
-
-  - name: YouTube
-    type: select
-    proxies:
-      - AUTO
-      - PROXY
-      - DIRECT
-    use:
-      - my-sub
-
-  - name: Discord
-    type: select
-    proxies:
-      - AUTO
-      - PROXY
-      - DIRECT
-    use:
-      - my-sub
-
-  - name: Telegram
-    type: select
-    proxies:
-      - AUTO
-      - PROXY
-      - DIRECT
-    use:
-      - my-sub
-
   - name: AI-Services
     type: select
     proxies:
-      - US-AUTO
       - AUTO
       - PROXY
       - DIRECT
@@ -3427,30 +3394,9 @@ proxy-groups:
     proxies:
       - DIRECT
 
-  - name: US-AUTO
-    type: select
-    proxies:
-      - DIRECT
-
-  - name: YouTube
-    type: select
-    proxies:
-      - DIRECT
-
-  - name: Discord
-    type: select
-    proxies:
-      - DIRECT
-
-  - name: Telegram
-    type: select
-    proxies:
-      - DIRECT
-
   - name: AI-Services
     type: select
     proxies:
-      - US-AUTO
       - DIRECT"
         fi
 
@@ -3778,33 +3724,33 @@ rules:
   - RULE-SET,gemini_site,AI-Services
   - RULE-SET,ai_chat,AI-Services
 
-  # YouTube и Google Video CDN — через группу YouTube (без замедления РКН)
-  - DOMAIN-SUFFIX,googlevideo.com,YouTube
-  - DOMAIN-SUFFIX,youtube.com,YouTube
-  - DOMAIN-SUFFIX,youtu.be,YouTube
-  - DOMAIN-SUFFIX,ytimg.com,YouTube
-  - DOMAIN-SUFFIX,ggpht.com,YouTube
-  - DOMAIN-SUFFIX,gvt1.com,YouTube
-  - DOMAIN-SUFFIX,youtube-nocookie.com,YouTube
-  - DOMAIN-SUFFIX,youtubekids.com,YouTube
-  - RULE-SET,youtube_site,YouTube
+  # YouTube и Google Video CDN — через группу PROXY (без замедления РКН)
+  - DOMAIN-SUFFIX,googlevideo.com,PROXY
+  - DOMAIN-SUFFIX,youtube.com,PROXY
+  - DOMAIN-SUFFIX,youtu.be,PROXY
+  - DOMAIN-SUFFIX,ytimg.com,PROXY
+  - DOMAIN-SUFFIX,ggpht.com,PROXY
+  - DOMAIN-SUFFIX,gvt1.com,PROXY
+  - DOMAIN-SUFFIX,youtube-nocookie.com,PROXY
+  - DOMAIN-SUFFIX,youtubekids.com,PROXY
+  - RULE-SET,youtube_site,PROXY
 
-  # Discord (голосовые серверы RTC, чаты, вложения, шлюз) — через группу Discord
-  - DOMAIN-SUFFIX,discord.com,Discord
-  - DOMAIN-SUFFIX,discord.gg,Discord
-  - DOMAIN-SUFFIX,discordapp.com,Discord
-  - DOMAIN-SUFFIX,discordapp.net,Discord
-  - DOMAIN-SUFFIX,discord.media,Discord
-  - DOMAIN-SUFFIX,discordcdn.com,Discord
-  - DOMAIN-KEYWORD,discord,Discord
-  - RULE-SET,discord_site,Discord
+  # Discord (голосовые серверы RTC, чаты, вложения, шлюз) — через группу PROXY
+  - DOMAIN-SUFFIX,discord.com,PROXY
+  - DOMAIN-SUFFIX,discord.gg,PROXY
+  - DOMAIN-SUFFIX,discordapp.com,PROXY
+  - DOMAIN-SUFFIX,discordapp.net,PROXY
+  - DOMAIN-SUFFIX,discord.media,PROXY
+  - DOMAIN-SUFFIX,discordcdn.com,PROXY
+  - DOMAIN-KEYWORD,discord,PROXY
+  - RULE-SET,discord_site,PROXY
 
-  # Telegram — через группу Telegram
-  - DOMAIN-SUFFIX,t.me,Telegram
-  - DOMAIN-SUFFIX,telegram.org,Telegram
-  - DOMAIN-SUFFIX,telegram.me,Telegram
-  - DOMAIN-SUFFIX,telegra.ph,Telegram
-  - RULE-SET,telegram_site,Telegram
+  # Telegram — через группу PROXY
+  - DOMAIN-SUFFIX,t.me,PROXY
+  - DOMAIN-SUFFIX,telegram.org,PROXY
+  - DOMAIN-SUFFIX,telegram.me,PROXY
+  - DOMAIN-SUFFIX,telegra.ph,PROXY
+  - RULE-SET,telegram_site,PROXY
 
   # Заблокированные в РФ соцсети и популярные платформы
   - DOMAIN-SUFFIX,instagram.com,PROXY
@@ -4368,10 +4314,12 @@ EOF_COMPOSE
     ports:
       - "127.0.0.1:8081:8081"
     environment:
-      - "PUID=${USER_UID}"
-      - "PGID=${USER_GID}"
-      - "UID=${USER_UID}"
-      - "GID=${USER_GID}"
+      - "PUID=${USER_UID:-1000}"
+      - "PGID=${USER_GID:-1000}"
+      - "UID=${USER_UID:-1000}"
+      - "GID=${USER_GID:-1000}"
+      - "UMASK=002"
+      - "CHOWN_DIRS=true"
       - "ALLOW_PRIVATE_ADDRESSES=true"
       - "ALLOW_YTDL_OPTIONS_OVERRIDES=true"
       - "DOWNLOAD_DIR=/downloads"
@@ -4405,7 +4353,7 @@ EOF_COMPOSE
     image: ${NAVIDROME_IMAGE:-deluan/navidrome:latest}
     container_name: navidrome
     restart: unless-stopped
-    user: "${USER_UID}:${USER_GID}"
+    user: "${USER_UID:-1000}:${USER_GID:-1000}"
     ports:
       - "127.0.0.1:4533:4533"
     environment:
@@ -4924,14 +4872,25 @@ for p in set(db_paths):
             for i in {1..30}; do
                 if docker inspect -f '{{.State.Status}}' navidrome 2>/dev/null | grep -q "running"; then
                     local RES_CREATE
-                    RES_CREATE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:4533/api/user" \
+                    RES_CREATE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:4533/auth/setup" \
                         -H "Content-Type: application/json" \
-                        -d "{\"userName\":\"${ADMIN_USER}\",\"username\":\"${ADMIN_USER}\",\"name\":\"${ADMIN_USER}\",\"password\":\"${MASTER_PASS}\",\"isAdmin\":true}" 2>/dev/null || echo "000")
+                        -d "{\"userName\":\"${ADMIN_USER}\",\"name\":\"${ADMIN_USER}\",\"password\":\"${MASTER_PASS}\"}" 2>/dev/null || echo "000")
                     if [ "${RES_CREATE}" = "200" ] || [ "${RES_CREATE}" = "201" ]; then
                         log_ok "Администратор Navidrome (${ADMIN_USER}) успешно создан с мастер-паролем"
                         NAVIDROME_READY=1
                         break
-                    elif [ "${RES_CREATE}" = "400" ] || [ "${RES_CREATE}" = "409" ] || [ "${RES_CREATE}" = "403" ]; then
+                    elif [ "${RES_CREATE}" = "404" ]; then
+                        local RES_FALLBACK
+                        RES_FALLBACK=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:4533/api/setup" \
+                            -H "Content-Type: application/json" \
+                            -d "{\"userName\":\"${ADMIN_USER}\",\"name\":\"${ADMIN_USER}\",\"password\":\"${MASTER_PASS}\"}" 2>/dev/null || echo "000")
+                        if [ "${RES_FALLBACK}" = "200" ] || [ "${RES_FALLBACK}" = "201" ]; then
+                            log_ok "Администратор Navidrome (${ADMIN_USER}) успешно создан с мастер-паролем"
+                            NAVIDROME_READY=1
+                            break
+                        fi
+                    elif [ "${RES_CREATE}" = "400" ] || [ "${RES_CREATE}" = "409" ]; then
+                        log_ok "Администратор Navidrome (${ADMIN_USER}) уже инициализирован"
                         NAVIDROME_READY=1
                         break
                     fi

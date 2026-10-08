@@ -352,14 +352,25 @@ for p in set(db_paths):
             for i in {1..30}; do
                 if docker inspect -f '{{.State.Status}}' navidrome 2>/dev/null | grep -q "running"; then
                     local RES_CREATE
-                    RES_CREATE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:4533/api/user" \
+                    RES_CREATE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:4533/auth/setup" \
                         -H "Content-Type: application/json" \
-                        -d "{\"userName\":\"${ADMIN_USER}\",\"username\":\"${ADMIN_USER}\",\"name\":\"${ADMIN_USER}\",\"password\":\"${MASTER_PASS}\",\"isAdmin\":true}" 2>/dev/null || echo "000")
+                        -d "{\"userName\":\"${ADMIN_USER}\",\"name\":\"${ADMIN_USER}\",\"password\":\"${MASTER_PASS}\"}" 2>/dev/null || echo "000")
                     if [ "${RES_CREATE}" = "200" ] || [ "${RES_CREATE}" = "201" ]; then
                         log_ok "Администратор Navidrome (${ADMIN_USER}) успешно создан с мастер-паролем"
                         NAVIDROME_READY=1
                         break
-                    elif [ "${RES_CREATE}" = "400" ] || [ "${RES_CREATE}" = "409" ] || [ "${RES_CREATE}" = "403" ]; then
+                    elif [ "${RES_CREATE}" = "404" ]; then
+                        local RES_FALLBACK
+                        RES_FALLBACK=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:4533/api/setup" \
+                            -H "Content-Type: application/json" \
+                            -d "{\"userName\":\"${ADMIN_USER}\",\"name\":\"${ADMIN_USER}\",\"password\":\"${MASTER_PASS}\"}" 2>/dev/null || echo "000")
+                        if [ "${RES_FALLBACK}" = "200" ] || [ "${RES_FALLBACK}" = "201" ]; then
+                            log_ok "Администратор Navidrome (${ADMIN_USER}) успешно создан с мастер-паролем"
+                            NAVIDROME_READY=1
+                            break
+                        fi
+                    elif [ "${RES_CREATE}" = "400" ] || [ "${RES_CREATE}" = "409" ]; then
+                        log_ok "Администратор Navidrome (${ADMIN_USER}) уже инициализирован"
                         NAVIDROME_READY=1
                         break
                     fi

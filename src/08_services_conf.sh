@@ -213,7 +213,6 @@ proxy-groups:
     type: select
     proxies:
       - AUTO
-      - US-AUTO
       - DIRECT
     use:
       - my-sub
@@ -227,49 +226,9 @@ proxy-groups:
     tolerance: 50
     lazy: true
 
-  - name: US-AUTO
-    type: url-test
-    use:
-      - my-sub
-    proxies:
-      - AUTO
-    filter: \"(?i)\\\\b(US|USA|United States|America)\\\\b|🇺🇸|США\"
-    url: https://cp.cloudflare.com/generate_204
-    interval: 300
-    tolerance: 50
-    lazy: true
-
-  - name: YouTube
-    type: select
-    proxies:
-      - AUTO
-      - PROXY
-      - DIRECT
-    use:
-      - my-sub
-
-  - name: Discord
-    type: select
-    proxies:
-      - AUTO
-      - PROXY
-      - DIRECT
-    use:
-      - my-sub
-
-  - name: Telegram
-    type: select
-    proxies:
-      - AUTO
-      - PROXY
-      - DIRECT
-    use:
-      - my-sub
-
   - name: AI-Services
     type: select
     proxies:
-      - US-AUTO
       - AUTO
       - PROXY
       - DIRECT
@@ -284,30 +243,9 @@ proxy-groups:
     proxies:
       - DIRECT
 
-  - name: US-AUTO
-    type: select
-    proxies:
-      - DIRECT
-
-  - name: YouTube
-    type: select
-    proxies:
-      - DIRECT
-
-  - name: Discord
-    type: select
-    proxies:
-      - DIRECT
-
-  - name: Telegram
-    type: select
-    proxies:
-      - DIRECT
-
   - name: AI-Services
     type: select
     proxies:
-      - US-AUTO
       - DIRECT"
         fi
 
@@ -635,33 +573,33 @@ rules:
   - RULE-SET,gemini_site,AI-Services
   - RULE-SET,ai_chat,AI-Services
 
-  # YouTube и Google Video CDN — через группу YouTube (без замедления РКН)
-  - DOMAIN-SUFFIX,googlevideo.com,YouTube
-  - DOMAIN-SUFFIX,youtube.com,YouTube
-  - DOMAIN-SUFFIX,youtu.be,YouTube
-  - DOMAIN-SUFFIX,ytimg.com,YouTube
-  - DOMAIN-SUFFIX,ggpht.com,YouTube
-  - DOMAIN-SUFFIX,gvt1.com,YouTube
-  - DOMAIN-SUFFIX,youtube-nocookie.com,YouTube
-  - DOMAIN-SUFFIX,youtubekids.com,YouTube
-  - RULE-SET,youtube_site,YouTube
+  # YouTube и Google Video CDN — через группу PROXY (без замедления РКН)
+  - DOMAIN-SUFFIX,googlevideo.com,PROXY
+  - DOMAIN-SUFFIX,youtube.com,PROXY
+  - DOMAIN-SUFFIX,youtu.be,PROXY
+  - DOMAIN-SUFFIX,ytimg.com,PROXY
+  - DOMAIN-SUFFIX,ggpht.com,PROXY
+  - DOMAIN-SUFFIX,gvt1.com,PROXY
+  - DOMAIN-SUFFIX,youtube-nocookie.com,PROXY
+  - DOMAIN-SUFFIX,youtubekids.com,PROXY
+  - RULE-SET,youtube_site,PROXY
 
-  # Discord (голосовые серверы RTC, чаты, вложения, шлюз) — через группу Discord
-  - DOMAIN-SUFFIX,discord.com,Discord
-  - DOMAIN-SUFFIX,discord.gg,Discord
-  - DOMAIN-SUFFIX,discordapp.com,Discord
-  - DOMAIN-SUFFIX,discordapp.net,Discord
-  - DOMAIN-SUFFIX,discord.media,Discord
-  - DOMAIN-SUFFIX,discordcdn.com,Discord
-  - DOMAIN-KEYWORD,discord,Discord
-  - RULE-SET,discord_site,Discord
+  # Discord (голосовые серверы RTC, чаты, вложения, шлюз) — через группу PROXY
+  - DOMAIN-SUFFIX,discord.com,PROXY
+  - DOMAIN-SUFFIX,discord.gg,PROXY
+  - DOMAIN-SUFFIX,discordapp.com,PROXY
+  - DOMAIN-SUFFIX,discordapp.net,PROXY
+  - DOMAIN-SUFFIX,discord.media,PROXY
+  - DOMAIN-SUFFIX,discordcdn.com,PROXY
+  - DOMAIN-KEYWORD,discord,PROXY
+  - RULE-SET,discord_site,PROXY
 
-  # Telegram — через группу Telegram
-  - DOMAIN-SUFFIX,t.me,Telegram
-  - DOMAIN-SUFFIX,telegram.org,Telegram
-  - DOMAIN-SUFFIX,telegram.me,Telegram
-  - DOMAIN-SUFFIX,telegra.ph,Telegram
-  - RULE-SET,telegram_site,Telegram
+  # Telegram — через группу PROXY
+  - DOMAIN-SUFFIX,t.me,PROXY
+  - DOMAIN-SUFFIX,telegram.org,PROXY
+  - DOMAIN-SUFFIX,telegram.me,PROXY
+  - DOMAIN-SUFFIX,telegra.ph,PROXY
+  - RULE-SET,telegram_site,PROXY
 
   # Заблокированные в РФ соцсети и популярные платформы
   - DOMAIN-SUFFIX,instagram.com,PROXY

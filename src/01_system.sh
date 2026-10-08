@@ -24,7 +24,7 @@ EOF_LOGO
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   (ТВ, ПК, Смартфоны)      CleanDNS/ZeroCache     Fake-IP / Mixed TUN / gVisor    ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                          │                                           ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                          ▼ (Анти-Утечки)   Маршрутизация трафика:    ${CLR_NEON_PURPLE}║${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                   ${CLR_RED}[ ECH / DOH DROP ]${CLR_RESET}  ├─► ${CLR_NEON_PINK}[ US-AUTO ]${CLR_RESET} ChatGPT / Claude  ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                   ${CLR_RED}[ ECH / DOH DROP ]${CLR_RESET}  ├─► ${CLR_NEON_PINK}[ AI-Services ]${CLR_RESET} ChatGPT / Claude ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                                            ├─► ${CLR_NEON_GOLD}[ PROXY ]${CLR_RESET} YT, Discord, Блоки  ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                                            └─► ${CLR_NEON_GREEN}[ DIRECT ]${CLR_RESET} РФ / Банки / Steam ║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           ▼                                                                      ${CLR_NEON_PURPLE}║${CLR_RESET}"
@@ -187,6 +187,8 @@ load_previous_config() {
         ADGUARD_WORK_DIR="${SAVED_ADGUARD_WORK_DIR:-$ADGUARD_WORK_DIR}"
         VAULT_ADMIN_TOKEN="${SAVED_VAULT_ADMIN_TOKEN:-$VAULT_ADMIN_TOKEN}"
         SUBDIR_NAME="${SAVED_SUBDIR_NAME:-$SUBDIR_NAME}"
+        USER_UID="${SAVED_USER_UID:-${USER_UID:-1000}}"
+        USER_GID="${SAVED_USER_GID:-${USER_GID:-1000}}"
     fi
     return 0
 }

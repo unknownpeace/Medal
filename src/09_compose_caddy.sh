@@ -499,10 +499,12 @@ EOF_COMPOSE
     ports:
       - "127.0.0.1:8081:8081"
     environment:
-      - "PUID=${USER_UID}"
-      - "PGID=${USER_GID}"
-      - "UID=${USER_UID}"
-      - "GID=${USER_GID}"
+      - "PUID=${USER_UID:-1000}"
+      - "PGID=${USER_GID:-1000}"
+      - "UID=${USER_UID:-1000}"
+      - "GID=${USER_GID:-1000}"
+      - "UMASK=002"
+      - "CHOWN_DIRS=true"
       - "ALLOW_PRIVATE_ADDRESSES=true"
       - "ALLOW_YTDL_OPTIONS_OVERRIDES=true"
       - "DOWNLOAD_DIR=/downloads"
@@ -536,7 +538,7 @@ EOF_COMPOSE
     image: ${NAVIDROME_IMAGE:-deluan/navidrome:latest}
     container_name: navidrome
     restart: unless-stopped
-    user: "${USER_UID}:${USER_GID}"
+    user: "${USER_UID:-1000}:${USER_GID:-1000}"
     ports:
       - "127.0.0.1:4533:4533"
     environment:
