@@ -140,7 +140,8 @@ EOF_NFT
         fi
 
         log_info "Установка интеллектуального сторожевого таймера защиты от петель маршрутизации..."
-        cat << 'EOF_WATCHDOG' > /usr/local/bin/gateway-watchdog.sh
+        local WD_TMP="/usr/local/bin/gateway-watchdog.sh.tmp.$$"
+        cat << 'EOF_WATCHDOG' > "${WD_TMP}"
 #!/usr/bin/env bash
 set -euo pipefail
 if [ -f /opt/homelab/.env ]; then
@@ -299,7 +300,8 @@ if command -v docker >/dev/null 2>&1 && docker inspect mihomo >/dev/null 2>&1; t
     fi
 fi
 EOF_WATCHDOG
-        chmod 750 /usr/local/bin/gateway-watchdog.sh
+        chmod 750 "${WD_TMP}"
+        mv -f "${WD_TMP}" /usr/local/bin/gateway-watchdog.sh
 
         if [ "${INIT_SYSTEM}" = "systemd" ]; then
             cat <<EOF_WD_SVC > /etc/systemd/system/network-gateway-watchdog.service
@@ -352,7 +354,8 @@ EOF_WD_TMR
     done
 
     log_info "Настройка сервиса системных оповещений (homelab-notify)..."
-    cat << 'EOF_NOTIFY' > /usr/local/bin/homelab-notify
+    local NOTIFY_TMP="/usr/local/bin/homelab-notify.tmp.$$"
+    cat << 'EOF_NOTIFY' > "${NOTIFY_TMP}"
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -400,7 +403,8 @@ if ! curl -sf -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
 ${MESSAGE}" >/dev/null 2>&1 || true
 fi
 EOF_NOTIFY
-    chmod 755 /usr/local/bin/homelab-notify
+    chmod 755 "${NOTIFY_TMP}"
+    mv -f "${NOTIFY_TMP}" /usr/local/bin/homelab-notify
 
     log_ok "Сетевой стек, сторож маршрутизации и служба оповещений настроены"
 }

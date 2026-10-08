@@ -6,6 +6,11 @@
 install_pkgs() {
     print_step_header "01/11" "УСТАНОВКА ЗАВИСИМОСТЕЙ И СТЕКА DOCKER"
 
+    if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1 && command -v nft >/dev/null 2>&1; then
+        log_ok "Системные зависимости и Docker CE уже установлены (пропуск в режиме обновления)"
+        return 0
+    fi
+
     if [ "${DISTRO_FAMILY}" = "alpine" ]; then
         if [ -f /etc/apk/repositories ]; then
             sed -i 's/^#\(.*\/community\)/\1/' /etc/apk/repositories 2>/dev/null || true
@@ -208,7 +213,8 @@ except Exception:
         [ ! -e /usr/libexec/docker/cli-plugins/docker-compose ] && ln -sf "${DC_PATH}" /usr/libexec/docker/cli-plugins/docker-compose
     fi
 
-    cat << 'EOF_DC_BIN' > /usr/local/bin/dc
+    local DC_BIN_TMP="/usr/local/bin/dc.tmp.$$"
+    cat << 'EOF_DC_BIN' > "${DC_BIN_TMP}"
 #!/usr/bin/env bash
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
     exec docker compose "$@"
@@ -222,12 +228,17 @@ else
     exec docker compose "$@"
 fi
 EOF_DC_BIN
-    chmod 755 /usr/local/bin/dc 2>/dev/null || true
+    chmod 755 "${DC_BIN_TMP}" 2>/dev/null || true
+    mv -f "${DC_BIN_TMP}" /usr/local/bin/dc 2>/dev/null || true
 
     log_ok "Стек Docker CE успешно настроен и готов к работе"
 }
 
 setup_zram() {
+    if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ] && (swapon --show 2>/dev/null | grep -q 'zram' || [ -f /etc/systemd/zram-generator.conf ] || [ -f /etc/init.d/zram-swap ]); then
+        log_ok "Конфигурация zRAM уже активна (пропуск в режиме обновления)"
+        return 0
+    fi
     local TOTAL_RAM_MB
     TOTAL_RAM_MB=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}' || echo "2048")
     if [ "${TOTAL_RAM_MB}" -le 4096 ]; then

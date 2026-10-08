@@ -11,6 +11,11 @@ benchmark_dns_servers() {
         return 0
     fi
 
+    if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ] && [ -n "${SELECTED_DOH_1:-}" ]; then
+        log_ok "Используются ранее настроенные DoH/DoT резолверы: ${SELECTED_DOH_1} (пропуск в режиме обновления)"
+        return 0
+    fi
+
     echo -e "  ${CLR_CYAN}Запуск параллельного бенчмарка безопасности и задержки DoH/DoT...${CLR_RESET}"
     echo -e "  ${CLR_DIM}Проверка подлинности сертификатов TLS, целостности DNSSEC и RTT пинга...${CLR_RESET}"
     echo ""

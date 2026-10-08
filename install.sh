@@ -319,7 +319,7 @@ SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.7"
+HOMELAB_VERSION="2.8.8"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -583,6 +583,11 @@ EOF_TIMESYNC
 install_pkgs() {
     print_step_header "01/11" "УСТАНОВКА ЗАВИСИМОСТЕЙ И СТЕКА DOCKER"
 
+    if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1 && command -v nft >/dev/null 2>&1; then
+        log_ok "Системные зависимости и Docker CE уже установлены (пропуск в режиме обновления)"
+        return 0
+    fi
+
     if [ "${DISTRO_FAMILY}" = "alpine" ]; then
         if [ -f /etc/apk/repositories ]; then
             sed -i 's/^#\(.*\/community\)/\1/' /etc/apk/repositories 2>/dev/null || true
@@ -785,7 +790,8 @@ except Exception:
         [ ! -e /usr/libexec/docker/cli-plugins/docker-compose ] && ln -sf "${DC_PATH}" /usr/libexec/docker/cli-plugins/docker-compose
     fi
 
-    cat << 'EOF_DC_BIN' > /usr/local/bin/dc
+    local DC_BIN_TMP="/usr/local/bin/dc.tmp.$$"
+    cat << 'EOF_DC_BIN' > "${DC_BIN_TMP}"
 #!/usr/bin/env bash
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
     exec docker compose "$@"
@@ -799,12 +805,17 @@ else
     exec docker compose "$@"
 fi
 EOF_DC_BIN
-    chmod 755 /usr/local/bin/dc 2>/dev/null || true
+    chmod 755 "${DC_BIN_TMP}" 2>/dev/null || true
+    mv -f "${DC_BIN_TMP}" /usr/local/bin/dc 2>/dev/null || true
 
     log_ok "Стек Docker CE успешно настроен и готов к работе"
 }
 
 setup_zram() {
+    if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ] && (swapon --show 2>/dev/null | grep -q 'zram' || [ -f /etc/systemd/zram-generator.conf ] || [ -f /etc/init.d/zram-swap ]); then
+        log_ok "Конфигурация zRAM уже активна (пропуск в режиме обновления)"
+        return 0
+    fi
     local TOTAL_RAM_MB
     TOTAL_RAM_MB=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}' || echo "2048")
     if [ "${TOTAL_RAM_MB}" -le 4096 ]; then
@@ -2114,7 +2125,8 @@ EOF_NFT
         fi
 
         log_info "Установка интеллектуального сторожевого таймера защиты от петель маршрутизации..."
-        cat << 'EOF_WATCHDOG' > /usr/local/bin/gateway-watchdog.sh
+        local WD_TMP="/usr/local/bin/gateway-watchdog.sh.tmp.$$"
+        cat << 'EOF_WATCHDOG' > "${WD_TMP}"
 #!/usr/bin/env bash
 set -euo pipefail
 if [ -f /opt/homelab/.env ]; then
@@ -2273,7 +2285,8 @@ if command -v docker >/dev/null 2>&1 && docker inspect mihomo >/dev/null 2>&1; t
     fi
 fi
 EOF_WATCHDOG
-        chmod 750 /usr/local/bin/gateway-watchdog.sh
+        chmod 750 "${WD_TMP}"
+        mv -f "${WD_TMP}" /usr/local/bin/gateway-watchdog.sh
 
         if [ "${INIT_SYSTEM}" = "systemd" ]; then
             cat <<EOF_WD_SVC > /etc/systemd/system/network-gateway-watchdog.service
@@ -2326,7 +2339,8 @@ EOF_WD_TMR
     done
 
     log_info "Настройка сервиса системных оповещений (homelab-notify)..."
-    cat << 'EOF_NOTIFY' > /usr/local/bin/homelab-notify
+    local NOTIFY_TMP="/usr/local/bin/homelab-notify.tmp.$$"
+    cat << 'EOF_NOTIFY' > "${NOTIFY_TMP}"
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -2374,7 +2388,8 @@ if ! curl -sf -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
 ${MESSAGE}" >/dev/null 2>&1 || true
 fi
 EOF_NOTIFY
-    chmod 755 /usr/local/bin/homelab-notify
+    chmod 755 "${NOTIFY_TMP}"
+    mv -f "${NOTIFY_TMP}" /usr/local/bin/homelab-notify
 
     log_ok "Сетевой стек, сторож маршрутизации и служба оповещений настроены"
 }
@@ -2778,6 +2793,11 @@ benchmark_dns_servers() {
 
     if [[ ! "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
         log_info "Сетевой шлюз отключен в конфигурации. Пропуск тестирования DoH / DoT."
+        return 0
+    fi
+
+    if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ] && [ -n "${SELECTED_DOH_1:-}" ]; then
+        log_ok "Используются ранее настроенные DoH/DoT резолверы: ${SELECTED_DOH_1} (пропуск в режиме обновления)"
         return 0
     fi
 
@@ -4735,37 +4755,44 @@ EOF_NAVI_BKP_TMR
 
     cd "${APP_DIR}"
 
-    run_spin "Загрузка Docker-образов стека" bash -c '
-        if dc config --images >/dev/null 2>&1; then
-            for img in $(dc config --images 2>/dev/null); do
-                docker pull "${img}" >/dev/null 2>&1 || true
-            done
-        else
-            dc pull -q 2>/dev/null || dc pull
-        fi
-    '
+    if [ "${IS_UPGRADE_MODE:-0}" -ne 1 ]; then
+        run_spin "Загрузка Docker-образов стека" bash -c '
+            if dc config --images >/dev/null 2>&1; then
+                for img in $(dc config --images 2>/dev/null); do
+                    docker pull "${img}" >/dev/null 2>&1 || true
+                done
+            else
+                dc pull -q 2>/dev/null || dc pull
+            fi
+        '
+    else
+        log_info "Режим обновления ядра: повторная загрузка образов пропущена (образы сохранены)"
+    fi
     run_spin "Запуск контейнеров стека (Docker Compose)" bash -c "dc up -d --quiet-pull 2>/dev/null || dc up -d"
 
     if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
-        log_info "Автоматическая инициализация администратора Gitea (${ADMIN_USER})..."
-        local GITEA_READY=0
-        for i in {1..40}; do
-            if docker inspect -f '{{.State.Status}}' gitea 2>/dev/null | grep -q "running"; then
-                if docker exec gitea wget -q -O - http://localhost:3000/api/v1/version >/dev/null 2>&1 || \
-                   docker exec gitea curl -sf http://localhost:3000/api/v1/version >/dev/null 2>&1 || \
-                   [ $i -ge 12 ]; then
-                    
-                    if docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u "${USER_UID}:${USER_GID}" gitea sh -c 'gitea admin user create --config /data/gitea/conf/app.ini --admin --username "$1" --password "$GITEA_ADMIN_PWD" --email "$1@example.lan" --must-change-password=false' _ "${ADMIN_USER}" >/dev/null 2>&1 || \
-                       docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u git gitea sh -c 'gitea admin user create --config /data/gitea/conf/app.ini --admin --username "$1" --password "$GITEA_ADMIN_PWD" --email "$1@example.lan" --must-change-password=false' _ "${ADMIN_USER}" >/dev/null 2>&1; then
-                        log_ok "Администратор Gitea (${ADMIN_USER}) успешно создан с мастер-паролем"
-                        GITEA_READY=1
-                    elif docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u git gitea sh -c 'gitea admin user change-password --config /data/gitea/conf/app.ini --username "$1" --password "$GITEA_ADMIN_PWD"' _ "${ADMIN_USER}" >/dev/null 2>&1; then
-                        log_ok "Пароль администратора Gitea (${ADMIN_USER}) успешно обновлен на мастер-пароль"
-                        GITEA_READY=1
-                    fi
+        if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
+            log_ok "Режим обновления: существующий администратор Gitea (${ADMIN_USER}) сохранен"
+        else
+            log_info "Автоматическая инициализация администратора Gitea (${ADMIN_USER})..."
+            local GITEA_READY=0
+            for i in {1..40}; do
+                if docker inspect -f '{{.State.Status}}' gitea 2>/dev/null | grep -q "running"; then
+                    if docker exec gitea wget -q -O - http://localhost:3000/api/v1/version >/dev/null 2>&1 || \
+                       docker exec gitea curl -sf http://localhost:3000/api/v1/version >/dev/null 2>&1 || \
+                       [ $i -ge 12 ]; then
+                        
+                        if docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u "${USER_UID}:${USER_GID}" gitea sh -c 'gitea admin user create --config /data/gitea/conf/app.ini --admin --username "$1" --password "$GITEA_ADMIN_PWD" --email "$1@example.lan" --must-change-password=false' _ "${ADMIN_USER}" >/dev/null 2>&1 || \
+                           docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u git gitea sh -c 'gitea admin user create --config /data/gitea/conf/app.ini --admin --username "$1" --password "$GITEA_ADMIN_PWD" --email "$1@example.lan" --must-change-password=false' _ "${ADMIN_USER}" >/dev/null 2>&1; then
+                            log_ok "Администратор Gitea (${ADMIN_USER}) успешно создан с мастер-паролем"
+                            GITEA_READY=1
+                        elif docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u git gitea sh -c 'gitea admin user change-password --config /data/gitea/conf/app.ini --username "$1" --password "$GITEA_ADMIN_PWD"' _ "${ADMIN_USER}" >/dev/null 2>&1; then
+                            log_ok "Пароль администратора Gitea (${ADMIN_USER}) успешно обновлен на мастер-пароль"
+                            GITEA_READY=1
+                        fi
 
-                    if [ "${GITEA_READY}" -eq 1 ]; then
-                        python3 -c "
+                        if [ "${GITEA_READY}" -eq 1 ]; then
+                            python3 -c "
 import sqlite3, glob, sys
 db_paths = glob.glob('${GITEA_DATA_DIR}/**/gitea.db', recursive=True) + glob.glob('${SAVE_DIR}/**/gitea.db', recursive=True)
 for p in set(db_paths):
@@ -4777,36 +4804,41 @@ for p in set(db_paths):
     except Exception:
         pass
 " 2>/dev/null || true
-                        break
+                            break
+                        fi
                     fi
                 fi
-            fi
-            sleep 2
-        done
-        [ $GITEA_READY -eq 0 ] && log_warn "Не удалось инициализировать админа Gitea (контейнер запускается в фоновом режиме)"
+                sleep 2
+            done
+            [ $GITEA_READY -eq 0 ] && log_warn "Не удалось инициализировать админа Gitea (контейнер запускается в фоновом режиме)"
+        fi
     fi
 
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
-        log_info "Автоматическая инициализация администратора Navidrome (${ADMIN_USER})..."
-        local NAVIDROME_READY=0
-        for i in {1..30}; do
-            if docker inspect -f '{{.State.Status}}' navidrome 2>/dev/null | grep -q "running"; then
-                local RES_CREATE
-                RES_CREATE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:4533/api/user" \
-                    -H "Content-Type: application/json" \
-                    -d "{\"userName\":\"${ADMIN_USER}\",\"username\":\"${ADMIN_USER}\",\"name\":\"${ADMIN_USER}\",\"password\":\"${MASTER_PASS}\",\"isAdmin\":true}" 2>/dev/null || echo "000")
-                if [ "${RES_CREATE}" = "200" ] || [ "${RES_CREATE}" = "201" ]; then
-                    log_ok "Администратор Navidrome (${ADMIN_USER}) успешно создан с мастер-паролем"
-                    NAVIDROME_READY=1
-                    break
-                elif [ "${RES_CREATE}" = "400" ] || [ "${RES_CREATE}" = "409" ] || [ "${RES_CREATE}" = "403" ]; then
-                    NAVIDROME_READY=1
-                    break
+        if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
+            log_ok "Режим обновления: существующий администратор Navidrome (${ADMIN_USER}) сохранен"
+        else
+            log_info "Автоматическая инициализация администратора Navidrome (${ADMIN_USER})..."
+            local NAVIDROME_READY=0
+            for i in {1..30}; do
+                if docker inspect -f '{{.State.Status}}' navidrome 2>/dev/null | grep -q "running"; then
+                    local RES_CREATE
+                    RES_CREATE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:4533/api/user" \
+                        -H "Content-Type: application/json" \
+                        -d "{\"userName\":\"${ADMIN_USER}\",\"username\":\"${ADMIN_USER}\",\"name\":\"${ADMIN_USER}\",\"password\":\"${MASTER_PASS}\",\"isAdmin\":true}" 2>/dev/null || echo "000")
+                    if [ "${RES_CREATE}" = "200" ] || [ "${RES_CREATE}" = "201" ]; then
+                        log_ok "Администратор Navidrome (${ADMIN_USER}) успешно создан с мастер-паролем"
+                        NAVIDROME_READY=1
+                        break
+                    elif [ "${RES_CREATE}" = "400" ] || [ "${RES_CREATE}" = "409" ] || [ "${RES_CREATE}" = "403" ]; then
+                        NAVIDROME_READY=1
+                        break
+                    fi
                 fi
-            fi
-            sleep 2
-        done
-        [ $NAVIDROME_READY -eq 1 ] && log_ok "Navidrome готов к работе (порт 4533 / ${MUSIC_DOMAIN})"
+                sleep 2
+            done
+            [ $NAVIDROME_READY -eq 1 ] && log_ok "Navidrome готов к работе (порт 4533 / ${MUSIC_DOMAIN})"
+        fi
     fi
 
     if [ "$SSL_MODE" = "1" ]; then
@@ -4826,7 +4858,8 @@ for p in set(db_paths):
     fi
 
     log_info "Установка консольной утилиты управления комплексом (/usr/local/bin/homelab)..."
-    cat << 'EOF_HOMELAB_CLI' > /usr/local/bin/homelab
+    local CLI_TMP="/usr/local/bin/homelab.tmp.$$"
+    cat << 'EOF_HOMELAB_CLI' > "${CLI_TMP}"
 #!/usr/bin/env bash
 # =============================================================================
 # Homelab Management CLI (Day-2 Operations & SRE Toolkit)
@@ -4884,7 +4917,7 @@ norm_service() {
 
 cmd_status() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── HOMELAB APPLIANCE: СТАТУС СИСТЕМЫ И СЕРВИСОВ ───────────────${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Версия комплекса:${CLR_RESET}  ${CLR_GREEN}v${SAVED_HOMELAB_VERSION:-2.8.7}${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Версия комплекса:${CLR_RESET}  ${CLR_GREEN}v${SAVED_HOMELAB_VERSION:-2.8.8}${CLR_RESET}"
     echo -e "  ${CLR_WHITE}• Ядро / ОС:${CLR_RESET}         $(uname -srm) [$(grep -E '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '\"' || echo 'Linux')]"
     local host_uptime=""
     if [ -r /proc/uptime ]; then
@@ -5161,7 +5194,7 @@ cmd_update() {
 
 cmd_version() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.7}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.8}"
     echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
 
     local REMOTE_VER=""
@@ -5195,7 +5228,7 @@ cmd_upgrade() {
     done
 
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.7}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.8}"
     echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
     echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
 
@@ -5275,12 +5308,12 @@ cmd_upgrade() {
         echo -e "  Все пользовательские данные, базы и учетные записи сохранены."
         echo -e "  В случае необходимости отката: ${CLR_GREEN}homelab rollback${CLR_RESET}"
         echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
-        return 0
+        exit 0
     else
         echo -e "  ${TAG_ERR} В процессе обновления произошла ошибка!"
         echo -e "  Для отката к исходному состоянию выполните: ${CLR_GREEN}homelab rollback${CLR_RESET}"
         echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
-        return 1
+        exit 1
     fi
 }
 
@@ -5456,9 +5489,11 @@ case "${1:-status}" in
     *) cmd_help ;;
 esac
 EOF_HOMELAB_CLI
-    chmod 755 /usr/local/bin/homelab
+    chmod 755 "${CLI_TMP}"
+    mv -f "${CLI_TMP}" /usr/local/bin/homelab
 
-    cat << 'EOF_MIHOMO_BIN' > /usr/local/bin/mihomo
+    local MIHOMO_TMP="/usr/local/bin/mihomo.tmp.$$"
+    cat << 'EOF_MIHOMO_BIN' > "${MIHOMO_TMP}"
 #!/usr/bin/env bash
 if [ $# -eq 0 ]; then
     echo -e "\033[1;36m✦ Mihomo (Clash Meta) запущен в контейнере Docker.\033[0m"
@@ -5470,9 +5505,11 @@ else
     exec docker exec -it mihomo "$@"
 fi
 EOF_MIHOMO_BIN
-    chmod 755 /usr/local/bin/mihomo 2>/dev/null || true
+    chmod 755 "${MIHOMO_TMP}" 2>/dev/null || true
+    mv -f "${MIHOMO_TMP}" /usr/local/bin/mihomo 2>/dev/null || true
 
-    cat << 'EOF_ADGUARD_BIN' > /usr/local/bin/adguard
+    local ADGUARD_TMP="/usr/local/bin/adguard.tmp.$$"
+    cat << 'EOF_ADGUARD_BIN' > "${ADGUARD_TMP}"
 #!/usr/bin/env bash
 if [ $# -eq 0 ]; then
     echo -e "\033[1;36m✦ AdGuard Home запущен в контейнере Docker.\033[0m"
@@ -5484,7 +5521,8 @@ else
     exec docker exec -it adguardhome "$@"
 fi
 EOF_ADGUARD_BIN
-    chmod 755 /usr/local/bin/adguard 2>/dev/null || true
+    chmod 755 "${ADGUARD_TMP}" 2>/dev/null || true
+    mv -f "${ADGUARD_TMP}" /usr/local/bin/adguard 2>/dev/null || true
     ln -sf /usr/local/bin/adguard /usr/local/bin/adguardhome 2>/dev/null || true
 
     log_ok "Сервисы комплекса успешно запущены и готовы к работе"
