@@ -319,7 +319,7 @@ SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.11"
+HOMELAB_VERSION="2.8.12"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -711,20 +711,27 @@ target_mirrors = [
     'https://docker.m.daocloud.io'
 ]
 changed = False
-for m in target_mirrors:
-    if m not in mirrors:
-        mirrors.append(m)
-        changed = True
 for bad in ['https://huecker.io', 'https://mirror.gcr.io', 'https://dockerhub.cloud.ru']:
-    if bad in mirrors:
+    while bad in mirrors:
         mirrors.remove(bad)
         changed = True
+# Гарантируем, что проверенные зеркала находятся первыми в списке
+new_mirrors = []
+for tm in target_mirrors:
+    new_mirrors.append(tm)
+for m in mirrors:
+    if m not in new_mirrors:
+        new_mirrors.append(m)
+if new_mirrors != mirrors:
+    mirrors = new_mirrors
+    changed = True
+
 if 'log-driver' not in data:
     data['log-driver'] = 'json-file'
     data['log-opts'] = {'max-size': '10m', 'max-file': '3'}
     changed = True
-if data.get('max-concurrent-downloads') != 2:
-    data['max-concurrent-downloads'] = 2
+if data.get('max-concurrent-downloads') != 3:
+    data['max-concurrent-downloads'] = 3
     data['max-concurrent-uploads'] = 2
     changed = True
 if changed:
@@ -2491,8 +2498,8 @@ import urllib.request, zipfile, os
 
 urls = [
     'https://ghfast.top/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
-    'https://mirror.ghproxy.com/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
-    'https://ghproxy.net/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
+    'https://ghp.ci/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
+    'https://hub.gitmirror.com/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
     'https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip'
 ]
 zip_p = '/tmp/vuetorrent.zip'
@@ -2502,14 +2509,16 @@ os.makedirs(dest, exist_ok=True)
 for u in urls:
     try:
         req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=8) as resp, open(zip_p, 'wb') as f:
+        with urllib.request.urlopen(req, timeout=6) as resp, open(zip_p, 'wb') as f:
             f.write(resp.read())
-        if os.path.isfile(zip_p) and os.path.getsize(zip_p) > 50000:
+        if os.path.isfile(zip_p) and os.path.getsize(zip_p) > 50000 and zipfile.is_zipfile(zip_p):
             break
     except Exception:
-        pass
+        if os.path.exists(zip_p):
+            try: os.remove(zip_p)
+            except Exception: pass
 
-if os.path.isfile(zip_p) and os.path.getsize(zip_p) > 50000:
+if os.path.isfile(zip_p) and zipfile.is_zipfile(zip_p):
     with zipfile.ZipFile(zip_p, 'r') as z:
         names = [n for n in z.namelist() if not n.endswith('/')]
         has_public = any('public/' in n for n in names)
@@ -2653,18 +2662,21 @@ sys.exit(1)
             fetch_metacubexd() {
                 local urls=(
                     'https://ghfast.top/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
-                    'https://mirror.ghproxy.com/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
-                    'https://ghproxy.net/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
+                    'https://ghp.ci/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
+                    'https://hub.gitmirror.com/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
                     'https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
                     'https://ghfast.top/https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.tar.gz'
                 )
                 local tar_tmp="/tmp/metacubexd.tar.gz"
                 for u in "${urls[@]}"; do
-                    if curl -fsSL -4 -k --connect-timeout 3 -m 10 "$u" -o "$tar_tmp" 2>/dev/null && [ -s "$tar_tmp" ]; then
-                        if [[ "$u" =~ compressed-dist ]]; then
-                            tar -xzf "$tar_tmp" -C "${APP_DIR}/mihomo/ui" 2>/dev/null && rm -f "$tar_tmp" && return 0
-                        else
-                            tar -xzf "$tar_tmp" -C "${APP_DIR}/mihomo/ui" --strip-components=1 2>/dev/null && rm -f "$tar_tmp" && return 0
+                    rm -f "$tar_tmp"
+                    if curl -fsSL -4 -k --connect-timeout 4 -m 12 "$u" -o "$tar_tmp" 2>/dev/null && [ -s "$tar_tmp" ]; then
+                        if tar -tzf "$tar_tmp" >/dev/null 2>&1; then
+                            if [[ "$u" =~ compressed-dist ]]; then
+                                tar -xzf "$tar_tmp" -C "${APP_DIR}/mihomo/ui" 2>/dev/null && rm -f "$tar_tmp" && return 0
+                            else
+                                tar -xzf "$tar_tmp" -C "${APP_DIR}/mihomo/ui" --strip-components=1 2>/dev/null && rm -f "$tar_tmp" && return 0
+                            fi
                         fi
                         rm -f "$tar_tmp"
                     fi
@@ -4762,19 +4774,35 @@ EOF_NAVI_BKP_TMR
             fi
 
             local PULL_DONE=0
-            for att in 1 2 3; do
-                log_info "Загрузка ${img} (попытка ${att}/3)..."
+            for att in 1 2; do
+                log_info "Загрузка ${img} (попытка ${att}/2)..."
                 if docker pull "${img}"; then
                     PULL_DONE=1
                     log_ok "Образ ${img} успешно загружен"
                     break
                 else
-                    log_warn "Сбой загрузки ${img} на попытке ${att}. Повтор через 3 сек..."
-                    sleep 3
+                    log_warn "Сбой штатной загрузки ${img} (попытка ${att}). Проверка зеркал..."
+                    sleep 2
                 fi
             done
 
-            # Если образ не загрузился с Docker Hub, пробуем прямой fallback на ghcr.io / lscr.io
+            # 2. Прямой pull через префиксы проверенных российских зеркал Docker Hub
+            if [ $PULL_DONE -eq 0 ]; then
+                local PREFIX_IMG="${img}"
+                [[ ! "${PREFIX_IMG}" =~ / ]] && PREFIX_IMG="library/${PREFIX_IMG}"
+                for mirror in "dockerhub.timeweb.cloud" "dockerproxy.net" "docker.m.daocloud.io"; do
+                    log_info "Прямая загрузка ${img} через проверенное зеркало (${mirror})..."
+                    if docker pull "${mirror}/${PREFIX_IMG}"; then
+                        docker tag "${mirror}/${PREFIX_IMG}" "${img}" 2>/dev/null || true
+                        docker rmi "${mirror}/${PREFIX_IMG}" >/dev/null 2>&1 || true
+                        PULL_DONE=1
+                        log_ok "Образ ${img} успешно получен через зеркало ${mirror}"
+                        break
+                    fi
+                done
+            fi
+
+            # 3. Прямой fallback на независимые реестры (ghcr.io / lscr.io)
             if [ $PULL_DONE -eq 0 ]; then
                 local FALLBACK_IMG=""
                 case "${img}" in
@@ -4786,6 +4814,8 @@ EOF_NAVI_BKP_TMR
                     *containrrr/watchtower*) FALLBACK_IMG="ghcr.io/containrrr/watchtower:latest" ;;
                     *willfarrell/autoheal*) FALLBACK_IMG="ghcr.io/willfarrell/autoheal:latest" ;;
                     *servercontainers/samba*) FALLBACK_IMG="ghcr.io/servercontainers/samba:latest" ;;
+                    *vaultwarden/server*) FALLBACK_IMG="ghcr.io/dani-garcia/vaultwarden:latest" ;;
+                    *gitea/gitea*) FALLBACK_IMG="ghcr.io/go-gitea/gitea:latest" ;;
                 esac
 
                 if [ -n "${FALLBACK_IMG}" ]; then
@@ -5284,7 +5314,26 @@ cmd_doctor() {
 
 cmd_update() {
     echo -e "  ${TAG_INFO} Проверка и загрузка свежих версий Docker-образов..."
-    (cd "$APP_DIR" && dc_cmd pull)
+    if ! (cd "$APP_DIR" && dc_cmd pull); then
+        echo -e "  ${TAG_WARN} Штатный dc pull завершился со сбоем. Загрузка через российские зеркала и fallback..."
+        local IMAGES=()
+        if (cd "$APP_DIR" && dc_cmd config --images >/dev/null 2>&1); then
+            while IFS= read -r line; do
+                [ -n "$line" ] && IMAGES+=("$line")
+            done < <(cd "$APP_DIR" && dc_cmd config --images 2>/dev/null | sort -u)
+        fi
+        for img in "${IMAGES[@]}"; do
+            local PREFIX_IMG="${img}"
+            [[ ! "${PREFIX_IMG}" =~ / ]] && PREFIX_IMG="library/${PREFIX_IMG}"
+            for mirror in "dockerhub.timeweb.cloud" "dockerproxy.net" "docker.m.daocloud.io"; do
+                if docker pull "${mirror}/${PREFIX_IMG}"; then
+                    docker tag "${mirror}/${PREFIX_IMG}" "${img}" 2>/dev/null || true
+                    docker rmi "${mirror}/${PREFIX_IMG}" >/dev/null 2>&1 || true
+                    break
+                fi
+            done
+        done
+    fi
     echo -e "  ${TAG_INFO} Пересоздание контейнеров с новыми образами..."
     (cd "$APP_DIR" && dc_cmd up -d --remove-orphans)
     echo -e "  ${TAG_INFO} Очистка неиспользуемых устаревших слоёв..."
@@ -5294,7 +5343,7 @@ cmd_update() {
 
 cmd_version() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.10}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.12}"
     echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
 
     local REMOTE_VER=""
@@ -5328,7 +5377,7 @@ cmd_upgrade() {
     done
 
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.10}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.12}"
     echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
     echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
 

@@ -91,8 +91,8 @@ import urllib.request, zipfile, os
 
 urls = [
     'https://ghfast.top/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
-    'https://mirror.ghproxy.com/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
-    'https://ghproxy.net/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
+    'https://ghp.ci/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
+    'https://hub.gitmirror.com/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
     'https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip'
 ]
 zip_p = '/tmp/vuetorrent.zip'
@@ -102,14 +102,16 @@ os.makedirs(dest, exist_ok=True)
 for u in urls:
     try:
         req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=8) as resp, open(zip_p, 'wb') as f:
+        with urllib.request.urlopen(req, timeout=6) as resp, open(zip_p, 'wb') as f:
             f.write(resp.read())
-        if os.path.isfile(zip_p) and os.path.getsize(zip_p) > 50000:
+        if os.path.isfile(zip_p) and os.path.getsize(zip_p) > 50000 and zipfile.is_zipfile(zip_p):
             break
     except Exception:
-        pass
+        if os.path.exists(zip_p):
+            try: os.remove(zip_p)
+            except Exception: pass
 
-if os.path.isfile(zip_p) and os.path.getsize(zip_p) > 50000:
+if os.path.isfile(zip_p) and zipfile.is_zipfile(zip_p):
     with zipfile.ZipFile(zip_p, 'r') as z:
         names = [n for n in z.namelist() if not n.endswith('/')]
         has_public = any('public/' in n for n in names)
@@ -253,18 +255,21 @@ sys.exit(1)
             fetch_metacubexd() {
                 local urls=(
                     'https://ghfast.top/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
-                    'https://mirror.ghproxy.com/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
-                    'https://ghproxy.net/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
+                    'https://ghp.ci/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
+                    'https://hub.gitmirror.com/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
                     'https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
                     'https://ghfast.top/https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.tar.gz'
                 )
                 local tar_tmp="/tmp/metacubexd.tar.gz"
                 for u in "${urls[@]}"; do
-                    if curl -fsSL -4 -k --connect-timeout 3 -m 10 "$u" -o "$tar_tmp" 2>/dev/null && [ -s "$tar_tmp" ]; then
-                        if [[ "$u" =~ compressed-dist ]]; then
-                            tar -xzf "$tar_tmp" -C "${APP_DIR}/mihomo/ui" 2>/dev/null && rm -f "$tar_tmp" && return 0
-                        else
-                            tar -xzf "$tar_tmp" -C "${APP_DIR}/mihomo/ui" --strip-components=1 2>/dev/null && rm -f "$tar_tmp" && return 0
+                    rm -f "$tar_tmp"
+                    if curl -fsSL -4 -k --connect-timeout 4 -m 12 "$u" -o "$tar_tmp" 2>/dev/null && [ -s "$tar_tmp" ]; then
+                        if tar -tzf "$tar_tmp" >/dev/null 2>&1; then
+                            if [[ "$u" =~ compressed-dist ]]; then
+                                tar -xzf "$tar_tmp" -C "${APP_DIR}/mihomo/ui" 2>/dev/null && rm -f "$tar_tmp" && return 0
+                            else
+                                tar -xzf "$tar_tmp" -C "${APP_DIR}/mihomo/ui" --strip-components=1 2>/dev/null && rm -f "$tar_tmp" && return 0
+                            fi
                         fi
                         rm -f "$tar_tmp"
                     fi

@@ -132,20 +132,27 @@ target_mirrors = [
     'https://docker.m.daocloud.io'
 ]
 changed = False
-for m in target_mirrors:
-    if m not in mirrors:
-        mirrors.append(m)
-        changed = True
 for bad in ['https://huecker.io', 'https://mirror.gcr.io', 'https://dockerhub.cloud.ru']:
-    if bad in mirrors:
+    while bad in mirrors:
         mirrors.remove(bad)
         changed = True
+# Гарантируем, что проверенные зеркала находятся первыми в списке
+new_mirrors = []
+for tm in target_mirrors:
+    new_mirrors.append(tm)
+for m in mirrors:
+    if m not in new_mirrors:
+        new_mirrors.append(m)
+if new_mirrors != mirrors:
+    mirrors = new_mirrors
+    changed = True
+
 if 'log-driver' not in data:
     data['log-driver'] = 'json-file'
     data['log-opts'] = {'max-size': '10m', 'max-file': '3'}
     changed = True
-if data.get('max-concurrent-downloads') != 2:
-    data['max-concurrent-downloads'] = 2
+if data.get('max-concurrent-downloads') != 3:
+    data['max-concurrent-downloads'] = 3
     data['max-concurrent-uploads'] = 2
     changed = True
 if changed:
