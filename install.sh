@@ -275,13 +275,15 @@ SELECTED_DOT_1=""
 SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
+ENABLE_METUBE="Y"
 ENABLE_NAVIDROME="Y"
 ENABLE_TG_BOT="Y"
 TG_BOT_TOKEN=""
 TG_CHAT_ID=""
+METUBE_DOMAIN=""
 MUSIC_DOMAIN=""
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.1"
+HOMELAB_VERSION="2.8.2"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -320,7 +322,7 @@ EOF_LOGO
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   • Умный Fake-IP DNS + nftables: Прозрачный обход без настройки клиентов ║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}╠══════════════════════════════════════════════════════════════════════════╣${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ЯДРО:${CLR_RESET} ${CLR_CYAN}Mihomo TUN${CLR_RESET} │ ${CLR_CYAN}AdGuard Home${CLR_RESET} │ ${CLR_CYAN}nftables${CLR_RESET} │ ${CLR_CYAN}Caddy SSL${CLR_RESET} │ ${CLR_CYAN}Docker${CLR_RESET}              ${CLR_NEON_PURPLE}║${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ПРИЛОЖЕНИЯ:${CLR_RESET} ${CLR_CYAN}Navidrome (Spotify)${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}qBittorrent${CLR_RESET} │ ${CLR_CYAN}TG-Бот (yt-dlp)${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Gitea${CLR_RESET} ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ПРИЛОЖЕНИЯ:${CLR_RESET} ${CLR_CYAN}Navidrome (Spotify)${CLR_RESET} │ ${CLR_CYAN}MeTube${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}qBittorrent${CLR_RESET} │ ${CLR_CYAN}TG-Бот (Управление)${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Gitea${CLR_RESET} ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ СИСТЕМА:${CLR_RESET} ${CLR_GRAY}Debian • Ubuntu • Arch Linux • Alpine Linux (OpenRC & Systemd)${CLR_RESET}   ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}╚══════════════════════════════════════════════════════════════════════════╝${CLR_RESET}"
     echo ""
@@ -454,8 +456,9 @@ load_previous_config() {
         [ -n "${SAVED_ENABLE_GITEA:-}" ] && ENABLE_GITEA="${SAVED_ENABLE_GITEA}"
         [ -n "${SAVED_ENABLE_SAMBA:-}" ] && ENABLE_SAMBA="${SAVED_ENABLE_SAMBA}"
         [ -n "${SAVED_ENABLE_QBIT:-}" ] && ENABLE_QBIT="${SAVED_ENABLE_QBIT}"
+        [ -n "${SAVED_ENABLE_METUBE:-}" ] && ENABLE_METUBE="${SAVED_ENABLE_METUBE}"
+        [ -n "${SAVED_METUBE_DOMAIN:-}" ] && METUBE_DOMAIN="${SAVED_METUBE_DOMAIN}"
         [ -n "${SAVED_ENABLE_TG_BOT:-}" ] && ENABLE_TG_BOT="${SAVED_ENABLE_TG_BOT}"
-        [ -z "${SAVED_ENABLE_TG_BOT:-}" ] && [ -n "${SAVED_ENABLE_METUBE:-}" ] && ENABLE_TG_BOT="${SAVED_ENABLE_METUBE}"
         [ -n "${SAVED_TG_BOT_TOKEN:-}" ] && TG_BOT_TOKEN="${SAVED_TG_BOT_TOKEN}"
         [ -n "${SAVED_TG_CHAT_ID:-}" ] && TG_CHAT_ID="${SAVED_TG_CHAT_ID}"
         [ -n "${SAVED_ENABLE_NAVIDROME:-}" ] && ENABLE_NAVIDROME="${SAVED_ENABLE_NAVIDROME}"
@@ -1277,7 +1280,8 @@ prompt_configuration() {
         ENABLE_GITEA="${SAVED_ENABLE_GITEA:-Y}"
         ENABLE_SAMBA="${SAVED_ENABLE_SAMBA:-Y}"
         ENABLE_QBIT="${SAVED_ENABLE_QBIT:-Y}"
-        ENABLE_TG_BOT="${SAVED_ENABLE_TG_BOT:-${SAVED_ENABLE_METUBE:-Y}}"
+        ENABLE_METUBE="${SAVED_ENABLE_METUBE:-Y}"
+        ENABLE_TG_BOT="${SAVED_ENABLE_TG_BOT:-Y}"
         ENABLE_NAVIDROME="${SAVED_ENABLE_NAVIDROME:-Y}"
         SSL_MODE="${SAVED_SSL_MODE:-1}"
 
@@ -1322,6 +1326,7 @@ prompt_configuration() {
         GITEA_DOMAIN="git.lan"
         ADGUARD_DOMAIN="adguard.lan"
         TORRENT_DOMAIN="torrent.lan"
+        METUBE_DOMAIN="metube.lan"
         MUSIC_DOMAIN="music.lan"
         PROXY_DOMAIN="proxy.lan"
         LOGS_DOMAIN="logs.lan"
@@ -1329,7 +1334,7 @@ prompt_configuration() {
         TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
         TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
         if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]] && [ -z "${TELEGRAM_BOT_TOKEN}" ]; then
-            prompt_read "  [?] Telegram Bot Token (для скачивания медиа) [Enter - пропустить]: " INPUT_TG_TOKEN
+            prompt_read "  [?] Telegram Bot Token (для управления сервером и оповещений) [Enter - пропустить]: " INPUT_TG_TOKEN
             TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-}
             if [ -n "${TELEGRAM_BOT_TOKEN}" ]; then
                 prompt_read "  [?] Telegram Chat ID владельца: " INPUT_TG_CHAT
@@ -1601,11 +1606,14 @@ EOF_UNLOCK
         prompt_read "  [?] Установить qBittorrent + VueTorrent (Торренты/Загрузки)? [Y/n] [${SAVED_ENABLE_QBIT:-Y}]: " ENABLE_QBIT
         ENABLE_QBIT=$(normalize_yn "${ENABLE_QBIT:-${SAVED_ENABLE_QBIT:-Y}}" "Y")
 
-        prompt_read "  [?] Установить Telegram-бота (Медиа-загрузчик yt-dlp в TG, Navidrome и Samba)? [Y/n] [${SAVED_ENABLE_TG_BOT:-${SAVED_ENABLE_METUBE:-Y}}]: " ENABLE_TG_BOT
-        ENABLE_TG_BOT=$(normalize_yn "${ENABLE_TG_BOT:-${SAVED_ENABLE_TG_BOT:-${SAVED_ENABLE_METUBE:-Y}}}" "Y")
+        prompt_read "  [?] Установить MeTube (Web-загрузчик видео и аудио)? [Y/n] [${SAVED_ENABLE_METUBE:-Y}]: " ENABLE_METUBE
+        ENABLE_METUBE=$(normalize_yn "${ENABLE_METUBE:-${SAVED_ENABLE_METUBE:-Y}}" "Y")
 
         prompt_read "  [?] Установить Navidrome (Hi-Fi Музыкальный стриминг, аналог Spotify)? [Y/n] [${SAVED_ENABLE_NAVIDROME:-Y}]: " ENABLE_NAVIDROME
         ENABLE_NAVIDROME=$(normalize_yn "${ENABLE_NAVIDROME:-${SAVED_ENABLE_NAVIDROME:-Y}}" "Y")
+
+        prompt_read "  [?] Включить Telegram-бота для управления комплексом и оповещений? [Y/n] [${SAVED_ENABLE_TG_BOT:-Y}]: " ENABLE_TG_BOT
+        ENABLE_TG_BOT=$(normalize_yn "${ENABLE_TG_BOT:-${SAVED_ENABLE_TG_BOT:-Y}}" "Y")
 
         echo ""
         echo -e "  ${CLR_CYAN}--- Настройка SSL сертификатов ---${CLR_RESET}"
@@ -1632,6 +1640,7 @@ EOF_UNLOCK
             GITEA_DOMAIN="git.${BASE_DOMAIN}"
             ADGUARD_DOMAIN="adguard.${BASE_DOMAIN}"
             TORRENT_DOMAIN="torrent.${BASE_DOMAIN}"
+            METUBE_DOMAIN="metube.${BASE_DOMAIN}"
             MUSIC_DOMAIN="music.${BASE_DOMAIN}"
             PROXY_DOMAIN="proxy.${BASE_DOMAIN}"
             LOGS_DOMAIN="logs.${BASE_DOMAIN}"
@@ -1647,6 +1656,7 @@ EOF_UNLOCK
             GITEA_DOMAIN="git.lan"
             ADGUARD_DOMAIN="adguard.lan"
             TORRENT_DOMAIN="torrent.lan"
+            METUBE_DOMAIN="metube.lan"
             MUSIC_DOMAIN="music.lan"
             PROXY_DOMAIN="proxy.lan"
             LOGS_DOMAIN="logs.lan"
@@ -1732,16 +1742,6 @@ EOF_UNLOCK
         fi
     fi
 
-    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^metube$'; then
-        log_info "Миграция MeTube: остановка и удаление устаревшего контейнера..."
-        docker stop metube 2>/dev/null || true
-        docker rm -f metube 2>/dev/null || true
-        if [ -d "${SAVE_DIR}/metube" ]; then
-            mkdir -p "${SAVE_DIR}/downloads"
-            find "${SAVE_DIR}/metube" -mindepth 1 -maxdepth 1 ! -name '.metube' ! -name 'tmp' -exec mv -n {} "${SAVE_DIR}/downloads/" \; 2>/dev/null || true
-        fi
-    fi
-
     SHARE_NAME=$(basename "${SAVE_DIR}" | tr -cd '[:alnum:]_-')
     [ -z "${SHARE_NAME}" ] && SHARE_NAME="storage"
 
@@ -1771,6 +1771,8 @@ EOF_UNLOCK
         printf "SAVED_ENABLE_GITEA=%q\n" "${ENABLE_GITEA}"
         printf "SAVED_ENABLE_SAMBA=%q\n" "${ENABLE_SAMBA}"
         printf "SAVED_ENABLE_QBIT=%q\n" "${ENABLE_QBIT}"
+        printf "SAVED_ENABLE_METUBE=%q\n" "${ENABLE_METUBE}"
+        printf "SAVED_METUBE_DOMAIN=%q\n" "${METUBE_DOMAIN}"
         printf "SAVED_ENABLE_TG_BOT=%q\n" "${ENABLE_TG_BOT}"
         printf "SAVED_ENABLE_NAVIDROME=%q\n" "${ENABLE_NAVIDROME}"
         printf "SAVED_MUSIC_DOMAIN=%q\n" "${MUSIC_DOMAIN}"
@@ -3758,9 +3760,13 @@ configure_caddy_and_compose() {
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>📥 qBittorrent (VueTorrent)</span><a href=\"https://${TORRENT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${TORRENT_DOMAIN}</a></li>"
     fi
+    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+        IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
+    <li><span>📥 MeTube (Загрузка видео)</span><a href=\"https://${METUBE_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${METUBE_DOMAIN}</a></li>"
+    fi
     if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🤖 Telegram Media Bot</span><span style=\"color:#a0aec0;font-size:0.9em\">Загрузчик медиа в /music и /downloads</span></li>"
+    <li><span>🤖 Telegram Control Bot</span><span style=\"color:#a0aec0;font-size:0.9em\">Управление комплексом, OTA-обновления, алерты</span></li>"
     fi
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
@@ -3873,6 +3879,15 @@ EOF_CADDY
 EOF_CADDY
         fi
 
+        if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+            cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
+    @metube host ${METUBE_DOMAIN} tube.${BASE_DOMAIN}
+    handle @metube {
+        reverse_proxy metube:8081
+    }
+EOF_CADDY
+        fi
+
 
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
@@ -3950,6 +3965,17 @@ ${TORRENT_DOMAIN} {
     import security_headers
     encode zstd gzip
     reverse_proxy qbittorrent:8080
+}
+EOF_CADDY
+        fi
+
+        if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+            cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
+${METUBE_DOMAIN}, tube.lan {
+    tls internal
+    import security_headers
+    encode zstd gzip
+    reverse_proxy metube:8081
 }
 EOF_CADDY
         fi
@@ -4191,6 +4217,41 @@ EOF_COMPOSE
 EOF_COMPOSE
     fi
 
+    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+        cat <<EOF_COMPOSE >> "${APP_DIR}/docker-compose.yml"
+  metube:
+    image: alexta69/metube:latest
+    container_name: metube
+    restart: unless-stopped
+    dns:
+      - 77.88.8.8
+      - 1.1.1.1
+      - 8.8.8.8
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      - "PUID=${USER_UID}"
+      - "PGID=${USER_GID}"
+      - "UID=${USER_UID}"
+      - "GID=${USER_GID}"
+      - "ALLOW_PRIVATE_ADDRESSES=true"
+      - "DOWNLOAD_DIR=/downloads"
+      - "STATE_DIR=/downloads/.metube"
+      - "TEMP_DIR=/downloads/tmp"
+      - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["android","web"]}}}'
+    volumes:
+      - ${SAVE_DIR}/downloads:/downloads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/ 2>/dev/null || curl -fs http://localhost:8081/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "autoheal=true"
+
+EOF_COMPOSE
+    fi
 
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         cat <<EOF_COMPOSE >> "${APP_DIR}/docker-compose.yml"
@@ -4687,16 +4748,13 @@ for p in set(db_paths):
         cat << 'EOF_TG_BOT' > "${APP_DIR}/scripts/homelab-bot.py"
 #!/usr/bin/env python3
 # ==============================================================================
-# Homelab Media Telegram Bot (2026 Native Daemon)
-# Zero external pip dependencies: Python 3 stdlib + standalone yt-dlp + ffmpeg + curl
+# Homelab Management & OTA Telegram Bot (2026 Native Daemon)
+# Zero external pip dependencies: Python 3 stdlib + UNIX docker.sock + curl
 # Features:
-# - Video download to ${SAVE_DIR}/downloads (MP4) -> Samba
-# - Music extract to ${SAVE_DIR}/music (Hi-Fi MP3 with Cover Art & Tags) -> Navidrome
-# - Direct audio send to Telegram Chat (<= 50MB) via Bot API
-# - Cookies upload (cookies.txt via chat) to bypass YouTube "Sign in to confirm you're not a bot"
+# - Full server control: /menu, /status, /doctor, /restart, /backup, /upgrade
 # - Auto-update notification via Telegram with 1-click Inline Button upgrade
-# - Full server control: /status, /doctor, /restart, /backup, /upgrade, /cookies, /update_ytdlp
-# - Native Telegram Menu Commands (setMyCommands) and Interactive Inline Keyboard UI
+# - Cross-platform metrics (/proc/uptime, /proc/meminfo, statvfs, Docker API)
+# - Compatible with Debian, Ubuntu, Arch, and Alpine Linux (Busybox/OpenRC)
 # ==============================================================================
 
 import os
@@ -4711,14 +4769,12 @@ import subprocess
 import threading
 import logging
 import shutil
-import uuid
-import datetime
+import socket
 
 ENV_PATH = "/opt/homelab/.env"
 APP_DIR_DEFAULT = "/opt/homelab"
 STATE_DIR_DEFAULT = "/opt/homelab/configs/bot"
 STATE_FILE_DEFAULT = "/opt/homelab/configs/bot/bot_state.json"
-COOKIES_FILE_DEFAULT = "/opt/homelab/configs/bot/cookies.txt"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -4726,8 +4782,6 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 
-URL_CACHE = {}  # {url_id: {"url": str, "ts": float}}
-URL_REGEX = re.compile(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
 ANSI_REGEX = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
 def clean_ansi(text):
@@ -4755,7 +4809,7 @@ def get_installed_version(app_dir):
                     return v
         except Exception:
             pass
-    return "2.8.0"
+    return "2.8.2"
 
 def parse_env():
     conf = {
@@ -4765,35 +4819,48 @@ def parse_env():
         "APP_DIR": APP_DIR_DEFAULT,
         "LOCAL_IP": "127.0.0.1",
         "ADMIN_USER": "admin",
-        "VERSION": "2.8.0"
+        "VERSION": "2.8.2",
+        "METUBE_DOMAIN": "metube.lan",
+        "MUSIC_DOMAIN": "music.lan"
     }
-    if os.path.exists(ENV_PATH):
-        try:
-            with open(ENV_PATH, "r", encoding="utf-8", errors="ignore") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("#") or "=" not in line:
-                        continue
-                    k, v = line.split("=", 1)
-                    k = k.strip()
-                    v = v.strip().strip("'\"")
-                    v = v.replace("\\n", "\n").replace("\\t", "\t")
-                    if k in ("SAVED_TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN"):
-                        conf["BOT_TOKEN"] = v
-                    elif k in ("SAVED_TELEGRAM_CHAT_ID", "TELEGRAM_CHAT_ID"):
-                        conf["CHAT_ID"] = str(v)
-                    elif k in ("SAVED_SAVE_DIR", "SAVE_DIR"):
-                        conf["SAVE_DIR"] = v
-                    elif k in ("SAVED_APP_DIR", "APP_DIR"):
-                        conf["APP_DIR"] = v
-                    elif k in ("SAVED_LOCAL_IP", "LOCAL_IP"):
-                        conf["LOCAL_IP"] = v
-                    elif k in ("SAVED_ADMIN_USER", "ADMIN_USER"):
-                        conf["ADMIN_USER"] = v
-                    elif k in ("SAVED_HOMELAB_VERSION", "HOMELAB_VERSION"):
-                        conf["VERSION"] = v
-        except Exception as e:
-            logging.error(f"Error parsing {ENV_PATH}: {e}")
+    env_paths = [
+        ENV_PATH,
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    ]
+    for ep in env_paths:
+        if os.path.exists(ep):
+            try:
+                with open(ep, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#") or "=" not in line:
+                            continue
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip("'\"")
+                        v = v.replace("\\n", "\n").replace("\\t", "\t")
+                        if k in ("SAVED_TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN"):
+                            conf["BOT_TOKEN"] = v
+                        elif k in ("SAVED_TELEGRAM_CHAT_ID", "TELEGRAM_CHAT_ID"):
+                            conf["CHAT_ID"] = str(v)
+                        elif k in ("SAVED_SAVE_DIR", "SAVE_DIR"):
+                            conf["SAVE_DIR"] = v
+                        elif k in ("SAVED_APP_DIR", "APP_DIR"):
+                            conf["APP_DIR"] = v
+                        elif k in ("SAVED_LOCAL_IP", "LOCAL_IP"):
+                            conf["LOCAL_IP"] = v
+                        elif k in ("SAVED_ADMIN_USER", "ADMIN_USER"):
+                            conf["ADMIN_USER"] = v
+                        elif k in ("SAVED_HOMELAB_VERSION", "HOMELAB_VERSION"):
+                            conf["VERSION"] = v
+                        elif k in ("SAVED_METUBE_DOMAIN", "METUBE_DOMAIN"):
+                            conf["METUBE_DOMAIN"] = v
+                        elif k in ("SAVED_MUSIC_DOMAIN", "MUSIC_DOMAIN"):
+                            conf["MUSIC_DOMAIN"] = v
+                break
+            except Exception as e:
+                logging.error(f"Error parsing {ep}: {e}")
+
     if not conf["BOT_TOKEN"] and os.environ.get("TELEGRAM_BOT_TOKEN"):
         conf["BOT_TOKEN"] = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not conf["CHAT_ID"] and os.environ.get("TELEGRAM_CHAT_ID"):
@@ -4825,24 +4892,6 @@ def save_bot_state(conf, state):
             json.dump(state, f, indent=2, ensure_ascii=False)
     except Exception as e:
         logging.error(f"Error saving bot state: {e}")
-
-def get_cookies_path(conf):
-    app_dir = conf.get("APP_DIR", APP_DIR_DEFAULT)
-    p1 = os.path.join(app_dir, "configs", "bot", "cookies.txt")
-    if os.path.isfile(p1) and os.path.getsize(p1) > 0:
-        return p1
-    p2 = os.path.join(conf.get("SAVE_DIR", "/opt/homelab/save"), "cookies.txt")
-    if os.path.isfile(p2) and os.path.getsize(p2) > 0:
-        return p2
-    return p1
-
-def get_cookies_info(conf):
-    cp = get_cookies_path(conf)
-    if os.path.isfile(cp) and os.path.getsize(cp) > 0:
-        sz_kb = os.path.getsize(cp) / 1024
-        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(cp)).strftime("%d.%m.%Y %H:%M")
-        return True, sz_kb, mtime, cp
-    return False, 0.0, "", cp
 
 def tg_call(token, method, payload=None, timeout=30):
     url = f"https://api.telegram.org/bot{token}/{method}"
@@ -4895,48 +4944,12 @@ def setup_tg_commands(token):
         {"command": "upgrade", "description": "Бесшовное OTA-обновление"},
         {"command": "restart", "description": "Перезапуск комплекса или сервисов"},
         {"command": "backup", "description": "Создать резервную копию БД"},
-        {"command": "cookies", "description": "Статус авторизации YouTube"},
-        {"command": "update_ytdlp", "description": "Обновить загрузчик yt-dlp"},
-        {"command": "help", "description": "Инструкция по загрузке медиа"}
+        {"command": "help", "description": "Справка и доступные сервисы"}
     ]
     try:
         tg_call(token, "setMyCommands", {"commands": commands}, timeout=10)
     except Exception as e:
         logging.warning(f"Failed to set bot commands: {e}")
-
-def find_ytdlp():
-    for p in ["/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"]:
-        if os.path.exists(p) and os.access(p, os.X_OK):
-            return p
-    return "yt-dlp"
-
-def get_ytdlp_base_cmd(conf):
-    cmd = [
-        find_ytdlp(),
-        "--no-warnings",
-        "--no-playlist",
-        "--extractor-args", "youtube:player_client=ios,android,web"
-    ]
-    has_cookies, _, _, cp = get_cookies_info(conf)
-    if has_cookies:
-        cmd.extend(["--cookies", cp])
-    return cmd
-
-def format_ytdlp_error(stderr_text):
-    clean = clean_ansi(stderr_text)
-    lower = clean.lower()
-    if "sign in to confirm you’re not a bot" in lower or "confirm you're not a bot" in lower or "--cookies" in lower:
-        return (
-            "⚠️ <b>YouTube заблокировал анонимное скачивание (Защита от ботов):</b>\n\n"
-            "Сервер YouTube запросил авторизацию аккаунта Google для этого видео.\n\n"
-            "🍪 <b>Как решить за 1 минуту:</b>\n"
-            "1. В браузере (Chrome / Firefox) установите расширение <b>«Get cookies.txt LOCALLY»</b>\n"
-            "2. Перейдите на <a href='https://www.youtube.com'>youtube.com</a> (войдите в аккаунт)\n"
-            "3. В расширении нажмите <b>Export</b> и сохраните файл <code>cookies.txt</code>\n"
-            "4. <b>Просто отправьте сохраненный файл <code>cookies.txt</code> сюда в чат!</b>\n\n"
-            "<i>Бот сохранит куки, и все видео будут скачиваться без ограничений.</i>"
-        )
-    return f"❌ <b>Ошибка при скачивании:</b>\n<pre>{clean[-450:]}</pre>"
 
 def get_main_menu_markup():
     return {
@@ -4951,10 +4964,6 @@ def get_main_menu_markup():
             ],
             [
                 {"text": "🔄 Перезапуск служб", "callback_data": "cmd:restart_menu"},
-                {"text": "🍪 Cookies (YouTube)", "callback_data": "cmd:cookies"}
-            ],
-            [
-                {"text": "🚀 Обновить yt-dlp", "callback_data": "cmd:update_ytdlp"},
                 {"text": "📖 Справка", "callback_data": "cmd:help"}
             ]
         ]
@@ -4965,6 +4974,10 @@ def get_restart_menu_markup():
         "inline_keyboard": [
             [
                 {"text": "🔄 Весь комплекс", "callback_data": "rst:all"},
+                {"text": "📥 MeTube", "callback_data": "rst:metube"}
+            ],
+            [
+                {"text": "🎵 Navidrome", "callback_data": "rst:navidrome"},
                 {"text": "🚀 Mihomo TUN", "callback_data": "rst:mihomo"}
             ],
             [
@@ -4972,61 +4985,121 @@ def get_restart_menu_markup():
                 {"text": "🔒 Caddy Gateway", "callback_data": "rst:caddy"}
             ],
             [
-                {"text": "🎵 Navidrome", "callback_data": "rst:navidrome"},
-                {"text": "🤖 Telegram Бот", "callback_data": "rst:bot"}
-            ],
-            [
+                {"text": "🤖 Telegram Бот", "callback_data": "rst:bot"},
                 {"text": "🔙 Назад в меню", "callback_data": "cmd:menu"}
             ]
         ]
     }
 
 def get_server_status(conf):
+    # 1. Uptime directly from /proc/uptime (universal for Debian, Ubuntu, Arch, and Alpine)
     uptime_str = "N/A"
     try:
-        uptime_str = subprocess.check_output(["uptime", "-p"], stderr=subprocess.DEV_NULL).decode().strip()
+        if os.path.exists("/proc/uptime"):
+            with open("/proc/uptime", "r") as f:
+                tot_sec = float(f.readline().split()[0])
+            d = int(tot_sec // 86400)
+            h = int((tot_sec % 86400) // 3600)
+            m = int((tot_sec % 3600) // 60)
+            parts = []
+            if d > 0:
+                parts.append(f"{d} дн.")
+            if h > 0 or d > 0:
+                parts.append(f"{h} ч.")
+            parts.append(f"{m} мин.")
+            uptime_str = " ".join(parts)
+        else:
+            uptime_str = subprocess.check_output(["uptime"]).decode().strip()
     except Exception:
         pass
 
+    # 2. RAM directly from /proc/meminfo (no dependence on free flags)
     ram_str = "N/A"
     try:
-        out = subprocess.check_output(["free", "-h"], stderr=subprocess.DEV_NULL).decode()
-        for line in out.splitlines():
-            if line.startswith("Mem:"):
-                parts = line.split()
-                ram_str = f"{parts[2]} / {parts[1]}"
+        if os.path.exists("/proc/meminfo"):
+            mem = {}
+            with open("/proc/meminfo", "r") as f:
+                for line in f:
+                    p = line.split(":")
+                    if len(p) == 2:
+                        mem[p[0].strip()] = int(p[1].split()[0]) # in kB
+            tot_kb = mem.get("MemTotal", 0)
+            avail_kb = mem.get("MemAvailable", mem.get("MemFree", 0) + mem.get("Buffers", 0) + mem.get("Cached", 0))
+            used_kb = max(0, tot_kb - avail_kb)
+            def fmt_k(kb):
+                mb = kb / 1024
+                if mb >= 1024:
+                    return f"{mb/1024:.1f} ГБ"
+                return f"{int(mb)} МБ"
+            if tot_kb > 0:
+                ram_str = f"{fmt_k(used_kb)} / {fmt_k(tot_kb)}"
+        else:
+            out = subprocess.check_output(["free", "-m"]).decode()
+            for l in out.splitlines():
+                if "Mem:" in l:
+                    pts = l.split()
+                    ram_str = f"{pts[2]} МБ / {pts[1]} МБ"
     except Exception:
         pass
 
+    # 3. Disk directly from os.statvfs (no dependence on df format)
     disk_str = "N/A"
     save_dir = conf.get("SAVE_DIR", "/opt/homelab/save")
+    check_dir = save_dir if os.path.exists(save_dir) else "/"
     try:
-        out = subprocess.check_output(["df", "-h", save_dir], stderr=subprocess.DEV_NULL).decode()
-        lines = out.splitlines()
-        if len(lines) >= 2:
-            parts = lines[1].split()
-            disk_str = f"{parts[2]} / {parts[1]} (свободно {parts[3]})"
+        st = os.statvfs(check_dir)
+        tot_b = st.f_blocks * st.f_frsize
+        avail_b = st.f_bavail * st.f_frsize
+        used_b = max(0, tot_b - avail_b)
+        def fmt_b(b):
+            gb = b / (1024**3)
+            if gb >= 1:
+                return f"{gb:.1f} ГБ"
+            return f"{b/(1024**2):.0f} МБ"
+        disk_str = f"{fmt_b(used_b)} / {fmt_b(tot_b)} (свободно {fmt_b(avail_b)})"
     except Exception:
         pass
 
-    ytdlp_ver = "N/A"
-    try:
-        ytdlp_ver = subprocess.check_output([find_ytdlp(), "--version"], stderr=subprocess.DEV_NULL).decode().strip()
-    except Exception:
-        pass
-
+    # 4. Docker active containers via /var/run/docker.sock or docker ps
     containers_active = 0
     try:
-        out = subprocess.check_output(["docker", "ps", "-q"], stderr=subprocess.DEV_NULL).decode().strip()
-        if out:
-            containers_active = len(out.splitlines())
+        if os.path.exists("/var/run/docker.sock"):
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.settimeout(3)
+            s.connect("/var/run/docker.sock")
+            s.sendall(b"GET /containers/json HTTP/1.0\r\nHost: localhost\r\n\r\n")
+            raw = b""
+            while True:
+                chunk = s.recv(4096)
+                if not chunk:
+                    break
+                raw += chunk
+            s.close()
+            idx = raw.find(b"\r\n\r\n")
+            if idx != -1:
+                body = raw[idx+4:]
+                c_data = json.loads(body.decode("utf-8", errors="ignore"))
+                if isinstance(c_data, list):
+                    containers_active = len(c_data)
     except Exception:
-        pass
+        containers_active = 0
 
-    has_cookies, sz_kb, mtime, cp = get_cookies_info(conf)
-    cookies_badge = f"🟢 Активен ({sz_kb:.1f} КБ)" if has_cookies else "🟡 Не загружен"
+    if containers_active == 0:
+        try:
+            env = os.environ.copy()
+            env["PATH"] = "/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
+            d_bin = shutil.which("docker") or "/usr/bin/docker"
+            out = subprocess.check_output([d_bin, "ps", "-q"], env=env, stderr=subprocess.DEV_NULL).decode().strip()
+            if out:
+                containers_active = len([c for c in out.splitlines() if c.strip()])
+        except Exception:
+            pass
 
-    cur_ver = conf.get("VERSION", "2.8.0")
+    cur_ver = conf.get("VERSION", "2.8.2")
+    local_ip = conf.get("LOCAL_IP", "127.0.0.1")
+    metube_url = f"https://{conf.get('METUBE_DOMAIN', 'metube.lan')}"
+    music_url = f"https://{conf.get('MUSIC_DOMAIN', 'music.lan')}"
+
     msg = (
         f"🖥 <b>Homelab Appliance v{cur_ver}</b>\n"
         f"────────────────────────────\n"
@@ -5034,12 +5107,11 @@ def get_server_status(conf):
         f"• <b>ОЗУ:</b> {ram_str}\n"
         f"• <b>Диск ({save_dir}):</b> {disk_str}\n"
         f"• <b>Docker контейнеры:</b> {containers_active} активных\n"
-        f"• <b>yt-dlp движок:</b> {ytdlp_ver}\n"
-        f"• <b>YouTube Cookies:</b> {cookies_badge}\n"
-        f"• <b>IP адрес:</b> <code>{conf.get('LOCAL_IP', '127.0.0.1')}</code>\n"
+        f"• <b>IP адрес:</b> <code>{local_ip}</code>\n"
         f"────────────────────────────\n"
-        f"🎵 Музыка: <a href='https://music.lan'>music.lan</a> (Navidrome)\n"
-        f"📂 Samba: <code>\\\\{conf.get('LOCAL_IP')}\\storage</code>\n"
+        f"📥 <b>MeTube (Загрузчик):</b> <a href='{metube_url}'>{conf.get('METUBE_DOMAIN', 'metube.lan')}</a>\n"
+        f"🎵 <b>Музыка:</b> <a href='{music_url}'>{conf.get('MUSIC_DOMAIN', 'music.lan')}</a> (Navidrome)\n"
+        f"📂 <b>Samba NAS:</b> <code>\\\\{local_ip}\\storage</code> &amp; <code>\\\\{local_ip}\\music</code>\n"
     )
     return msg
 
@@ -5060,7 +5132,7 @@ def fetch_remote_version():
     return None
 
 def worker_check_update(token, chat_id, message_id, conf):
-    cur_ver = conf.get("VERSION", "2.8.0")
+    cur_ver = conf.get("VERSION", "2.8.2")
     remote_ver = fetch_remote_version()
     if not remote_ver:
         edit_msg(token, chat_id, message_id,
@@ -5183,246 +5255,6 @@ def worker_restart_service(token, chat_id, message_id, service_name):
     except Exception as e:
         edit_msg(token, chat_id, message_id, f"❌ Исключение при перезапуске: {e}")
 
-def worker_update_ytdlp(token, chat_id, message_id):
-    edit_msg(token, chat_id, message_id, "⏳ <b>Проверка и обновление движка yt-dlp...</b>")
-    ytdlp = find_ytdlp()
-    try:
-        res = subprocess.run([ytdlp, "-U"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=90)
-        out = (res.stdout + "\n" + res.stderr).strip()
-        clean_out = clean_ansi(out)
-        if "up to date" in clean_out.lower() or "updated" in clean_out.lower():
-            ver = subprocess.check_output([ytdlp, "--version"], text=True).strip()
-            kbd = {"inline_keyboard": [[{"text": "🔙 В главное меню", "callback_data": "cmd:menu"}]]}
-            edit_msg(token, chat_id, message_id,
-                f"✅ <b>Движок yt-dlp готов к работе!</b>\nТекущая версия: <code>{ver}</code>\n\n<pre>{clean_out[-300:]}</pre>",
-                reply_markup=kbd
-            )
-            return
-    except Exception:
-        pass
-
-    try:
-        url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
-        req = urllib.request.Request(url, headers={"User-Agent": "Homelab-Bot/2.8"})
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            data = resp.read()
-        if len(data) > 100000:
-            with open(ytdlp, "wb") as f:
-                f.write(data)
-            os.chmod(ytdlp, 0o755)
-            ver = subprocess.check_output([ytdlp, "--version"], text=True).strip()
-            kbd = {"inline_keyboard": [[{"text": "🔙 В главное меню", "callback_data": "cmd:menu"}]]}
-            edit_msg(token, chat_id, message_id,
-                f"✅ <b>yt-dlp успешно обновлен с GitHub!</b>\nНовая версия: <code>{ver}</code>",
-                reply_markup=kbd
-            )
-            return
-    except Exception as e:
-        edit_msg(token, chat_id, message_id, f"❌ Ошибка загрузки yt-dlp: {e}")
-
-def handle_cookies_view(token, chat_id, conf, message_id=None):
-    has_cookies, sz_kb, mtime, cp = get_cookies_info(conf)
-    if has_cookies:
-        text = (
-            f"🍪 <b>Статус авторизации YouTube (Cookies):</b>\n\n"
-            f"• Статус: 🟢 <b>АКТИВЕН И ПРИМЕНЯЕТСЯ</b>\n"
-            f"• Размер файла: <b>{sz_kb:.1f} КБ</b>\n"
-            f"• Дата обновления: <code>{mtime}</code>\n"
-            f"• Расположение: <code>{cp}</code>\n\n"
-            f"<i>yt-dlp авторизован для обхода проверок YouTube (Sign in / Anti-bot).</i>\n\n"
-            f"Чтобы обновить cookies, просто отправьте новый файл <code>cookies.txt</code> в чат."
-        )
-        kbd = {
-            "inline_keyboard": [
-                [{"text": "🗑 Удалить Cookies", "callback_data": "cb:del_cookies"}],
-                [{"text": "🔙 В главное меню", "callback_data": "cmd:menu"}]
-            ]
-        }
-    else:
-        text = (
-            f"🍪 <b>Статус авторизации YouTube (Cookies):</b>\n\n"
-            f"• Статус: 🟡 <b>НЕ ЗАГРУЖЕН</b>\n\n"
-            f"Без cookies YouTube может блокировать скачивание некоторых видео защитой <i>«Sign in to confirm you’re not a bot»</i>.\n\n"
-            f"<b>Как загрузить cookies за 1 минуту:</b>\n"
-            f"1. Установите расширение для браузера:\n"
-            f"   • Chrome: <b>Get cookies.txt LOCALLY</b>\n"
-            f"   • Firefox: <b>cookies.txt</b>\n"
-            f"2. Откройте <a href='https://www.youtube.com'>youtube.com</a> (войдите в аккаунт Google)\n"
-            f"3. Нажмите иконку расширения и нажмите <b>Export</b>\n"
-            f"4. <b>Просто перетащите или отправьте файл <code>cookies.txt</code> сюда в чат!</b>"
-        )
-        kbd = {"inline_keyboard": [[{"text": "🔙 В главное меню", "callback_data": "cmd:menu"}]]}
-
-    if message_id:
-        edit_msg(token, chat_id, message_id, text, reply_markup=kbd)
-    else:
-        send_msg(token, chat_id, text, reply_markup=kbd)
-
-def handle_cookies_upload(token, chat_id, doc, conf):
-    file_name = doc.get("file_name", "").lower()
-    if not (file_name.endswith(".txt") or "cookie" in file_name):
-        send_msg(token, chat_id, "ℹ️ Пожалуйста, отправьте текстовый файл <code>cookies.txt</code>.")
-        return
-
-    file_id = doc.get("file_id")
-    res = tg_call(token, "getFile", {"file_id": file_id})
-    if not res.get("ok"):
-        send_msg(token, chat_id, "❌ Не удалось получить файл из Telegram API.")
-        return
-
-    file_path = res["result"]["file_path"]
-    download_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
-
-    try:
-        req = urllib.request.Request(download_url)
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            content = resp.read()
-
-        target_path = get_cookies_path(conf)
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        with open(target_path, "wb") as f:
-            f.write(content)
-
-        sz_kb = len(content) / 1024
-        send_msg(token, chat_id,
-            f"🍪 <b>Файл cookies.txt успешно загружен и сохранен!</b>\n\n"
-            f"• Размер: <b>{sz_kb:.1f} КБ</b>\n"
-            f"• Статус: 🟢 <b>АКТИВЕН</b>\n"
-            f"• Путь: <code>{target_path}</code>\n\n"
-            f"yt-dlp теперь использует авторизованную сессию. Попробуйте скачать видео еще раз!"
-        )
-    except Exception as e:
-        send_msg(token, chat_id, f"❌ Ошибка сохранения cookies: {e}")
-
-def clean_url_cache():
-    now = time.time()
-    expired = [k for k, v in URL_CACHE.items() if now - v["ts"] > 86400]
-    for k in expired:
-        URL_CACHE.pop(k, None)
-
-def worker_download_video(token, chat_id, message_id, url, conf):
-    save_dir = conf.get("SAVE_DIR", "/opt/homelab/save")
-    dl_dir = os.path.join(save_dir, "downloads")
-    os.makedirs(dl_dir, exist_ok=True)
-    edit_msg(token, chat_id, message_id, "⏳ <b>[1/2] Скачивание видео в MP4...</b>\nПожалуйста, подождите.")
-
-    cmd = get_ytdlp_base_cmd(conf) + [
-        "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "--merge-output-format", "mp4",
-        "-o", os.path.join(dl_dir, "%(title)s.%(ext)s"),
-        url
-    ]
-    try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=600)
-        if res.returncode == 0:
-            edit_msg(token, chat_id, message_id,
-                f"✅ <b>Видео успешно сохранено!</b>\n\n"
-                f"📁 <b>Каталог:</b> <code>{dl_dir}</code>\n"
-                f"💻 <b>Samba NAS:</b> <code>\\\\{conf.get('LOCAL_IP')}\\storage\\downloads</code>"
-            )
-        else:
-            err_msg = format_ytdlp_error(res.stderr or res.stdout)
-            edit_msg(token, chat_id, message_id, err_msg)
-    except Exception as e:
-        edit_msg(token, chat_id, message_id, f"❌ <b>Исключение:</b> {str(e)}")
-
-def worker_download_music(token, chat_id, message_id, url, conf):
-    save_dir = conf.get("SAVE_DIR", "/opt/homelab/save")
-    music_dir = os.path.join(save_dir, "music")
-    os.makedirs(music_dir, exist_ok=True)
-    edit_msg(token, chat_id, message_id, "⏳ <b>[1/2] Извлечение аудио Hi-Fi, обложки и тегов...</b>\nОбработка через ffmpeg...")
-
-    cmd = get_ytdlp_base_cmd(conf) + [
-        "-x",
-        "--audio-format", "mp3",
-        "--audio-quality", "0",
-        "--embed-metadata",
-        "--embed-thumbnail",
-        "-o", os.path.join(music_dir, "%(artist,uploader)s/%(album,title)s/%(title)s.%(ext)s"),
-        url
-    ]
-    try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=600)
-        if res.returncode == 0:
-            edit_msg(token, chat_id, message_id,
-                f"✅ <b>Трек успешно добавлен в библиотеку!</b>\n\n"
-                f"🎵 <b>Каталог Navidrome:</b> <code>{music_dir}</code>\n"
-                f"🎧 <b>Стриминг:</b> Трек уже готов к воспроизведению в Symfonium, Substreamer и Feishin!"
-            )
-        else:
-            err_msg = format_ytdlp_error(res.stderr or res.stdout)
-            edit_msg(token, chat_id, message_id, err_msg)
-    except Exception as e:
-        edit_msg(token, chat_id, message_id, f"❌ <b>Исключение:</b> {str(e)}")
-
-def worker_download_tg(token, chat_id, message_id, url, conf):
-    work_id = uuid.uuid4().hex[:8]
-    tmp_dir = f"/tmp/homelab_tg_{work_id}"
-    os.makedirs(tmp_dir, exist_ok=True)
-    save_dir = conf.get("SAVE_DIR", "/opt/homelab/save")
-    music_dir = os.path.join(save_dir, "music")
-
-    edit_msg(token, chat_id, message_id, "⏳ <b>[1/3] Загрузка и конвертация аудио в MP3...</b>")
-    cmd = get_ytdlp_base_cmd(conf) + [
-        "-x",
-        "--audio-format", "mp3",
-        "--audio-quality", "0",
-        "--embed-metadata",
-        "--embed-thumbnail",
-        "-o", os.path.join(tmp_dir, "%(title)s.%(ext)s"),
-        url
-    ]
-    try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=600)
-        if res.returncode != 0:
-            err_msg = format_ytdlp_error(res.stderr or res.stdout)
-            edit_msg(token, chat_id, message_id, err_msg)
-            shutil.rmtree(tmp_dir, ignore_errors=True)
-            return
-
-        files = [os.path.join(tmp_dir, f) for f in os.listdir(tmp_dir) if f.lower().endswith(".mp3")]
-        if not files:
-            files = [os.path.join(tmp_dir, f) for f in os.listdir(tmp_dir) if os.path.isfile(os.path.join(tmp_dir, f))]
-
-        if not files:
-            edit_msg(token, chat_id, message_id, "❌ Файл аудио не найден после конвертации.")
-            shutil.rmtree(tmp_dir, ignore_errors=True)
-            return
-
-        target_file = files[0]
-        size_bytes = os.path.getsize(target_file)
-        size_mb = size_bytes / (1024 * 1024)
-
-        if size_bytes > 50 * 1024 * 1024:
-            dest_name = os.path.basename(target_file)
-            os.makedirs(music_dir, exist_ok=True)
-            dest_path = os.path.join(music_dir, dest_name)
-            shutil.move(target_file, dest_path)
-            edit_msg(token, chat_id, message_id,
-                f"⚠️ <b>Размер файла ({size_mb:.1f} МБ) превышает лимит Telegram (50 МБ).</b>\n\n"
-                f"Файл сохранен на сервере в <code>/music/{dest_name}</code> и доступен в Navidrome!"
-            )
-        else:
-            edit_msg(token, chat_id, message_id, f"📤 <b>[2/3] Отправка файла ({size_mb:.1f} МБ) в Telegram...</b>")
-            title = os.path.splitext(os.path.basename(target_file))[0]
-            curl_cmd = [
-                "curl", "-s", "-S",
-                "-F", f"chat_id={chat_id}",
-                "-F", f"audio=@{target_file}",
-                "-F", f"title={title}",
-                "-F", "caption=🎵 Скачано через Homelab Bot",
-                f"https://api.telegram.org/bot{token}/sendAudio"
-            ]
-            up_res = subprocess.run(curl_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=180)
-            if up_res.returncode == 0 and '"ok":true' in up_res.stdout:
-                edit_msg(token, chat_id, message_id, "✅ <b>Аудио успешно отправлено в чат!</b>")
-            else:
-                edit_msg(token, chat_id, message_id, f"❌ <b>Ошибка при передаче аудио:</b>\n<pre>{up_res.stdout[-300:]}</pre>")
-    except Exception as e:
-        edit_msg(token, chat_id, message_id, f"❌ <b>Исключение:</b> {str(e)}")
-    finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-
 def version_monitor_daemon(conf):
     logging.info("Starting background Version Monitor daemon...")
     time.sleep(45)
@@ -5430,7 +5262,7 @@ def version_monitor_daemon(conf):
         try:
             token = conf.get("BOT_TOKEN")
             chat_id = conf.get("CHAT_ID")
-            cur_ver = conf.get("VERSION", "2.8.0")
+            cur_ver = conf.get("VERSION", "2.8.2")
             if token and chat_id:
                 remote_ver = fetch_remote_version()
                 if remote_ver:
@@ -5452,8 +5284,8 @@ def version_monitor_daemon(conf):
                             f"🚀 <b>Доступно обновление Homelab Appliance!</b>\n\n"
                             f"• Текущая версия: <code>v{cur_ver}</code>\n"
                             f"• Новая версия: <b>v{remote_ver}</b>\n\n"
-                            f"Все базы данных, токены и пароли сохраняются автоматически.\n"
-                            f"Нажмите кнопку ниже, чтобы запустить обновление:"
+                            f"Все базы данных, конфигурации и пользовательские данные сохраняются.\n"
+                            f"Нажмите кнопку ниже, чтобы запустить процесс обновления:"
                         )
                         send_msg(token, chat_id, text, reply_markup=kbd)
                         state["last_notified_version"] = remote_ver
@@ -5540,35 +5372,15 @@ def handle_update(upd, conf):
             edit_msg(token, chat_id, msg_id, "ℹ️ Напоминание об обновлении отложено. Вы можете обновиться в любое время через /upgrade.")
             return
 
-        if data == "cmd:cookies":
-            answer_cb(token, cq_id)
-            handle_cookies_view(token, chat_id, conf, message_id=msg_id)
-            return
-
-        if data == "cb:del_cookies":
-            cp = get_cookies_path(conf)
-            if os.path.exists(cp):
-                try:
-                    os.remove(cp)
-                    answer_cb(token, cq_id, "Cookies удалены")
-                except Exception as e:
-                    answer_cb(token, cq_id, f"Ошибка: {e}")
-            else:
-                answer_cb(token, cq_id, "Файл не найден")
-            handle_cookies_view(token, chat_id, conf, message_id=msg_id)
-            return
-
-        if data == "cmd:update_ytdlp":
-            answer_cb(token, cq_id, "Обновление yt-dlp...")
-            threading.Thread(target=worker_update_ytdlp, args=(token, chat_id, msg_id), daemon=True).start()
-            return
-
         if data == "cmd:help":
             answer_cb(token, cq_id)
             help_text = (
-                "📖 <b>Справка и управление Homelab Bot</b>\n\n"
-                "• <b>Загрузка медиа:</b> Отправьте любую ссылку (YouTube, VK, RuTube, TikTok, SoundCloud).\n"
-                "• <b>Анти-бот YouTube:</b> Просто отправьте файл <code>cookies.txt</code> в чат.\n\n"
+                "📖 <b>Справка и сервисы комплекса Homelab</b>\n\n"
+                "• 📥 <b>Загрузка медиа:</b> Откройте <a href='https://metube.lan'>https://metube.lan</a> (MeTube Web).\n"
+                "  Вставьте ссылку на YouTube, VK или RuTube — видео и аудио сохранятся в папку загрузок и библиотеку Navidrome!\n\n"
+                "• 🎵 <b>Hi-Fi Музыка:</b> <a href='https://music.lan'>https://music.lan</a> (Navidrome).\n"
+                "  Приложения: Symfonium (Android), Substreamer (iOS), Feishin (ПК).\n\n"
+                "• 📂 <b>Samba Хранилище:</b> <code>\\\\{LOCAL_IP}\\storage</code> и <code>\\\\{LOCAL_IP}\\music</code>\n\n"
                 "<b>Команды управления:</b>\n"
                 "/menu — Интерактивная панель управления\n"
                 "/status — Состояние сервера, RAM и дисков\n"
@@ -5576,31 +5388,12 @@ def handle_update(upd, conf):
                 "/check_update — Проверка новых версий\n"
                 "/upgrade — Запуск бесшовного OTA-обновления\n"
                 "/restart — Перезапуск комплекса или служб\n"
-                "/backup — Горячий бэкап баз данных\n"
-                "/cookies — Просмотр и загрузка cookies\n"
-                "/update_ytdlp — Обновление движка yt-dlp"
-            )
+                "/backup — Горячий бэкап баз данных"
+            ).replace("{LOCAL_IP}", conf.get("LOCAL_IP", "127.0.0.1"))
             kbd = {"inline_keyboard": [[{"text": "🔙 В главное меню", "callback_data": "cmd:menu"}]]}
             edit_msg(token, chat_id, msg_id, help_text, reply_markup=kbd)
             return
 
-        parts = data.split(":", 1)
-        if len(parts) == 2:
-            act, uid = parts[0], parts[1]
-            cached = URL_CACHE.get(uid)
-            if not cached:
-                answer_cb(token, cq_id, "Ссылка устарела. Отправьте ее повторно.")
-                return
-
-            url = cached["url"]
-            answer_cb(token, cq_id, "Задача принята в обработку...")
-
-            if act == "vid":
-                threading.Thread(target=worker_download_video, args=(token, chat_id, msg_id, url, conf), daemon=True).start()
-            elif act == "mus":
-                threading.Thread(target=worker_download_music, args=(token, chat_id, msg_id, url, conf), daemon=True).start()
-            elif act == "tg":
-                threading.Thread(target=worker_download_tg, args=(token, chat_id, msg_id, url, conf), daemon=True).start()
         return
 
     if "message" in upd:
@@ -5613,24 +5406,19 @@ def handle_update(upd, conf):
             send_msg(token, chat_id, "⛔ <b>Доступ запрещен.</b>\nЭтот сервер Homelab привязан к другому владельцу.")
             return
 
-        if "document" in msg:
-            handle_cookies_upload(token, chat_id, msg["document"], conf)
-            return
-
         if text in ("/start", "/help"):
             welcome = (
-                "👋 <b>Привет! Я персональный Homelab Медиа & Управляющий бот.</b>\n\n"
-                "• <b>Загрузка медиа:</b> Отправьте мне ссылку (YouTube, VK, RuTube, TikTok, SoundCloud и др.) "
-                "и выберите нужный формат (видео в <code>/downloads</code>, трек в <code>/music</code> Navidrome или файл прямо в чат TG).\n"
-                "• <b>Авторизация YouTube:</b> При ошибках Sign-in просто отправьте файл <code>cookies.txt</code> в этот диалог.\n"
-                "• <b>Управление комплексом:</b> Используйте меню ниже для мониторинга и обновления сервера.\n\n"
+                "👋 <b>Привет! Я управляющий бот вашего Homelab Appliance.</b>\n\n"
+                "• 📥 <b>Загрузка видео и музыки:</b> Откройте веб-загрузчик <a href='https://metube.lan'>https://metube.lan</a> (MeTube). "
+                "Там можно вставить любую ссылку, и файлы скачаются прямо на сервер в Samba и Navidrome!\n"
+                "• 🎵 <b>Музыкальный сервер:</b> <a href='https://music.lan'>https://music.lan</a> (Navidrome / OpenSubsonic)\n"
+                "• ⚡ <b>Управление комплексом:</b> Используйте меню ниже для мониторинга, диагностики и обновления сервера.\n\n"
                 "<b>Основные команды:</b>\n"
                 "/menu — Интерактивная панель управления\n"
                 "/status — Состояние сервера, RAM и дисков\n"
                 "/doctor — Диагностика сетевого стека и контейнеров\n"
                 "/check_update — Проверить OTA-обновления\n"
                 "/upgrade — Запустить бесшовное обновление\n"
-                "/cookies — Статус cookies для YouTube\n"
                 "/backup — Сделать резервную копию БД"
             )
             kbd = {
@@ -5694,48 +5482,27 @@ def handle_update(upd, conf):
                 threading.Thread(target=worker_run_upgrade, args=(token, chat_id, mid, remote_v, conf), daemon=True).start()
             return
 
-        if text == "/cookies":
-            handle_cookies_view(token, chat_id, conf)
-            return
-
-        if text == "/update_ytdlp":
-            resp = send_msg(token, chat_id, "⏳ Проверка обновлений yt-dlp...")
-            if resp.get("ok"):
-                mid = resp["result"]["message_id"]
-                threading.Thread(target=worker_update_ytdlp, args=(token, chat_id, mid), daemon=True).start()
-            return
-
         if text == "/ping":
             send_msg(token, chat_id, "Pong! 🏓 Бот и сервер работают штатно.")
             return
 
-        urls = URL_REGEX.findall(text)
-        if urls:
-            url = urls[0]
-            clean_url_cache()
-            uid = uuid.uuid4().hex[:8]
-            URL_CACHE[uid] = {"url": url, "ts": time.time()}
-
-            kbd = {
-                "inline_keyboard": [
-                    [
-                        {"text": "🎬 Видео (MP4)", "callback_data": f"vid:{uid}"},
-                        {"text": "🎵 В Navidrome (Hi-Fi)", "callback_data": f"mus:{uid}"}
-                    ],
-                    [
-                        {"text": "📥 Аудио прямо в чат TG", "callback_data": f"tg:{uid}"}
-                    ]
-                ]
-            }
-            send_msg(token, chat_id, f"🔗 <b>Ссылка принята:</b>\n<code>{url[:60]}...</code>\n\nВыберите формат сохранения:", reply_markup=kbd)
+        # If a URL is sent, direct user to MeTube
+        if "http://" in text or "https://" in text or "www." in text:
+            metube_url = f"https://{conf.get('METUBE_DOMAIN', 'metube.lan')}"
+            send_msg(token, chat_id,
+                f"📥 <b>Скачивание видео и музыки выполняется через MeTube!</b>\n\n"
+                f"Перейдите в веб-интерфейс: <a href='{metube_url}'>{metube_url}</a>\n"
+                f"Вставьте ссылку — MeTube автоматически загрузит файл прямо на сервер (в Samba и Navidrome).",
+                reply_markup={"inline_keyboard": [[{"text": "⚡ Панель управления", "callback_data": "cmd:menu"}]]}
+            )
         elif text:
             send_msg(token, chat_id,
-                "💡 Отправьте ссылку на видео/аудио для скачивания, отправьте файл <code>cookies.txt</code> для авторизации, или откройте меню управления: /menu",
+                "💡 Для управления сервером откройте панель управления: /menu или запросите статус: /status",
                 reply_markup={"inline_keyboard": [[{"text": "⚡ Панель управления", "callback_data": "cmd:menu"}]]}
             )
 
 def main():
-    logging.info("Starting Homelab Telegram Media & Management Bot Daemon...")
+    logging.info("Starting Homelab Telegram Management Bot Daemon...")
     last_env_check = 0
     conf = parse_env()
     offset = 0
@@ -5767,7 +5534,7 @@ def main():
             if state.get("pending_upgrade_version"):
                 target_v = state.get("pending_upgrade_version")
                 notify_chat = state.get("pending_upgrade_chat_id", conf.get("CHAT_ID"))
-                cur_v = conf.get("VERSION", "2.8.0")
+                cur_v = conf.get("VERSION", "2.8.2")
                 if notify_chat and parse_version_tuple(cur_v) >= parse_version_tuple(target_v):
                     send_msg(token, notify_chat,
                         f"🎉 <b>Комплекс успешно обновлен до v{cur_v}!</b>\n\n"
@@ -6475,22 +6242,8 @@ cmd_bot() {
                 tail "$@" /var/log/homelab-bot.log
             fi
             ;;
-        update-ytdlp|ytdlp)
-            echo -e "  ${TAG_INFO} Обновление медиа-движка yt-dlp..."
-            /usr/local/bin/yt-dlp -U 2>/dev/null || curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp" && chmod a+rx /usr/local/bin/yt-dlp
-            echo -e "  ${TAG_OK} yt-dlp готов к работе ($(/usr/local/bin/yt-dlp --version 2>/dev/null || echo 'latest'))"
-            ;;
-        cookies)
-            echo -e "  ${TAG_INFO} Проверка авторизации YouTube cookies.txt..."
-            if [ -s "${APP_DIR}/configs/bot/cookies.txt" ]; then
-                echo -e "  ${TAG_OK} Файл cookies.txt активен ($(du -h "${APP_DIR}/configs/bot/cookies.txt" | awk '{print $1}'))"
-            else
-                echo -e "  ${TAG_WARN} Файл cookies.txt не загружен."
-                echo -e "  Отправьте экспортированный cookies.txt напрямую вашему Telegram-боту в чат!"
-            fi
-            ;;
         *)
-            echo -e "Использование: ${CLR_GREEN}homelab bot [status|start|stop|restart|logs|update-ytdlp|cookies]${CLR_RESET}"
+            echo -e "Использование: ${CLR_GREEN}homelab bot [status|start|stop|restart|logs]${CLR_RESET}"
             ;;
     esac
 }
@@ -6813,12 +6566,15 @@ show_summary_dashboard() {
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ qBittorrent (VueTorrent):${CLR_RESET}        ${CLR_NEON_CYAN}https://${TORRENT_DOMAIN}${CLR_RESET}"
     fi
-    if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Telegram Управляющий бот:${CLR_RESET}        ${CLR_NEON_GREEN}АКТИВЕН (/menu, OTA Upgrade, yt-dlp, Navidrome)${CLR_RESET}"
+    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ MeTube (Загрузка видео и аудио):${CLR_RESET} ${CLR_NEON_CYAN}https://${METUBE_DOMAIN}${CLR_RESET}"
     fi
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Navidrome (Hi-Fi Музыка / Spotify):${CLR_RESET}   ${CLR_NEON_CYAN}https://${MUSIC_DOMAIN}${CLR_RESET}"
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_DIM}    (Клиенты: Symfonium для Android / Substreamer для iOS / Feishin для ПК)${CLR_RESET}"
+    fi
+    if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Telegram Управляющий бот:${CLR_RESET}        ${CLR_NEON_GREEN}АКТИВЕН (/menu, /status, OTA Upgrade, алерты)${CLR_RESET}"
     fi
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Dozzle (Логи контейнеров):${CLR_RESET}       ${CLR_NEON_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_DIM}(Авторизация: ${ADMIN_USER})${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"

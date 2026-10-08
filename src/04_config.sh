@@ -135,7 +135,8 @@ prompt_configuration() {
         ENABLE_GITEA="${SAVED_ENABLE_GITEA:-Y}"
         ENABLE_SAMBA="${SAVED_ENABLE_SAMBA:-Y}"
         ENABLE_QBIT="${SAVED_ENABLE_QBIT:-Y}"
-        ENABLE_TG_BOT="${SAVED_ENABLE_TG_BOT:-${SAVED_ENABLE_METUBE:-Y}}"
+        ENABLE_METUBE="${SAVED_ENABLE_METUBE:-Y}"
+        ENABLE_TG_BOT="${SAVED_ENABLE_TG_BOT:-Y}"
         ENABLE_NAVIDROME="${SAVED_ENABLE_NAVIDROME:-Y}"
         SSL_MODE="${SAVED_SSL_MODE:-1}"
 
@@ -180,6 +181,7 @@ prompt_configuration() {
         GITEA_DOMAIN="git.lan"
         ADGUARD_DOMAIN="adguard.lan"
         TORRENT_DOMAIN="torrent.lan"
+        METUBE_DOMAIN="metube.lan"
         MUSIC_DOMAIN="music.lan"
         PROXY_DOMAIN="proxy.lan"
         LOGS_DOMAIN="logs.lan"
@@ -187,7 +189,7 @@ prompt_configuration() {
         TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
         TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
         if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]] && [ -z "${TELEGRAM_BOT_TOKEN}" ]; then
-            prompt_read "  [?] Telegram Bot Token (для скачивания медиа) [Enter - пропустить]: " INPUT_TG_TOKEN
+            prompt_read "  [?] Telegram Bot Token (для управления сервером и оповещений) [Enter - пропустить]: " INPUT_TG_TOKEN
             TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-}
             if [ -n "${TELEGRAM_BOT_TOKEN}" ]; then
                 prompt_read "  [?] Telegram Chat ID владельца: " INPUT_TG_CHAT
@@ -459,11 +461,14 @@ EOF_UNLOCK
         prompt_read "  [?] Установить qBittorrent + VueTorrent (Торренты/Загрузки)? [Y/n] [${SAVED_ENABLE_QBIT:-Y}]: " ENABLE_QBIT
         ENABLE_QBIT=$(normalize_yn "${ENABLE_QBIT:-${SAVED_ENABLE_QBIT:-Y}}" "Y")
 
-        prompt_read "  [?] Установить Telegram-бота (Медиа-загрузчик yt-dlp в TG, Navidrome и Samba)? [Y/n] [${SAVED_ENABLE_TG_BOT:-${SAVED_ENABLE_METUBE:-Y}}]: " ENABLE_TG_BOT
-        ENABLE_TG_BOT=$(normalize_yn "${ENABLE_TG_BOT:-${SAVED_ENABLE_TG_BOT:-${SAVED_ENABLE_METUBE:-Y}}}" "Y")
+        prompt_read "  [?] Установить MeTube (Web-загрузчик видео и аудио)? [Y/n] [${SAVED_ENABLE_METUBE:-Y}]: " ENABLE_METUBE
+        ENABLE_METUBE=$(normalize_yn "${ENABLE_METUBE:-${SAVED_ENABLE_METUBE:-Y}}" "Y")
 
         prompt_read "  [?] Установить Navidrome (Hi-Fi Музыкальный стриминг, аналог Spotify)? [Y/n] [${SAVED_ENABLE_NAVIDROME:-Y}]: " ENABLE_NAVIDROME
         ENABLE_NAVIDROME=$(normalize_yn "${ENABLE_NAVIDROME:-${SAVED_ENABLE_NAVIDROME:-Y}}" "Y")
+
+        prompt_read "  [?] Включить Telegram-бота для управления комплексом и оповещений? [Y/n] [${SAVED_ENABLE_TG_BOT:-Y}]: " ENABLE_TG_BOT
+        ENABLE_TG_BOT=$(normalize_yn "${ENABLE_TG_BOT:-${SAVED_ENABLE_TG_BOT:-Y}}" "Y")
 
         echo ""
         echo -e "  ${CLR_CYAN}--- Настройка SSL сертификатов ---${CLR_RESET}"
@@ -490,6 +495,7 @@ EOF_UNLOCK
             GITEA_DOMAIN="git.${BASE_DOMAIN}"
             ADGUARD_DOMAIN="adguard.${BASE_DOMAIN}"
             TORRENT_DOMAIN="torrent.${BASE_DOMAIN}"
+            METUBE_DOMAIN="metube.${BASE_DOMAIN}"
             MUSIC_DOMAIN="music.${BASE_DOMAIN}"
             PROXY_DOMAIN="proxy.${BASE_DOMAIN}"
             LOGS_DOMAIN="logs.${BASE_DOMAIN}"
@@ -505,6 +511,7 @@ EOF_UNLOCK
             GITEA_DOMAIN="git.lan"
             ADGUARD_DOMAIN="adguard.lan"
             TORRENT_DOMAIN="torrent.lan"
+            METUBE_DOMAIN="metube.lan"
             MUSIC_DOMAIN="music.lan"
             PROXY_DOMAIN="proxy.lan"
             LOGS_DOMAIN="logs.lan"
@@ -590,16 +597,6 @@ EOF_UNLOCK
         fi
     fi
 
-    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^metube$'; then
-        log_info "Миграция MeTube: остановка и удаление устаревшего контейнера..."
-        docker stop metube 2>/dev/null || true
-        docker rm -f metube 2>/dev/null || true
-        if [ -d "${SAVE_DIR}/metube" ]; then
-            mkdir -p "${SAVE_DIR}/downloads"
-            find "${SAVE_DIR}/metube" -mindepth 1 -maxdepth 1 ! -name '.metube' ! -name 'tmp' -exec mv -n {} "${SAVE_DIR}/downloads/" \; 2>/dev/null || true
-        fi
-    fi
-
     SHARE_NAME=$(basename "${SAVE_DIR}" | tr -cd '[:alnum:]_-')
     [ -z "${SHARE_NAME}" ] && SHARE_NAME="storage"
 
@@ -629,6 +626,8 @@ EOF_UNLOCK
         printf "SAVED_ENABLE_GITEA=%q\n" "${ENABLE_GITEA}"
         printf "SAVED_ENABLE_SAMBA=%q\n" "${ENABLE_SAMBA}"
         printf "SAVED_ENABLE_QBIT=%q\n" "${ENABLE_QBIT}"
+        printf "SAVED_ENABLE_METUBE=%q\n" "${ENABLE_METUBE}"
+        printf "SAVED_METUBE_DOMAIN=%q\n" "${METUBE_DOMAIN}"
         printf "SAVED_ENABLE_TG_BOT=%q\n" "${ENABLE_TG_BOT}"
         printf "SAVED_ENABLE_NAVIDROME=%q\n" "${ENABLE_NAVIDROME}"
         printf "SAVED_MUSIC_DOMAIN=%q\n" "${MUSIC_DOMAIN}"

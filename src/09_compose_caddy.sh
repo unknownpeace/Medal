@@ -33,9 +33,13 @@ configure_caddy_and_compose() {
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>📥 qBittorrent (VueTorrent)</span><a href=\"https://${TORRENT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${TORRENT_DOMAIN}</a></li>"
     fi
+    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+        IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
+    <li><span>📥 MeTube (Загрузка видео)</span><a href=\"https://${METUBE_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${METUBE_DOMAIN}</a></li>"
+    fi
     if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🤖 Telegram Media Bot</span><span style=\"color:#a0aec0;font-size:0.9em\">Загрузчик медиа в /music и /downloads</span></li>"
+    <li><span>🤖 Telegram Control Bot</span><span style=\"color:#a0aec0;font-size:0.9em\">Управление комплексом, OTA-обновления, алерты</span></li>"
     fi
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
@@ -148,6 +152,15 @@ EOF_CADDY
 EOF_CADDY
         fi
 
+        if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+            cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
+    @metube host ${METUBE_DOMAIN} tube.${BASE_DOMAIN}
+    handle @metube {
+        reverse_proxy metube:8081
+    }
+EOF_CADDY
+        fi
+
 
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
@@ -225,6 +238,17 @@ ${TORRENT_DOMAIN} {
     import security_headers
     encode zstd gzip
     reverse_proxy qbittorrent:8080
+}
+EOF_CADDY
+        fi
+
+        if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+            cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
+${METUBE_DOMAIN}, tube.lan {
+    tls internal
+    import security_headers
+    encode zstd gzip
+    reverse_proxy metube:8081
 }
 EOF_CADDY
         fi
@@ -466,6 +490,41 @@ EOF_COMPOSE
 EOF_COMPOSE
     fi
 
+    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+        cat <<EOF_COMPOSE >> "${APP_DIR}/docker-compose.yml"
+  metube:
+    image: alexta69/metube:latest
+    container_name: metube
+    restart: unless-stopped
+    dns:
+      - 77.88.8.8
+      - 1.1.1.1
+      - 8.8.8.8
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      - "PUID=${USER_UID}"
+      - "PGID=${USER_GID}"
+      - "UID=${USER_UID}"
+      - "GID=${USER_GID}"
+      - "ALLOW_PRIVATE_ADDRESSES=true"
+      - "DOWNLOAD_DIR=/downloads"
+      - "STATE_DIR=/downloads/.metube"
+      - "TEMP_DIR=/downloads/tmp"
+      - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["android","web"]}}}'
+    volumes:
+      - ${SAVE_DIR}/downloads:/downloads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/ 2>/dev/null || curl -fs http://localhost:8081/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "autoheal=true"
+
+EOF_COMPOSE
+    fi
 
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         cat <<EOF_COMPOSE >> "${APP_DIR}/docker-compose.yml"
