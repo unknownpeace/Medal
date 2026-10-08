@@ -131,7 +131,6 @@ prompt_configuration() {
         SAVE_FSTYPE=$(findmnt -n -o FSTYPE -T "${SAVE_DIR}" 2>/dev/null || df -T "${SAVE_DIR}" 2>/dev/null | awk 'NR==2{print $2}' || echo "ext4")
 
         ENABLE_GATEWAY="${SAVED_ENABLE_GATEWAY:-Y}"
-        ENABLE_ZAPRET="${SAVED_ENABLE_ZAPRET:-Y}"
         ENABLE_VAULT="${SAVED_ENABLE_VAULT:-Y}"
         ENABLE_GITEA="${SAVED_ENABLE_GITEA:-Y}"
         ENABLE_SAMBA="${SAVED_ENABLE_SAMBA:-Y}"
@@ -448,9 +447,6 @@ EOF_UNLOCK
         prompt_read "  [?] Установить сетевой шлюз (AdGuard + Mihomo TUN)? [Y/n] [${SAVED_ENABLE_GATEWAY:-Y}]: " ENABLE_GATEWAY
         ENABLE_GATEWAY=$(normalize_yn "${ENABLE_GATEWAY:-${SAVED_ENABLE_GATEWAY:-Y}}" "Y")
 
-        prompt_read "  [?] Активировать Zapret2 (DPI-Bypass ТСПУ для YouTube и Discord)? [Y/n] [${SAVED_ENABLE_ZAPRET:-Y}]: " ENABLE_ZAPRET
-        ENABLE_ZAPRET=$(normalize_yn "${ENABLE_ZAPRET:-${SAVED_ENABLE_ZAPRET:-Y}}" "Y")
-
         prompt_read "  [?] Установить Vaultwarden (Менеджер паролей)? [Y/n] [${SAVED_ENABLE_VAULT:-Y}]: " ENABLE_VAULT
         ENABLE_VAULT=$(normalize_yn "${ENABLE_VAULT:-${SAVED_ENABLE_VAULT:-Y}}" "Y")
 
@@ -629,7 +625,6 @@ EOF_UNLOCK
         printf "SAVED_ROUTER_GATEWAY=%q\n" "${ROUTER_GATEWAY}"
         printf "SAVED_LAN_SUBNET=%q\n" "${LAN_SUBNET}"
         printf "SAVED_ENABLE_GATEWAY=%q\n" "${ENABLE_GATEWAY}"
-        printf "SAVED_ENABLE_ZAPRET=%q\n" "${ENABLE_ZAPRET}"
         printf "SAVED_ENABLE_VAULT=%q\n" "${ENABLE_VAULT}"
         printf "SAVED_ENABLE_GITEA=%q\n" "${ENABLE_GITEA}"
         printf "SAVED_ENABLE_SAMBA=%q\n" "${ENABLE_SAMBA}"

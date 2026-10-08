@@ -18,7 +18,6 @@ MODULES=(
     "03_network.sh"
     "04_config.sh"
     "05_gateway.sh"
-    "05b_zapret.sh"
     "06_directories.sh"
     "07_dns_bench.sh"
     "08_services_conf.sh"

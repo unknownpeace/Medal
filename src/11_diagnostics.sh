@@ -116,20 +116,6 @@ EOF_DIAG
         echo "Firewall status: ${FW_STATUS}" >> "${DIAG_LOG}"
     fi
 
-    if [[ "${ENABLE_ZAPRET}" =~ ^[Yy]$ ]]; then
-        local ZP_RUNNING=0
-        if pgrep -x nfqws2 >/dev/null 2>&1 || pgrep -f "nfqws2" >/dev/null 2>&1; then
-            ZP_RUNNING=1
-        fi
-        if [ "$ZP_RUNNING" -eq 1 ]; then
-            echo -e "    ${TAG_OK} Zapret2 DPI-Bypass (nfqws2): ${CLR_GREEN}[РАБОТАЕТ]${CLR_RESET}"
-            echo "Zapret2 DPI-Bypass: RUNNING (nfqws2)" >> "${DIAG_LOG}"
-        else
-            echo -e "    ${TAG_WARN} Zapret2 DPI-Bypass (nfqws2): ${CLR_YELLOW}[ОСТАНОВЛЕН / СБОЙ]${CLR_RESET}"
-            echo "Zapret2 DPI-Bypass: NOT RUNNING" >> "${DIAG_LOG}"
-        fi
-    fi
-
     local DNS_TEST=0
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
         if python3 -c "import socket, sys; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 53)); data, _ = s.recvfrom(512); sys.exit(0 if len(data) > 12 else 1)" 2>/dev/null; then
@@ -219,9 +205,6 @@ show_summary_dashboard() {
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Секрет API панели управления:${CLR_RESET}    ${CLR_NEON_GOLD}${MIHOMO_SECRET}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Госуслуги, банки и сервисы РФ:${CLR_RESET}   ${CLR_NEON_GREEN}100% ПРЯМОЙ ДОСТУП (DIRECT, без капч и задержек)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Маршрутизация YouTube & Media:${CLR_RESET}  ${CLR_NEON_GREEN}АКТИВНА (Туннелирование -> AUTO / PROXY)${CLR_RESET}"
-        if [[ "${ENABLE_ZAPRET}" =~ ^[Yy]$ ]]; then
-            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Zapret2 DPI-Bypass:${CLR_RESET}          ${CLR_NEON_GREEN}АКТИВЕН (nfqws2: YouTube 4K/Discord/Pixiv/DPI для ВСЕХ сайтов)${CLR_RESET}"
-        fi
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Защита от перехвата и утечек:${CLR_RESET}    ${CLR_NEON_GREEN}АКТИВНА (nftables DNS Hijack -> порт 53)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Автоматический TCP MSS Clamp:${CLR_RESET}    ${CLR_NEON_GREEN}АКТИВЕН (защита от зависания пакетов на MTU)${CLR_RESET}"
         if [ -n "${SELECTED_DOH_1:-}" ]; then
@@ -327,7 +310,6 @@ show_summary_dashboard() {
     echo -e "  ${CLR_NEON_CYAN}╭── ЕДИНАЯ КОНСОЛЬНАЯ УТИЛИТА УПРАВЛЕНИЯ (HOMELAB CLI) ───────────────────────╮${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Статус и дашборд:${CLR_RESET}            ${CLR_NEON_GREEN}homelab status${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Полная самодиагностика:${CLR_RESET}      ${CLR_NEON_GREEN}homelab doctor${CLR_RESET}"
-    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Автоподбор стратегий DPI:${CLR_RESET}     ${CLR_NEON_GREEN}homelab blockcheck${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журналы сервисов в реалтайме:${CLR_RESET} ${CLR_NEON_GREEN}homelab logs [сервис] -f${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Экспорт всех логов в файл:${CLR_RESET}   ${CLR_NEON_GREEN}homelab dump-logs${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Перезапуск стека/сервиса:${CLR_RESET}    ${CLR_NEON_GREEN}homelab restart [сервис]${CLR_RESET}"
@@ -365,7 +347,6 @@ main() {
     prompt_configuration
     setup_credentials
     setup_gateway_networking
-    setup_zapret2
     setup_directories
     benchmark_dns_servers
     configure_gateway_services

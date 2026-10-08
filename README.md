@@ -3,7 +3,6 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Архитектура-Transparent_Gateway-0ea5e9?style=for-the-badge&logo=shield" alt="Transparent Gateway">
-  <img src="https://img.shields.io/badge/DPI_Bypass-Zapret2_(nfqws2)-f59e0b?style=for-the-badge&logo=shield" alt="Zapret2">
   <img src="https://img.shields.io/badge/Routing-Mihomo_TUN_(Meta)-8b5cf6?style=for-the-badge&logo=fastapi" alt="Mihomo TUN">
   <img src="https://img.shields.io/badge/Music_Streaming-Navidrome_(Spotify)-ec4899?style=for-the-badge&logo=spotify" alt="Navidrome">
   <img src="https://img.shields.io/badge/DNS-AdGuard_Home-16a34a?style=for-the-badge&logo=adguard" alt="AdGuard Home">
@@ -21,20 +20,18 @@
   ╔══════════════════════════════════════════════════════════════════════════╗
   ║   HOMELAB APPLIANCE & TRANSPARENT GATEWAY ◈ RUSSIA PRO 2026 EDITION      ║
   ╠══════════════════════════════════════════════════════════════════════════╣
-  ║  ◆ ГИБРИДНЫЙ СЕТЕВОЙ СТЕК: ZAPRET2 + MIHOMO TUN + ADGUARD HOME (CLEAN)   ║
+  ║  ◆ ПРОЗРАЧНЫЙ СЕТЕВОЙ ШЛЮЗ: MIHOMO TUN + ADGUARD HOME (CLEAN DNS)        ║
   ║                                                                          ║
   ║   [ КЛИЕНТЫ LAN ] ──► [ ADGUARD :53 ] ──► [ MIHOMO TUN :1053 ]           ║
   ║   (ТВ, ПК, Смартфоны)  CleanDNS/ZeroCache   Fake-IP / Mixed TUN / gVisor ║
   ║           │                     │                                        ║
   ║           │                     ▼ (Анти-Утечки)   Маршрутизация трафика: ║
   ║           │              [ ECH / DOH DROP ]  ├─► [ US-AUTO ] AI (ChatGPT)║
-  ║           │                                  ├─► [ PROXY ] Зарубежное    ║
+  ║           │                                  ├─► [ PROXY ] YT, Discord   ║
   ║           │                                  └─► [ DIRECT ] РФ / Банки   ║
   ║           ▼                                                      │       ║
-  ║   [ ZAPRET2 ENGINE ] ────────────────────────────────────────────┘       ║
-  ║   • NFQUEUE / nfqws2: Аппаратный DPI-Bypass для ВСЕХ сайтов прямо        ║
-  ║     через провайдера без VPN (YouTube 4K, Discord, Pixiv, Rutracker)!    ║
-  ║   • Работает автономно ДАЖЕ ЕСЛИ НЕ УКАЗАНА ПОДПИСКА НА ПРОКСИ!          ║
+  ║   [ ПРЯМОЙ ВЫХОД ] ──────────────────────────────────────────────┘       ║
+  ║   • Умный Fake-IP DNS + nftables: Прозрачный обход без настройки клиентов║
   ╚══════════════════════════════════════════════════════════════════════════╝
 ```
 
@@ -56,8 +53,7 @@
 
 | Вызов в РФ | Как это решено в комплексе |
 | :--- | :--- |
-| **DPI-обход для ВСЕХ сайтов (YouTube 4K, Discord, Pixiv, Rutracker)** | **Универсальный режим Zapret2 (`MODE_FILTER=none`):** Аппаратная десинхронизация ТСПУ применяется ко **всему** исходящему HTTP/HTTPS трафику. Даже если вы **вообще не настраивали прокси/подписку**, сервер в одиночку открывает `pixiv.net`, `rutracker.org`, `youtube.com` (4K 60fps) и Discord прямо через провайдера без расхода платного VPS-трафика! |
-| **Автоподбор стратегий обхода под провайдера** | Встроенная команда **`homelab blockcheck`** (или просто `blockcheck`). Тестирует реакцию ТСПУ вашего конкретного провайдера (Ростелеком, Дом.ру, МТС, Билайн, Мегафон) и выводит идеальные параметры десинхронизации. |
+| **Интеллектуальная маршрутизация (YouTube, Discord, Блокировки)** | **Mihomo TUN Mixed-Stack:** Полная маршрутизация на базе Fake-IP DNS и нативных `.mrs` наборов правил. YouTube и Discord направляются через оптимизированный туннель, гарантируя стабильное 4K 60fps видео и бесперебойную голосовую связь Discord Voice (Full-Cone NAT). |
 | **Геоблокировки зарубежного AI (ChatGPT, Claude, Gemini)** | Умный выбор узла **`US-AUTO`**: алгоритм автоматически фильтрует серверы США (`(?i)\b(US|USA|United States|America)\b|🇺🇸|США`) и выбирает узел с минимальным пингом. Никаких «Access Denied» из-за случайного европейского IP. |
 | **Свой домашний Spotify (Hi-Fi Стриминг & Офлайн в метро)** | **Идеальная триада: Navidrome + Telegram Бот (yt-dlp) + Samba NAS:** Легковесный музыкальный сервис (~40 МБ RAM). Отправляете любую ссылку боту в Telegram ➔ трек сохраняется в `/music` с обложкой и тегами (или качаете FLAC через торренты) ➔ приложения **Symfonium** (Android), **Substreamer** (iOS) и **Feishin** (ПК) обеспечивают 100% офлайн-кэш, тексты песен в такт, Android Auto / CarPlay и стриминг Hi-Fi. |
 | **Банки, Госуслуги и доставка РФ** | **100% прямой доступ (DIRECT)**. Все национальные зоны (`.ru`, `.su`, `.рф`, `.москва`), базы `category-ru` и весь диапазон российских IP-адресов идут мимо прокси на полной скорости провайдера (до 1 Гбит/с, без капч и ограничений). |
@@ -88,8 +84,6 @@ flowchart TD
         AGH["🟢 AdGuard Home (:53)<br/>• Zero-Cache (Синхронизация Fake-IP)<br/>• Защита от DoH/ECH утечек<br/>• Чистые фильтры без ложных банов"]
         
         MIHOMO["🚀 Mihomo Core (:1053 TUN / Fake-IP)<br/>• Stack: Mixed (gVisor + System UDP)<br/>• Full-Cone NAT (Discord / Voice)<br/>• Группа US-AUTO (AI: ChatGPT, Claude)<br/>• Meta Rule-Sets (.mrs)"]
-        
-        ZAPRET["⚡ Zapret2 (NFQUEUE / nfqws2)<br/>• Hardware DPI Desync Engine<br/>• YouTube 4K & Discord на прямом канале<br/>• Discord Media UDP Voice Handler"]
 
         CADDY["🔒 Caddy Web Gateway (:80 / :443)<br/>• Стартовый веб-портал по IP<br/>• Раздача Root CA сертификата<br/>• Локальные домены *.lan"]
 
@@ -107,8 +101,8 @@ flowchart TD
     end
 
     subgraph INTERNET[" 🌐 Внешний интернет "]
-        DIRECT_NET["🇷🇺 Провайдерский канал (Direct ISP до 1 Гбит/с)<br/>• Госуслуги, Банки, VK, Ozon, Steam, P2P Торренты<br/>• YouTube 4K & Discord (Десинхронизация через Zapret2)"]
-        PROXY_NET["🌍 Зарубежный прокси-туннель (VLESS / SS / Hysteria2)<br/>• OpenAI ChatGPT, Claude, Gemini (US-AUTO)<br/>• Заблокированные трекеры, X, Instagram, Резерв"]
+        DIRECT_NET["🇷🇺 Провайдерский канал (Direct ISP до 1 Гбит/с)<br/>• Госуслуги, Банки, VK, Ozon, Steam, P2P Торренты"]
+        PROXY_NET["🌍 Зарубежный прокси-туннель (VLESS / SS / Hysteria2)<br/>• OpenAI ChatGPT, Claude, Gemini (US-AUTO)<br/>• YouTube 4K, Discord Voice, X, Instagram, Резерв"]
     end
 
     TV & PC & PHONE & CONSOLE -->|"DNS (UDP/TCP 53)"| NFT
@@ -117,11 +111,9 @@ flowchart TD
     
     TV & PC & PHONE & CONSOLE -->|"Трафик LAN"| NFT
     NFT --> MIHOMO
-    NFT -.->|"NFQUEUE: Direct TCP/UDP"| ZAPRET
-    ZAPRET -->|"Десинхронизированные пакеты"| DIRECT_NET
 
     MIHOMO -->|"DIRECT (.ru / GEOIP RU / P2P)"| DIRECT_NET
-    MIHOMO -->|"PROXY (US-AUTO / Blocked)"| PROXY_NET
+    MIHOMO -->|"PROXY (US-AUTO / YouTube / Discord / Blocked)"| PROXY_NET
 
     PC & PHONE -->|"HTTP :80 / HTTPS :443"| CADDY
     CADDY --> APPS
@@ -261,7 +253,6 @@ sudo ./install.sh
 Команды:
   status              Дашборд состояния сервера, ОЗУ, дисков, nftables и контейнеров
   doctor              Глубокая диагностика DNS (53), Mihomo TUN (1053, Meta), MSS, API
-  blockcheck [домен]  Интеллектуальный автоподбор стратегий десинхронизации ТСПУ (Zapret2)
   upgrade [--force]   Бесшовное обновление ядра комплекса из GitHub (OTA In-Place Update)
   rollback            Мгновенный откат к предыдущей версии из снимка восстановления
   version             Проверка текущей версии ядра и наличия обновлений на GitHub
@@ -287,16 +278,11 @@ homelab upgrade
 # При возникновении проблем мгновенно откатиться назад
 homelab rollback
 
-# Проверить здоровье всех компонентов, сетевых правил и nfqws2
+# Проверить здоровье всех компонентов, сетевых правил и контейнеров
 homelab doctor
 
-# Запустить автоподбор стратегий DPI под вашего провайдера (Zapret2 blockcheck)
-homelab blockcheck
-# или для проверки конкретного домена:
-homelab blockcheck rutracker.org
-
-# Перезапустить сервис или службу Zapret2
-homelab restart zapret
+# Перезапустить стек или отдельный сервис
+homelab restart
 homelab restart mihomo
 
 # Посмотреть живые логи Caddy или AdGuard
@@ -336,7 +322,6 @@ homelab backup
     ├── 03_network.sh         # Анализ сети (IP, шлюз, подсеть, интерфейс), защита дисков от затирания
     ├── 04_config.sh          # Интерактивный мастер настроек (Express / Custom / Reset), хеширование
     ├── 05_gateway.sh         # Твики ядра (sysctl, BBR), nftables (inet homelab), сторож watchdog
-    ├── 05b_zapret.sh         # Установка Zapret2 (DPI-Bypass ТСПУ, NFQUEUE, nfqws2, Discord UDP)
     ├── 06_directories.sh     # Создание каталогов, Btrfs No-COW (+C), предзагрузка MRS-правил и UI
     ├── 07_dns_bench.sh       # Параллельный DoH/DoT бенчмарк апстримов с гео-приоритетом
     ├── 08_services_conf.sh   # Генерация AdGuardHome.yaml (trusted proxies, ECH) и mihomo/config.yaml

@@ -275,14 +275,13 @@ SELECTED_DOT_1=""
 SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
-ENABLE_ZAPRET="Y"
 ENABLE_NAVIDROME="Y"
 ENABLE_TG_BOT="Y"
 TG_BOT_TOKEN=""
 TG_CHAT_ID=""
 MUSIC_DOMAIN=""
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.7.0"
+HOMELAB_VERSION="2.8.0"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -307,21 +306,20 @@ EOF_LOGO
     echo -e "  ${CLR_NEON_PURPLE}╔══════════════════════════════════════════════════════════════════════════╗${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   ${CLR_WHITE}${CLR_BOLD}HOMELAB APPLIANCE & TRANSPARENT GATEWAY${CLR_RESET} ${CLR_NEON_CYAN}◈${CLR_RESET} ${CLR_NEON_GREEN}${CLR_BOLD}RUSSIA PRO 2026${CLR_RESET}        ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}╠══════════════════════════════════════════════════════════════════════════╣${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_NEON_CYAN}◆ ГИБРИДНЫЙ СЕТЕВОЙ СТЕК: ZAPRET2 + MIHOMO TUN + ADGUARD HOME (CLEAN)    ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_NEON_CYAN}◆ ПРОЗРАЧНЫЙ СЕТЕВОЙ ШЛЮЗ: MIHOMO TUN + ADGUARD HOME (CLEAN DNS)        ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}                                                                          ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   ${CLR_WHITE}[ КЛИЕНТЫ LAN ]${CLR_RESET} ──► ${CLR_NEON_CYAN}[ ADGUARD :53 ]${CLR_RESET} ──► ${CLR_NEON_PURPLE}[ MIHOMO TUN :1053 ]${CLR_RESET}                 ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   (ТВ, ПК, Смартфоны)      CleanDNS/ZeroCache     Fake-IP / Mixed TUN / gVisor    ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                          │                                           ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                          ▼ (Анти-Утечки)   Маршрутизация трафика:    ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                   ${CLR_RED}[ ECH / DOH DROP ]${CLR_RESET}  ├─► ${CLR_NEON_PINK}[ US-AUTO ]${CLR_RESET} ChatGPT / Claude  ${CLR_NEON_PURPLE}║${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                                            ├─► ${CLR_NEON_GOLD}[ PROXY ]${CLR_RESET} Заблокированное     ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                                            ├─► ${CLR_NEON_GOLD}[ PROXY ]${CLR_RESET} YT, Discord, Блоки  ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           │                                            └─► ${CLR_NEON_GREEN}[ DIRECT ]${CLR_RESET} РФ / Банки / Steam ║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}           ▼                                                                      ${CLR_NEON_PURPLE}║${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   ${CLR_NEON_GOLD}[ ZAPRET2 ENGINE ]${CLR_RESET} ─────────────────────────────────────────────────────────────┘        ${CLR_NEON_PURPLE}║${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   • NFQUEUE / nfqws2: Аппаратный DPI-Bypass для ВСЕХ сайтов (YouTube 4K, ║${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}     Discord Voice, Pixiv, Rutracker) прямо через провайдера без VPN!     ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   ${CLR_NEON_GREEN}[ ПРЯМОЙ ВЫХОД ]${CLR_RESET} ────────────────────────────────────────────────────────────┘        ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   • Умный Fake-IP DNS + nftables: Прозрачный обход без настройки клиентов ║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}╠══════════════════════════════════════════════════════════════════════════╣${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ЯДРО:${CLR_RESET} ${CLR_CYAN}Zapret2${CLR_RESET} │ ${CLR_CYAN}Mihomo TUN${CLR_RESET} │ ${CLR_CYAN}AdGuard Home${CLR_RESET} │ ${CLR_CYAN}nftables${CLR_RESET} │ ${CLR_CYAN}Caddy SSL${CLR_RESET} │ ${CLR_CYAN}Docker${CLR_RESET}     ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ЯДРО:${CLR_RESET} ${CLR_CYAN}Mihomo TUN${CLR_RESET} │ ${CLR_CYAN}AdGuard Home${CLR_RESET} │ ${CLR_CYAN}nftables${CLR_RESET} │ ${CLR_CYAN}Caddy SSL${CLR_RESET} │ ${CLR_CYAN}Docker${CLR_RESET}              ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ПРИЛОЖЕНИЯ:${CLR_RESET} ${CLR_CYAN}Navidrome (Spotify)${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}qBittorrent${CLR_RESET} │ ${CLR_CYAN}TG-Бот (yt-dlp)${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Gitea${CLR_RESET} ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ СИСТЕМА:${CLR_RESET} ${CLR_GRAY}Debian • Ubuntu • Arch Linux • Alpine Linux (OpenRC & Systemd)${CLR_RESET}   ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}╚══════════════════════════════════════════════════════════════════════════╝${CLR_RESET}"
@@ -444,7 +442,6 @@ load_previous_config() {
         [ -n "${SAVED_SELECTED_BOOTSTRAP_IP_1:-}" ] && SELECTED_BOOTSTRAP_IP_1="${SAVED_SELECTED_BOOTSTRAP_IP_1}"
         [ -n "${SAVED_LOGS_DOMAIN:-}" ] && LOGS_DOMAIN="${SAVED_LOGS_DOMAIN}"
         [ -n "${SAVED_ENABLE_TELEGRAM:-}" ] && ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM}"
-        [ -n "${SAVED_ENABLE_ZAPRET:-}" ] && ENABLE_ZAPRET="${SAVED_ENABLE_ZAPRET}"
         [ -n "${SAVED_TELEGRAM_BOT_TOKEN:-}" ] && TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN}"
         [ -n "${SAVED_TELEGRAM_CHAT_ID:-}" ] && TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID}"
         [ -n "${SAVED_SAVE_FSTYPE:-}" ] && SAVE_FSTYPE="${SAVED_SAVE_FSTYPE}"
@@ -1276,7 +1273,6 @@ prompt_configuration() {
         SAVE_FSTYPE=$(findmnt -n -o FSTYPE -T "${SAVE_DIR}" 2>/dev/null || df -T "${SAVE_DIR}" 2>/dev/null | awk 'NR==2{print $2}' || echo "ext4")
 
         ENABLE_GATEWAY="${SAVED_ENABLE_GATEWAY:-Y}"
-        ENABLE_ZAPRET="${SAVED_ENABLE_ZAPRET:-Y}"
         ENABLE_VAULT="${SAVED_ENABLE_VAULT:-Y}"
         ENABLE_GITEA="${SAVED_ENABLE_GITEA:-Y}"
         ENABLE_SAMBA="${SAVED_ENABLE_SAMBA:-Y}"
@@ -1593,9 +1589,6 @@ EOF_UNLOCK
         prompt_read "  [?] Установить сетевой шлюз (AdGuard + Mihomo TUN)? [Y/n] [${SAVED_ENABLE_GATEWAY:-Y}]: " ENABLE_GATEWAY
         ENABLE_GATEWAY=$(normalize_yn "${ENABLE_GATEWAY:-${SAVED_ENABLE_GATEWAY:-Y}}" "Y")
 
-        prompt_read "  [?] Активировать Zapret2 (DPI-Bypass ТСПУ для YouTube и Discord)? [Y/n] [${SAVED_ENABLE_ZAPRET:-Y}]: " ENABLE_ZAPRET
-        ENABLE_ZAPRET=$(normalize_yn "${ENABLE_ZAPRET:-${SAVED_ENABLE_ZAPRET:-Y}}" "Y")
-
         prompt_read "  [?] Установить Vaultwarden (Менеджер паролей)? [Y/n] [${SAVED_ENABLE_VAULT:-Y}]: " ENABLE_VAULT
         ENABLE_VAULT=$(normalize_yn "${ENABLE_VAULT:-${SAVED_ENABLE_VAULT:-Y}}" "Y")
 
@@ -1774,7 +1767,6 @@ EOF_UNLOCK
         printf "SAVED_ROUTER_GATEWAY=%q\n" "${ROUTER_GATEWAY}"
         printf "SAVED_LAN_SUBNET=%q\n" "${LAN_SUBNET}"
         printf "SAVED_ENABLE_GATEWAY=%q\n" "${ENABLE_GATEWAY}"
-        printf "SAVED_ENABLE_ZAPRET=%q\n" "${ENABLE_ZAPRET}"
         printf "SAVED_ENABLE_VAULT=%q\n" "${ENABLE_VAULT}"
         printf "SAVED_ENABLE_GITEA=%q\n" "${ENABLE_GITEA}"
         printf "SAVED_ENABLE_SAMBA=%q\n" "${ENABLE_SAMBA}"
@@ -1918,6 +1910,22 @@ EOF_RESOLVED
 dns=none
 EOF_NM
             systemctl reload NetworkManager 2>/dev/null || true
+        fi
+
+        # Полная очистка и удаление любых следов Zapret (службы, процессы, таблицы nftables)
+        if [ "${INIT_SYSTEM}" = "openrc" ]; then
+            rc-service zapret2 stop >/dev/null 2>&1 || true
+            rc-update del zapret2 default >/dev/null 2>&1 || true
+            rm -f /etc/init.d/zapret2
+        elif [ "${INIT_SYSTEM}" = "systemd" ]; then
+            systemctl disable --now zapret2.service >/dev/null 2>&1 || true
+            rm -f /etc/systemd/system/zapret2.service
+            systemctl daemon-reload >/dev/null 2>&1 || true
+        fi
+        pkill -9 nfqws2 >/dev/null 2>&1 || true
+        rm -rf /opt/zapret2 /usr/local/bin/blockcheck /etc/sysctl.d/99-zapret.conf /etc/modules-load.d/zapret.conf
+        if command -v nft >/dev/null 2>&1; then
+            nft delete table inet zapret2 >/dev/null 2>&1 || true
         fi
 
         chattr -i /etc/resolv.conf 2>/dev/null || true
@@ -2297,165 +2305,6 @@ EOF_NOTIFY
     chmod 755 /usr/local/bin/homelab-notify
 
     log_ok "Сетевой стек, сторож маршрутизации и служба оповещений настроены"
-}
-
-# ==============================================================================
-# МОДУЛЬ 05b: УСТАНОВКА И НАСТРОЙКА ZAPRET2 (DPI-BYPASS ТСПУ ДЛЯ YOUTUBE И DISCORD)
-# ==============================================================================
-
-setup_zapret2() {
-    print_step_header "05b/11" "ИНТЕГРАЦИЯ И АКТИВАЦИЯ ZAPRET2 (DPI-BYPASS ТСПУ)"
-
-    if [[ ! "${ENABLE_ZAPRET:-Y}" =~ ^[Yy]$ ]]; then
-        log_info "Zapret2 DPI-Bypass отключен пользователем в конфигурации (пропуск)"
-        return 0
-    fi
-
-    log_info "Подготовка подсистемы Zapret2 (DPI Desynchronization Engine)..."
-
-    # 1. Загрузка необходимых модулей ядра Linux (NFQUEUE / Conntrack)
-    modprobe nfnetlink_queue 2>/dev/null || true
-    modprobe nft_queue 2>/dev/null || true
-    mkdir -p /etc/modules-load.d
-    echo -e "nfnetlink_queue\nnft_queue" > /etc/modules-load.d/zapret.conf 2>/dev/null || true
-    grep -q '^nfnetlink_queue$' /etc/modules 2>/dev/null || echo "nfnetlink_queue" >> /etc/modules 2>/dev/null || true
-    grep -q '^nft_queue$' /etc/modules 2>/dev/null || echo "nft_queue" >> /etc/modules 2>/dev/null || true
-
-    # Либеральный режим Conntrack для предотвращения отбрасывания пакетов с измененным TCP Seq/ACK
-    sysctl -w net.netfilter.nf_conntrack_tcp_be_liberal=1 >/dev/null 2>&1 || true
-    mkdir -p /etc/sysctl.d
-    echo "net.netfilter.nf_conntrack_tcp_be_liberal = 1" > /etc/sysctl.d/99-zapret.conf 2>/dev/null || true
-
-    local ZAPRET_DIR="/opt/zapret2"
-    mkdir -p "${ZAPRET_DIR}"
-
-    # 2. Динамическое определение последней версии релиза zapret2 на GitHub
-    log_info "Поиск последнего релиза zapret2 на GitHub..."
-    local LATEST_TAG=""
-    LATEST_TAG=$(curl -sSI -m 10 "https://github.com/bol-van/zapret2/releases/latest" 2>/dev/null | grep -i '^location:' | tr -d '\r' | awk -F'/' '{print $NF}' || true)
-    LATEST_TAG="${LATEST_TAG:-v1.0.5.2}"
-    local TAR_URL="https://github.com/bol-van/zapret2/releases/download/${LATEST_TAG}/zapret2-${LATEST_TAG}.tar.gz"
-
-    log_info "Загрузка официального дистрибутива Zapret2 (${LATEST_TAG})..."
-    local TMP_TAR="/tmp/zapret2_${LATEST_TAG}.tar.gz"
-    local DOWNLOAD_OK=0
-
-    if curl -fsSL -m 60 "${TAR_URL}" -o "${TMP_TAR}" 2>/dev/null; then
-        DOWNLOAD_OK=1
-    elif command -v wget >/dev/null 2>&1 && wget -q --timeout=60 "${TAR_URL}" -O "${TMP_TAR}" 2>/dev/null; then
-        DOWNLOAD_OK=1
-    fi
-
-    if [ $DOWNLOAD_OK -eq 1 ] && [ -s "${TMP_TAR}" ]; then
-        run_spin "Распаковка дистрибутива Zapret2" bash -c "tar -xzf '${TMP_TAR}' -C '/tmp/' && cp -rf /tmp/zapret2-${LATEST_TAG#v}/* '${ZAPRET_DIR}/' 2>/dev/null || cp -rf /tmp/zapret2-*/* '${ZAPRET_DIR}/' 2>/dev/null && rm -rf /tmp/zapret2-*"
-        rm -f "${TMP_TAR}"
-    elif [ -d "zapret2-${LATEST_TAG#v}" ]; then
-        log_info "Использование локально предзагруженного архива zapret2..."
-        cp -rf "zapret2-${LATEST_TAG#v}/"* "${ZAPRET_DIR}/" 2>/dev/null || true
-    fi
-
-    # 3. Автоматический выбор архитектурных бинарников (nfqws2, ip2net, mdig)
-    if [ -x "${ZAPRET_DIR}/install_bin.sh" ]; then
-        run_spin "Компоновка исполняемых файлов (nfqws2 / ${SYSTEM_ARCH})" bash -c "cd '${ZAPRET_DIR}' && ./install_bin.sh"
-    fi
-
-    # 4. Формирование боевой конфигурации /opt/zapret2/config
-    cat <<'EOF_ZCONFIG' > "${ZAPRET_DIR}/config"
-# Zapret2 production configuration (Russia Pro 2026 - Universal DPI Bypass)
-FWTYPE=nftables
-POSTNAT=1
-NFQWS2_ENABLE=1
-NFQWS2_PORTS_TCP=80,443
-NFQWS2_PORTS_UDP=443
-NFQWS2_TCP_PKT_OUT=20
-NFQWS2_TCP_PKT_IN=10
-NFQWS2_UDP_PKT_OUT=5
-NFQWS2_UDP_PKT_IN=3
-DESYNC_MARK=0x40000000
-DESYNC_MARK_POSTNAT=0x20000000
-
-# Универсальные стратегии десинхронизации ТСПУ для ВСЕХ сайтов (YouTube 4K, Discord, Pixiv, Rutracker и др.)
-NFQWS2_OPT="
---filter-tcp=80 --filter-l7=http <HOSTLIST> --payload=http_req --lua-desync=fake:blob=fake_default_http:tcp_md5 --lua-desync=multisplit:pos=method+2 --new
---filter-tcp=443 --filter-l7=tls <HOSTLIST> --payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_md5:tcp_seq=-10000 --lua-desync=multidisorder:pos=1,midsld --new
---filter-udp=443 --filter-l7=quic <HOSTLIST_NOAUTO> --payload=quic_initial --lua-desync=fake:blob=fake_default_quic:repeats=6
-"
-
-# Режим 'none' активирует десинхронизацию ТСПУ для ВСЕХ исходящих соединений (без ограничений списком доменов)
-MODE_FILTER=none
-FLOWOFFLOAD=donttouch
-INIT_APPLY_FW=1
-DISABLE_IPV6=1
-FILTER_TTL_EXPIRED_ICMP=1
-EOF_ZCONFIG
-
-    # 5. Активация кастомного скрипта обхода замедления Discord медиа/голосовых пакетов
-    mkdir -p "${ZAPRET_DIR}/init.d/sysv/custom.d"
-    if [ -f "${ZAPRET_DIR}/init.d/custom.d.examples.linux/50-discord-media" ]; then
-        cp "${ZAPRET_DIR}/init.d/custom.d.examples.linux/50-discord-media" "${ZAPRET_DIR}/init.d/sysv/custom.d/50-discord-media"
-        chmod 755 "${ZAPRET_DIR}/init.d/sysv/custom.d/50-discord-media" 2>/dev/null || true
-    fi
-
-    # 6. Интеграция службы и запуск в Init-системе (OpenRC / systemd)
-    if [ "${INIT_SYSTEM}" = "openrc" ]; then
-        cat << 'EOF_OPENRC_ZAPRET' > /etc/init.d/zapret2
-#!/sbin/openrc-run
-# Zapret2 OpenRC service wrapper with explicit base path
-ZAPRET_BASE="/opt/zapret2"
-ZAPRET_INIT="${ZAPRET_BASE}/init.d/sysv/zapret2"
-
-extra_commands="start_fw stop_fw restart_fw start_daemons stop_daemons restart_daemons reload_ifsets list_ifsets list_table"
-description="Zapret2 DPI Desynchronization Daemon (nfqws2)"
-
-depend() {
-    rc-service -e networking && need networking
-}
-start() {
-    "${ZAPRET_INIT}" start
-}
-stop() {
-    "${ZAPRET_INIT}" stop
-}
-restart() {
-    "${ZAPRET_INIT}" restart
-}
-start_fw() {
-    "${ZAPRET_INIT}" start_fw
-}
-stop_fw() {
-    "${ZAPRET_INIT}" stop_fw
-}
-restart_fw() {
-    "${ZAPRET_INIT}" restart_fw
-}
-start_daemons() {
-    "${ZAPRET_INIT}" start_daemons
-}
-stop_daemons() {
-    "${ZAPRET_INIT}" stop_daemons
-}
-restart_daemons() {
-    "${ZAPRET_INIT}" restart_daemons
-}
-reload_ifsets() {
-    "${ZAPRET_INIT}" reload_ifsets
-}
-EOF_OPENRC_ZAPRET
-        chmod 755 /etc/init.d/zapret2
-        rc-update add zapret2 default >/dev/null 2>&1 || true
-        rc-service zapret2 restart >/dev/null 2>&1 || rc-service zapret2 start >/dev/null 2>&1 || true
-    elif [ "${INIT_SYSTEM}" = "systemd" ]; then
-        if [ -f "${ZAPRET_DIR}/init.d/systemd/zapret2.service" ]; then
-            cp "${ZAPRET_DIR}/init.d/systemd/zapret2.service" /etc/systemd/system/zapret2.service
-            systemctl daemon-reload >/dev/null 2>&1 || true
-            systemctl enable --now zapret2.service >/dev/null 2>&1 || systemctl restart zapret2.service >/dev/null 2>&1 || true
-        fi
-    fi
-
-    # Глобальный симлинк для прямого вызова утилиты blockcheck
-    ln -sf /usr/local/bin/homelab /usr/local/bin/blockcheck 2>/dev/null || true
-
-    log_ok "Zapret2 успешно развернут и активирован (DPI-Bypass: nfqws2, все сайты, YouTube 4K, Pixiv, Discord)"
 }
 
 # ==============================================================================
@@ -5448,16 +5297,6 @@ cmd_status() {
 
 cmd_restart() {
     local target="${1:-}"
-    if [ "$target" = "zapret" ] || [ "$target" = "zapret2" ]; then
-        echo -e "  ${TAG_INFO} Перезапуск службы Zapret2 DPI-Bypass..."
-        if command -v rc-service >/dev/null 2>&1; then
-            rc-service zapret2 restart 2>/dev/null || rc-service zapret2 start 2>/dev/null || true
-        elif command -v systemctl >/dev/null 2>&1; then
-            systemctl restart zapret2.service 2>/dev/null || true
-        fi
-        echo -e "  ${TAG_OK} Служба Zapret2 перезапущена"
-        return 0
-    fi
     if [ -n "$target" ]; then
         target=$(norm_service "$target")
         shift || true
@@ -5641,16 +5480,6 @@ cmd_doctor() {
         if [ -f /opt/homelab/adguard/conf/AdGuardHome.yaml ] && grep -q 'anonymize_client_ip: false' /opt/homelab/adguard/conf/AdGuardHome.yaml 2>/dev/null; then
             echo -e "  ${TAG_OK} Идентификация клиентов LAN (AdGuard):     ${CLR_GREEN}[АКТИВНА (полные IP и имена устройств)]${CLR_RESET}"
         fi
-
-        if [[ "${SAVED_ENABLE_ZAPRET:-Y}" =~ ^[Yy]$ ]]; then
-            if pgrep -x nfqws2 >/dev/null 2>&1 || pidof nfqws2 >/dev/null 2>&1; then
-                echo -e "  ${TAG_OK} Zapret2 DPI-Bypass (демон nfqws2):       ${CLR_GREEN}[АКТИВЕН И ОБРАБАТЫВАЕТ ТРАФИК]${CLR_RESET}"
-            else
-                echo -e "  ${TAG_WARN} Zapret2 DPI-Bypass (демон nfqws2):       ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
-            fi
-            if command -v nft >/dev/null 2>&1 && nft list table inet zapret2 >/dev/null 2>&1; then
-                echo -e "  ${TAG_OK} nftables (таблица inet zapret2):         ${CLR_GREEN}[АКТИВНА И ПРИМЕНЕНА]${CLR_RESET}"
-            fi
         fi
     fi
 
@@ -5679,57 +5508,6 @@ cmd_update() {
     echo -e "  ${TAG_INFO} Очистка неиспользуемых устаревших слоёв..."
     docker image prune -f >/dev/null 2>&1 || true
     echo -e "  ${TAG_OK} Стек Homelab успешно обновлен до последних версий!"
-}
-
-cmd_blockcheck() {
-    local ZAPRET_DIR="/opt/zapret2"
-    if [ ! -f "${ZAPRET_DIR}/blockcheck2.sh" ]; then
-        echo -e "  ${TAG_ERR} Утилита blockcheck2.sh не найдена в ${ZAPRET_DIR}!"
-        echo -e "  Убедитесь, что модуль Zapret2 установлен."
-        return 1
-    fi
-
-    echo -e "${CLR_NEON_CYAN}${CLR_BOLD}╭── ИНТЕЛЛЕКТУАЛЬНЫЙ ПОДБОР СТРАТЕГИЙ DPI (ZAPRET2 BLOCKCHECK) ─${CLR_RESET}"
-    echo -e "  ${TAG_INFO} Подготовка к тестированию десинхронизации ТСПУ вашего провайдера..."
-    echo -e "  ${CLR_YELLOW}Внимание:${CLR_RESET} Для чистого замера DPI служба Zapret2 будет временно остановлена,"
-    echo -e "  а по окончании теста — автоматически запущена обратно с сохранением всех настроек."
-    echo ""
-
-    local RESTART_ZP=0
-    if pgrep -x nfqws2 >/dev/null 2>&1 || pgrep -f "nfqws2" >/dev/null 2>&1; then
-        RESTART_ZP=1
-        echo -e "  ${TAG_INFO} Временная приостановка nfqws2 для прямого замера DPI..."
-        if command -v rc-service >/dev/null 2>&1 && rc-service zapret2 status >/dev/null 2>&1; then
-            rc-service zapret2 stop >/dev/null 2>&1 || true
-        elif command -v systemctl >/dev/null 2>&1 && systemctl is-active zapret2.service >/dev/null 2>&1; then
-            systemctl stop zapret2.service >/dev/null 2>&1 || true
-        elif [ -x "${ZAPRET_DIR}/init.d/sysv/zapret2" ]; then
-            "${ZAPRET_DIR}/init.d/sysv/zapret2" stop >/dev/null 2>&1 || true
-        fi
-    fi
-
-    (
-        cd "${ZAPRET_DIR}"
-        chmod +x blockcheck2.sh 2>/dev/null || true
-        ./blockcheck2.sh "$@"
-    )
-    local RET=$?
-
-    if [ $RESTART_ZP -eq 1 ]; then
-        echo ""
-        echo -e "  ${TAG_INFO} Автоматический перезапуск службы Zapret2..."
-        if command -v rc-service >/dev/null 2>&1; then
-            rc-service zapret2 start >/dev/null 2>&1 || rc-service zapret2 restart >/dev/null 2>&1 || true
-        elif command -v systemctl >/dev/null 2>&1; then
-            systemctl start zapret2.service >/dev/null 2>&1 || systemctl restart zapret2.service >/dev/null 2>&1 || true
-        elif [ -x "${ZAPRET_DIR}/init.d/sysv/zapret2" ]; then
-            "${ZAPRET_DIR}/init.d/sysv/zapret2" start >/dev/null 2>&1 || true
-        fi
-        echo -e "  ${TAG_OK} Служба Zapret2 возвращена в исходное рабочее состояние."
-    fi
-
-    echo -e "${CLR_NEON_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
-    return $RET
 }
 
 cmd_version() {
@@ -5809,7 +5587,6 @@ cmd_upgrade() {
     [ -d "${APP_DIR}/mihomo" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" mihomo/config.yaml 2>/dev/null || true
     [ -d "${APP_DIR}/adguard/conf" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" adguard/conf/AdGuardHome.yaml 2>/dev/null || true
     [ -d "${APP_DIR}/configs/navidrome" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" configs/navidrome 2>/dev/null || true
-    [ -f "/opt/zapret2/config" ] && tar -rf "${SNAP_TAR}" -C "/opt" zapret2/config 2>/dev/null || true
     chmod 600 "${SNAP_TAR}" 2>/dev/null || true
     echo -e "  ${TAG_OK} Снимок конфигураций сохранен в: ${SNAP_TAR}"
 
@@ -5867,16 +5644,9 @@ cmd_rollback() {
 
     echo -e "  ${TAG_INFO} Восстановление конфигураций из снимка..."
     tar -xzf "${SNAP_TAR}" -C "${APP_DIR}" 2>/dev/null || true
-    [ -f "${APP_DIR}/zapret2/config" ] && cp -f "${APP_DIR}/zapret2/config" "/opt/zapret2/config" 2>/dev/null || true
 
     echo -e "  ${TAG_INFO} Перезапуск сервисов после отката..."
     (cd "${APP_DIR}" && dc_cmd up -d) >/dev/null 2>&1 || true
-
-    if command -v rc-service >/dev/null 2>&1 && rc-service zapret2 status >/dev/null 2>&1; then
-        rc-service zapret2 restart >/dev/null 2>&1 || true
-    elif command -v systemctl >/dev/null 2>&1 && systemctl is-active zapret2.service >/dev/null 2>&1; then
-        systemctl restart zapret2.service >/dev/null 2>&1 || true
-    fi
 
     echo -e "  ${TAG_OK} Откат завершен: конфигурация успешно возвращена к предыдущему состоянию."
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
@@ -6061,7 +5831,6 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}dump-logs [файл]${CLR_RESET}    Собрать логи всех сервисов и системы в единый файл"
     echo -e "  ${CLR_WHITE}bot [действие]${CLR_RESET}      Управление Telegram-ботом медиа (start|stop|restart|logs|status)"
     echo -e "  ${CLR_WHITE}doctor${CLR_RESET}              Комплексная самодиагностика DNS, TUN, NAT и прав"
-    echo -e "  ${CLR_WHITE}blockcheck [домен]${CLR_RESET}  Тестирование и автоподбор стратегий обхода ТСПУ (Zapret2)"
     echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
     echo -e "  ${CLR_WHITE}notify [текст]${CLR_RESET}      Отправить тестовое оповещение в Telegram"
     echo -e "  ${CLR_WHITE}update${CLR_RESET}              Обновление всех Docker-образов стека"
@@ -6083,7 +5852,6 @@ case "${1:-status}" in
     bot|tg-bot) shift; cmd_bot "$@" ;;
     backup) cmd_backup ;;
     doctor|check) cmd_doctor ;;
-    blockcheck|check-dpi|test-dpi) shift; cmd_blockcheck "$@" ;;
     upgrade|self-update|ota) shift; cmd_upgrade "$@" ;;
     rollback|revert) cmd_rollback ;;
     version|-v|--version|check-update) cmd_version ;;
@@ -6252,20 +6020,6 @@ EOF_DIAG
         echo "Firewall status: ${FW_STATUS}" >> "${DIAG_LOG}"
     fi
 
-    if [[ "${ENABLE_ZAPRET}" =~ ^[Yy]$ ]]; then
-        local ZP_RUNNING=0
-        if pgrep -x nfqws2 >/dev/null 2>&1 || pgrep -f "nfqws2" >/dev/null 2>&1; then
-            ZP_RUNNING=1
-        fi
-        if [ "$ZP_RUNNING" -eq 1 ]; then
-            echo -e "    ${TAG_OK} Zapret2 DPI-Bypass (nfqws2): ${CLR_GREEN}[РАБОТАЕТ]${CLR_RESET}"
-            echo "Zapret2 DPI-Bypass: RUNNING (nfqws2)" >> "${DIAG_LOG}"
-        else
-            echo -e "    ${TAG_WARN} Zapret2 DPI-Bypass (nfqws2): ${CLR_YELLOW}[ОСТАНОВЛЕН / СБОЙ]${CLR_RESET}"
-            echo "Zapret2 DPI-Bypass: NOT RUNNING" >> "${DIAG_LOG}"
-        fi
-    fi
-
     local DNS_TEST=0
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
         if python3 -c "import socket, sys; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 53)); data, _ = s.recvfrom(512); sys.exit(0 if len(data) > 12 else 1)" 2>/dev/null; then
@@ -6355,9 +6109,6 @@ show_summary_dashboard() {
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Секрет API панели управления:${CLR_RESET}    ${CLR_NEON_GOLD}${MIHOMO_SECRET}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Госуслуги, банки и сервисы РФ:${CLR_RESET}   ${CLR_NEON_GREEN}100% ПРЯМОЙ ДОСТУП (DIRECT, без капч и задержек)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Маршрутизация YouTube & Media:${CLR_RESET}  ${CLR_NEON_GREEN}АКТИВНА (Туннелирование -> AUTO / PROXY)${CLR_RESET}"
-        if [[ "${ENABLE_ZAPRET}" =~ ^[Yy]$ ]]; then
-            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Zapret2 DPI-Bypass:${CLR_RESET}          ${CLR_NEON_GREEN}АКТИВЕН (nfqws2: YouTube 4K/Discord/Pixiv/DPI для ВСЕХ сайтов)${CLR_RESET}"
-        fi
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Защита от перехвата и утечек:${CLR_RESET}    ${CLR_NEON_GREEN}АКТИВНА (nftables DNS Hijack -> порт 53)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Автоматический TCP MSS Clamp:${CLR_RESET}    ${CLR_NEON_GREEN}АКТИВЕН (защита от зависания пакетов на MTU)${CLR_RESET}"
         if [ -n "${SELECTED_DOH_1:-}" ]; then
@@ -6463,7 +6214,6 @@ show_summary_dashboard() {
     echo -e "  ${CLR_NEON_CYAN}╭── ЕДИНАЯ КОНСОЛЬНАЯ УТИЛИТА УПРАВЛЕНИЯ (HOMELAB CLI) ───────────────────────╮${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Статус и дашборд:${CLR_RESET}            ${CLR_NEON_GREEN}homelab status${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Полная самодиагностика:${CLR_RESET}      ${CLR_NEON_GREEN}homelab doctor${CLR_RESET}"
-    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Автоподбор стратегий DPI:${CLR_RESET}     ${CLR_NEON_GREEN}homelab blockcheck${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журналы сервисов в реалтайме:${CLR_RESET} ${CLR_NEON_GREEN}homelab logs [сервис] -f${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Экспорт всех логов в файл:${CLR_RESET}   ${CLR_NEON_GREEN}homelab dump-logs${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Перезапуск стека/сервиса:${CLR_RESET}    ${CLR_NEON_GREEN}homelab restart [сервис]${CLR_RESET}"
@@ -6501,7 +6251,6 @@ main() {
     prompt_configuration
     setup_credentials
     setup_gateway_networking
-    setup_zapret2
     setup_directories
     benchmark_dns_servers
     configure_gateway_services

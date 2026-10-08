@@ -932,16 +932,6 @@ cmd_status() {
 
 cmd_restart() {
     local target="${1:-}"
-    if [ "$target" = "zapret" ] || [ "$target" = "zapret2" ]; then
-        echo -e "  ${TAG_INFO} Перезапуск службы Zapret2 DPI-Bypass..."
-        if command -v rc-service >/dev/null 2>&1; then
-            rc-service zapret2 restart 2>/dev/null || rc-service zapret2 start 2>/dev/null || true
-        elif command -v systemctl >/dev/null 2>&1; then
-            systemctl restart zapret2.service 2>/dev/null || true
-        fi
-        echo -e "  ${TAG_OK} Служба Zapret2 перезапущена"
-        return 0
-    fi
     if [ -n "$target" ]; then
         target=$(norm_service "$target")
         shift || true
@@ -1125,16 +1115,6 @@ cmd_doctor() {
         if [ -f /opt/homelab/adguard/conf/AdGuardHome.yaml ] && grep -q 'anonymize_client_ip: false' /opt/homelab/adguard/conf/AdGuardHome.yaml 2>/dev/null; then
             echo -e "  ${TAG_OK} Идентификация клиентов LAN (AdGuard):     ${CLR_GREEN}[АКТИВНА (полные IP и имена устройств)]${CLR_RESET}"
         fi
-
-        if [[ "${SAVED_ENABLE_ZAPRET:-Y}" =~ ^[Yy]$ ]]; then
-            if pgrep -x nfqws2 >/dev/null 2>&1 || pidof nfqws2 >/dev/null 2>&1; then
-                echo -e "  ${TAG_OK} Zapret2 DPI-Bypass (демон nfqws2):       ${CLR_GREEN}[АКТИВЕН И ОБРАБАТЫВАЕТ ТРАФИК]${CLR_RESET}"
-            else
-                echo -e "  ${TAG_WARN} Zapret2 DPI-Bypass (демон nfqws2):       ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
-            fi
-            if command -v nft >/dev/null 2>&1 && nft list table inet zapret2 >/dev/null 2>&1; then
-                echo -e "  ${TAG_OK} nftables (таблица inet zapret2):         ${CLR_GREEN}[АКТИВНА И ПРИМЕНЕНА]${CLR_RESET}"
-            fi
         fi
     fi
 
@@ -1163,57 +1143,6 @@ cmd_update() {
     echo -e "  ${TAG_INFO} Очистка неиспользуемых устаревших слоёв..."
     docker image prune -f >/dev/null 2>&1 || true
     echo -e "  ${TAG_OK} Стек Homelab успешно обновлен до последних версий!"
-}
-
-cmd_blockcheck() {
-    local ZAPRET_DIR="/opt/zapret2"
-    if [ ! -f "${ZAPRET_DIR}/blockcheck2.sh" ]; then
-        echo -e "  ${TAG_ERR} Утилита blockcheck2.sh не найдена в ${ZAPRET_DIR}!"
-        echo -e "  Убедитесь, что модуль Zapret2 установлен."
-        return 1
-    fi
-
-    echo -e "${CLR_NEON_CYAN}${CLR_BOLD}╭── ИНТЕЛЛЕКТУАЛЬНЫЙ ПОДБОР СТРАТЕГИЙ DPI (ZAPRET2 BLOCKCHECK) ─${CLR_RESET}"
-    echo -e "  ${TAG_INFO} Подготовка к тестированию десинхронизации ТСПУ вашего провайдера..."
-    echo -e "  ${CLR_YELLOW}Внимание:${CLR_RESET} Для чистого замера DPI служба Zapret2 будет временно остановлена,"
-    echo -e "  а по окончании теста — автоматически запущена обратно с сохранением всех настроек."
-    echo ""
-
-    local RESTART_ZP=0
-    if pgrep -x nfqws2 >/dev/null 2>&1 || pgrep -f "nfqws2" >/dev/null 2>&1; then
-        RESTART_ZP=1
-        echo -e "  ${TAG_INFO} Временная приостановка nfqws2 для прямого замера DPI..."
-        if command -v rc-service >/dev/null 2>&1 && rc-service zapret2 status >/dev/null 2>&1; then
-            rc-service zapret2 stop >/dev/null 2>&1 || true
-        elif command -v systemctl >/dev/null 2>&1 && systemctl is-active zapret2.service >/dev/null 2>&1; then
-            systemctl stop zapret2.service >/dev/null 2>&1 || true
-        elif [ -x "${ZAPRET_DIR}/init.d/sysv/zapret2" ]; then
-            "${ZAPRET_DIR}/init.d/sysv/zapret2" stop >/dev/null 2>&1 || true
-        fi
-    fi
-
-    (
-        cd "${ZAPRET_DIR}"
-        chmod +x blockcheck2.sh 2>/dev/null || true
-        ./blockcheck2.sh "$@"
-    )
-    local RET=$?
-
-    if [ $RESTART_ZP -eq 1 ]; then
-        echo ""
-        echo -e "  ${TAG_INFO} Автоматический перезапуск службы Zapret2..."
-        if command -v rc-service >/dev/null 2>&1; then
-            rc-service zapret2 start >/dev/null 2>&1 || rc-service zapret2 restart >/dev/null 2>&1 || true
-        elif command -v systemctl >/dev/null 2>&1; then
-            systemctl start zapret2.service >/dev/null 2>&1 || systemctl restart zapret2.service >/dev/null 2>&1 || true
-        elif [ -x "${ZAPRET_DIR}/init.d/sysv/zapret2" ]; then
-            "${ZAPRET_DIR}/init.d/sysv/zapret2" start >/dev/null 2>&1 || true
-        fi
-        echo -e "  ${TAG_OK} Служба Zapret2 возвращена в исходное рабочее состояние."
-    fi
-
-    echo -e "${CLR_NEON_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
-    return $RET
 }
 
 cmd_version() {
@@ -1293,7 +1222,6 @@ cmd_upgrade() {
     [ -d "${APP_DIR}/mihomo" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" mihomo/config.yaml 2>/dev/null || true
     [ -d "${APP_DIR}/adguard/conf" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" adguard/conf/AdGuardHome.yaml 2>/dev/null || true
     [ -d "${APP_DIR}/configs/navidrome" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" configs/navidrome 2>/dev/null || true
-    [ -f "/opt/zapret2/config" ] && tar -rf "${SNAP_TAR}" -C "/opt" zapret2/config 2>/dev/null || true
     chmod 600 "${SNAP_TAR}" 2>/dev/null || true
     echo -e "  ${TAG_OK} Снимок конфигураций сохранен в: ${SNAP_TAR}"
 
@@ -1351,16 +1279,9 @@ cmd_rollback() {
 
     echo -e "  ${TAG_INFO} Восстановление конфигураций из снимка..."
     tar -xzf "${SNAP_TAR}" -C "${APP_DIR}" 2>/dev/null || true
-    [ -f "${APP_DIR}/zapret2/config" ] && cp -f "${APP_DIR}/zapret2/config" "/opt/zapret2/config" 2>/dev/null || true
 
     echo -e "  ${TAG_INFO} Перезапуск сервисов после отката..."
     (cd "${APP_DIR}" && dc_cmd up -d) >/dev/null 2>&1 || true
-
-    if command -v rc-service >/dev/null 2>&1 && rc-service zapret2 status >/dev/null 2>&1; then
-        rc-service zapret2 restart >/dev/null 2>&1 || true
-    elif command -v systemctl >/dev/null 2>&1 && systemctl is-active zapret2.service >/dev/null 2>&1; then
-        systemctl restart zapret2.service >/dev/null 2>&1 || true
-    fi
 
     echo -e "  ${TAG_OK} Откат завершен: конфигурация успешно возвращена к предыдущему состоянию."
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
@@ -1545,7 +1466,6 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}dump-logs [файл]${CLR_RESET}    Собрать логи всех сервисов и системы в единый файл"
     echo -e "  ${CLR_WHITE}bot [действие]${CLR_RESET}      Управление Telegram-ботом медиа (start|stop|restart|logs|status)"
     echo -e "  ${CLR_WHITE}doctor${CLR_RESET}              Комплексная самодиагностика DNS, TUN, NAT и прав"
-    echo -e "  ${CLR_WHITE}blockcheck [домен]${CLR_RESET}  Тестирование и автоподбор стратегий обхода ТСПУ (Zapret2)"
     echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
     echo -e "  ${CLR_WHITE}notify [текст]${CLR_RESET}      Отправить тестовое оповещение в Telegram"
     echo -e "  ${CLR_WHITE}update${CLR_RESET}              Обновление всех Docker-образов стека"
@@ -1567,7 +1487,6 @@ case "${1:-status}" in
     bot|tg-bot) shift; cmd_bot "$@" ;;
     backup) cmd_backup ;;
     doctor|check) cmd_doctor ;;
-    blockcheck|check-dpi|test-dpi) shift; cmd_blockcheck "$@" ;;
     upgrade|self-update|ota) shift; cmd_upgrade "$@" ;;
     rollback|revert) cmd_rollback ;;
     version|-v|--version|check-update) cmd_version ;;
