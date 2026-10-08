@@ -70,9 +70,10 @@ setup_directories() {
 import urllib.request, zipfile, os
 
 urls = [
-    'https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
+    'https://ghfast.top/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
     'https://mirror.ghproxy.com/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
-    'https://ghproxy.net/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip'
+    'https://ghproxy.net/https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip',
+    'https://github.com/VueTorrent/VueTorrent/releases/latest/download/vuetorrent.zip'
 ]
 zip_p = '/tmp/vuetorrent.zip'
 dest = '${APP_DIR}/qbittorrent/vuetorrent'
@@ -81,7 +82,7 @@ os.makedirs(dest, exist_ok=True)
 for u in urls:
     try:
         req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=15) as resp, open(zip_p, 'wb') as f:
+        with urllib.request.urlopen(req, timeout=8) as resp, open(zip_p, 'wb') as f:
             f.write(resp.read())
         if os.path.isfile(zip_p) and os.path.getsize(zip_p) > 50000:
             break
@@ -180,13 +181,43 @@ EOF_QBIT_CONF
 
         if [ -n "${SUB_URL}" ] && [ "${SUB_URL}" != "none" ]; then
             log_info "Проверка и кэширование подписки прокси..."
-            curl -fsSL --connect-timeout 8 -m 20 "${SUB_URL}" -o "${APP_DIR}/mihomo/providers/proxies.yaml.tmp" 2>/dev/null || true
-            if [ -s "${APP_DIR}/mihomo/providers/proxies.yaml.tmp" ]; then
+            local SUB_OK=0
+            if curl -fsSL -4 -k -A "clash.meta" --connect-timeout 6 -m 15 "${SUB_URL}" -o "${APP_DIR}/mihomo/providers/proxies.yaml.tmp" 2>/dev/null && \
+               [ -s "${APP_DIR}/mihomo/providers/proxies.yaml.tmp" ]; then
+                SUB_OK=1
+            elif curl -fsSL -4 -k -A "mihomo" --connect-timeout 6 -m 15 "${SUB_URL}" -o "${APP_DIR}/mihomo/providers/proxies.yaml.tmp" 2>/dev/null && \
+                 [ -s "${APP_DIR}/mihomo/providers/proxies.yaml.tmp" ]; then
+                SUB_OK=1
+            elif curl -fsSL -4 -k --connect-timeout 6 -m 15 "${SUB_URL}" -o "${APP_DIR}/mihomo/providers/proxies.yaml.tmp" 2>/dev/null && \
+                 [ -s "${APP_DIR}/mihomo/providers/proxies.yaml.tmp" ]; then
+                SUB_OK=1
+            elif python3 -c "
+import urllib.request, ssl, sys
+ctx = ssl._create_unverified_context()
+req = urllib.request.Request('${SUB_URL}', headers={'User-Agent': 'clash.meta; clash-verge; mihomo'})
+try:
+    with urllib.request.urlopen(req, timeout=12, context=ctx) as resp:
+        d = resp.read()
+        if len(d) > 50:
+            with open('${APP_DIR}/mihomo/providers/proxies.yaml.tmp', 'wb') as f:
+                f.write(d)
+            sys.exit(0)
+except Exception:
+    pass
+sys.exit(1)
+" 2>/dev/null && [ -s "${APP_DIR}/mihomo/providers/proxies.yaml.tmp" ]; then
+                SUB_OK=1
+            fi
+
+            if [ "${SUB_OK}" -eq 1 ]; then
                 mv -f "${APP_DIR}/mihomo/providers/proxies.yaml.tmp" "${APP_DIR}/mihomo/providers/proxies.yaml"
-                log_ok "Подписка успешно проверена и кэширована"
+                local SUB_LINES
+                SUB_LINES=$(wc -l < "${APP_DIR}/mihomo/providers/proxies.yaml" 2>/dev/null || echo 0)
+                log_ok "Подписка успешно проверена и кэширована (${SUB_LINES} строк конфигурации)"
             else
                 rm -f "${APP_DIR}/mihomo/providers/proxies.yaml.tmp"
-                log_warn "Подписка временно недоступна или пуста. Будет активирован безопасный режим DIRECT."
+                log_warn "Подписка временно недоступна на этапе предзагрузки."
+                echo -e "      ${CLR_DIM}Mihomo автоматически загрузит подписку при старте службы через свои встроенные механизмы.${CLR_RESET}"
             fi
         fi
 
@@ -195,15 +226,15 @@ EOF_QBIT_CONF
         else
             fetch_metacubexd() {
                 local urls=(
-                    'https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
+                    'https://ghfast.top/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
                     'https://mirror.ghproxy.com/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
-                    'https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.tar.gz'
-                    'https://mirror.ghproxy.com/https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.tar.gz'
-                    'https://ghproxy.net/https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.tar.gz'
+                    'https://ghproxy.net/https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
+                    'https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz'
+                    'https://ghfast.top/https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.tar.gz'
                 )
                 local tar_tmp="/tmp/metacubexd.tar.gz"
                 for u in "${urls[@]}"; do
-                    if curl -fsSL --connect-timeout 8 -m 30 "$u" -o "$tar_tmp" 2>/dev/null && [ -s "$tar_tmp" ]; then
+                    if curl -fsSL -4 -k --connect-timeout 3 -m 10 "$u" -o "$tar_tmp" 2>/dev/null && [ -s "$tar_tmp" ]; then
                         if [[ "$u" =~ compressed-dist ]]; then
                             tar -xzf "$tar_tmp" -C "${APP_DIR}/mihomo/ui" 2>/dev/null && rm -f "$tar_tmp" && return 0
                         else
@@ -214,34 +245,68 @@ EOF_QBIT_CONF
                 done
                 return 1
             }
-            if ! run_spin "Загрузка веб-интерфейса MetaCubeXD (с зеркалами)" fetch_metacubexd; then
+
+            if run_spin "Загрузка веб-интерфейса MetaCubeXD (с зеркалами)" fetch_metacubexd; then
+                log_ok "Веб-интерфейс MetaCubeXD успешно развернут"
+            else
+                log_info "Активация встроенного автономного веб-портала управления шлюзом..."
                 cat << 'EOF_FALLBACK_UI' > "${APP_DIR}/mihomo/ui/index.html"
 <!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mihomo TUN Gateway</title>
+<title>Homelab Gateway Dashboard</title>
 <style>
-body { background: #0f172a; color: #f8fafc; font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-.card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 28px; max-width: 520px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-h1 { color: #38bdf8; font-size: 22px; margin-top: 0; }
-p { color: #94a3b8; font-size: 14px; line-height: 1.6; }
-.btn { display: inline-block; background: #0284c7; color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 6px; font-weight: 500; margin-top: 12px; }
-.btn:hover { background: #0369a1; }
-.badge { background: #047857; color: #a7f3d0; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+:root { --bg: #090d16; --card: #111827; --border: #1f2937; --accent: #38bdf8; --green: #10b981; --purple: #a855f7; --text: #f3f4f6; --muted: #9ca3af; }
+body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; box-sizing: border-box; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px; max-width: 580px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+h1 { color: var(--accent); font-size: 22px; margin: 0; display: flex; align-items: center; gap: 8px; }
+.badge { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; }
+p { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 8px 0 20px; }
+.links { display: grid; gap: 10px; margin: 16px 0; }
+.btn { display: flex; align-items: center; justify-content: space-between; background: #1f2937; color: var(--text); text-decoration: none; padding: 12px 16px; border-radius: 10px; font-weight: 500; font-size: 14px; border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s; }
+.btn:hover { background: #374151; border-color: var(--accent); transform: translateY(-1px); }
+.btn-primary { background: #0284c7; color: #fff; font-weight: 600; }
+.btn-primary:hover { background: #0369a1; }
+.info-box { background: rgba(56, 189, 248, 0.06); border-left: 3px solid var(--accent); padding: 12px 14px; border-radius: 6px; font-size: 13px; color: #cbd5e1; margin-top: 18px; line-height: 1.5; }
+code { background: #1e293b; color: var(--accent); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 12px; }
 </style>
 </head>
 <body>
 <div class="card">
-  <span class="badge">ONLINE</span>
-  <h1>Mihomo TUN Smart Gateway</h1>
-  <p>Ядро маршрутизации успешно запущено и активно. Внешний веб-интерфейс MetaCubeXD может быть открыт через официальный онлайн-клиент или обновлен позже.</p>
-  <a class="btn" href="https://metacubex.github.io/metacubexd/" target="_blank" rel="noopener">Открыть MetaCubeXD Online</a>
+  <div class="header">
+    <h1>🚀 Homelab Gateway</h1>
+    <span class="badge">CORE ONLINE</span>
+  </div>
+  <p>Ядро маршрутизации <b>Mihomo TUN</b> и <b>AdGuard Home</b> успешно запущены и функционируют на данном сервере.</p>
+  <div class="links">
+    <a class="btn btn-primary" href="https://metacubex.github.io/metacubexd/#/?hostname=proxy.lan&port=443&protocol=https" target="_blank" rel="noopener">
+      <span>🌐 Открыть MetaCubeXD Online</span>
+      <span>↗</span>
+    </a>
+    <a class="btn" href="https://adguard.lan" target="_blank" rel="noopener">
+      <span>🛡️ AdGuard Home Dashboard</span>
+      <span>→</span>
+    </a>
+    <a class="btn" href="https://music.lan" target="_blank" rel="noopener">
+      <span>🎵 Navidrome Hi-Fi Стриминг</span>
+      <span>→</span>
+    </a>
+    <a class="btn" href="https://logs.lan" target="_blank" rel="noopener">
+      <span>📋 Журналы Dozzle</span>
+      <span>→</span>
+    </a>
+  </div>
+  <div class="info-box">
+    💡 <b>API шлюза:</b> Хост: <code>proxy.lan</code> | Порт: <code>443</code> (HTTPS)
+  </div>
 </div>
 </body>
 </html>
 EOF_FALLBACK_UI
+                log_ok "Встроенный портал управления шлюзом успешно подготовлен"
             fi
         fi
 
@@ -251,11 +316,14 @@ EOF_FALLBACK_UI
 
         mkdir -p "${APP_DIR}/mihomo/ruleset"
         fetch_mrs_rulesets() {
-            local CDN_FASTLY="https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo"
-            local CDN_TESTING="https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo"
-            local GHPROXY_NET="https://ghproxy.net/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo"
-            local GHPROXY_BASE="https://mirror.ghproxy.com/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo"
-            local RAW_BASE="https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo"
+            local TEST_MIRRORS=(
+                "https://raw.gitmirror.com/MetaCubeX/meta-rules-dat/meta/geo"
+                "https://ghfast.top/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo"
+                "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo"
+                "https://mirror.ghproxy.com/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo"
+                "https://ghproxy.net/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo"
+                "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo"
+            )
 
             local RULES=(
                 "geosite/category-ru.mrs"
@@ -271,23 +339,38 @@ EOF_FALLBACK_UI
                 "geoip/ru.mrs"
             )
 
+            local WORKING_BASE=""
+            for m in "${TEST_MIRRORS[@]}"; do
+                if curl -fsSL -4 -k --connect-timeout 2 -m 3 "${m}/geosite/youtube.mrs" -o /dev/null 2>/dev/null; then
+                    WORKING_BASE="$m"
+                    break
+                fi
+            done
+
+            if [ -z "$WORKING_BASE" ]; then
+                return 0
+            fi
+
+            local pids=()
             for rel_path in "${RULES[@]}"; do
                 local fname
                 fname=$(basename "$rel_path")
                 local target="${APP_DIR}/mihomo/ruleset/${fname}"
                 if [ ! -s "$target" ]; then
-                    curl -fsSL --connect-timeout 6 -m 15 "${CDN_FASTLY}/${rel_path}" -o "${target}.tmp" 2>/dev/null || \
-                    curl -fsSL --connect-timeout 6 -m 15 "${GHPROXY_NET}/${rel_path}" -o "${target}.tmp" 2>/dev/null || \
-                    curl -fsSL --connect-timeout 6 -m 15 "${CDN_TESTING}/${rel_path}" -o "${target}.tmp" 2>/dev/null || \
-                    curl -fsSL --connect-timeout 6 -m 15 "${GHPROXY_BASE}/${rel_path}" -o "${target}.tmp" 2>/dev/null || \
-                    curl -fsSL --connect-timeout 6 -m 15 "${RAW_BASE}/${rel_path}" -o "${target}.tmp" 2>/dev/null || true
-                    
-                    if [ -s "${target}.tmp" ] && [ "$(wc -c < "${target}.tmp" 2>/dev/null || echo 0)" -ge 100 ]; then
-                        mv -f "${target}.tmp" "$target"
-                    else
-                        rm -f "${target}.tmp"
-                    fi
+                    (
+                        if curl -fsSL -4 -k --connect-timeout 3 -m 8 "${WORKING_BASE}/${rel_path}" -o "${target}.tmp" 2>/dev/null && \
+                           [ -s "${target}.tmp" ] && [ "$(wc -c < "${target}.tmp" 2>/dev/null || echo 0)" -ge 100 ]; then
+                            mv -f "${target}.tmp" "$target"
+                        else
+                            rm -f "${target}.tmp"
+                        fi
+                    ) &
+                    pids+=($!)
                 fi
+            done
+
+            for pid in "${pids[@]}"; do
+                wait "$pid" 2>/dev/null || true
             done
             return 0
         }
