@@ -83,47 +83,47 @@ flowchart TD
     end
 
     subgraph SERVER[" ⚡ Homelab Server (Прозрачный шлюз) "]
-        NFT["🛡️ Native nftables (inet homelab)\n• TCP MSS Clamping (MTU)\n• DNS Hijack (Порт 53 Anti-Bypass)\n• Защита от петель маршрута"]
+        NFT["🛡️ Native nftables (inet homelab)<br/>• TCP MSS Clamping (MTU)<br/>• DNS Hijack (Порт 53 Anti-Bypass)<br/>• Защита от петель маршрута"]
         
-        AGH["🟢 AdGuard Home (:53)\n• Zero-Cache (Синхронизация Fake-IP)\n• Защита от DoH/ECH утечек\n• Чистые фильтры без ложных банов"]
+        AGH["🟢 AdGuard Home (:53)<br/>• Zero-Cache (Синхронизация Fake-IP)<br/>• Защита от DoH/ECH утечек<br/>• Чистые фильтры без ложных банов"]
         
-        MIHOMO["🚀 Mihomo Core (:1053 TUN / Fake-IP)\n• Stack: Mixed (gVisor + System UDP)\n• Full-Cone NAT (Discord / Voice)\n• Группа US-AUTO (AI: ChatGPT, Claude)\n• Meta Rule-Sets (.mrs)"]
+        MIHOMO["🚀 Mihomo Core (:1053 TUN / Fake-IP)<br/>• Stack: Mixed (gVisor + System UDP)<br/>• Full-Cone NAT (Discord / Voice)<br/>• Группа US-AUTO (AI: ChatGPT, Claude)<br/>• Meta Rule-Sets (.mrs)"]
         
-        ZAPRET["⚡ Zapret2 (NFQUEUE / nfqws2)\n• Hardware DPI Desync Engine\n• YouTube 4K & Discord на прямом канале\n• Discord Media UDP Voice Handler"]
+        ZAPRET["⚡ Zapret2 (NFQUEUE / nfqws2)<br/>• Hardware DPI Desync Engine<br/>• YouTube 4K & Discord на прямом канале<br/>• Discord Media UDP Voice Handler"]
 
-        CADDY["🔒 Caddy Web Gateway (:80 / :443)\n• Стартовый веб-портал по IP\n• Раздача Root CA сертификата\n• Локальные домены *.lan"]
+        CADDY["🔒 Caddy Web Gateway (:80 / :443)<br/>• Стартовый веб-портал по IP<br/>• Раздача Root CA сертификата<br/>• Локальные домены *.lan"]
 
         subgraph APPS[" 📦 Docker Compose Стек (Self-Healing) "]
-            NAVI["🎵 Navidrome\n(music.lan)"]
-            VW["🔑 Vaultwarden\n(vault.lan)"]
-            GIT["🐙 Gitea\n(git.lan)"]
-            QBIT["📥 qBittorrent\n+ VueTorrent (torrent.lan)"]
-            BOT["🤖 Telegram Media Bot\n(yt-dlp Audio/Video)"]
-            DOZZLE["📋 Dozzle Logs\n(logs.lan)"]
-            SMB["📂 Samba NAS\n(\\IP\\storage & \\IP\\music)"]
-            HEAL["🩺 Autoheal\n(Автоперезапуск)"]
-            WT["🔄 Watchtower\n(Автообновление)"]
+            NAVI["🎵 Navidrome<br/>(music.lan)"]
+            VW["🔑 Vaultwarden<br/>(vault.lan)"]
+            GIT["🐙 Gitea<br/>(git.lan)"]
+            QBIT["📥 qBittorrent<br/>+ VueTorrent (torrent.lan)"]
+            BOT["🤖 Telegram Media Bot<br/>(yt-dlp Audio/Video)"]
+            DOZZLE["📋 Dozzle Logs<br/>(logs.lan)"]
+            SMB["📂 Samba NAS<br/>(\\IP\storage и \\IP\music)"]
+            HEAL["🩺 Autoheal<br/>(Автоперезапуск)"]
+            WT["🔄 Watchtower<br/>(Автообновление)"]
         end
     end
 
     subgraph INTERNET[" 🌐 Внешний интернет "]
-        DIRECT_NET["🇷🇺 Провайдерский канал (Direct ISP до 1 Гбит/с)\n• Госуслуги, Банки, VK, Ozon, Steam, P2P Торренты\n• YouTube 4K & Discord (Десинхронизация через Zapret2)"]
-        PROXY_NET["🌍 Зарубежный прокси-туннель (VLESS / SS / Hysteria2)\n• OpenAI ChatGPT, Claude, Gemini (US-AUTO)\n• Заблокированные трекеры, X, Instagram, Резерв"]
+        DIRECT_NET["🇷🇺 Провайдерский канал (Direct ISP до 1 Гбит/с)<br/>• Госуслуги, Банки, VK, Ozon, Steam, P2P Торренты<br/>• YouTube 4K & Discord (Десинхронизация через Zapret2)"]
+        PROXY_NET["🌍 Зарубежный прокси-туннель (VLESS / SS / Hysteria2)<br/>• OpenAI ChatGPT, Claude, Gemini (US-AUTO)<br/>• Заблокированные трекеры, X, Instagram, Резерв"]
     end
 
-    TV & PC & PHONE & CONSOLE -->|DNS (UDP/TCP 53)| NFT
+    TV & PC & PHONE & CONSOLE -->|"DNS (UDP/TCP 53)"| NFT
     NFT --> AGH
-    AGH -->|Upstream :1053| MIHOMO
+    AGH -->|"Upstream :1053"| MIHOMO
     
-    TV & PC & PHONE & CONSOLE -->|Трафик LAN| NFT
+    TV & PC & PHONE & CONSOLE -->|"Трафик LAN"| NFT
     NFT --> MIHOMO
-    NFT -.->|NFQUEUE: Direct TCP/UDP| ZAPRET
-    ZAPRET -->|Десинхронизированные пакеты| DIRECT_NET
+    NFT -.->|"NFQUEUE: Direct TCP/UDP"| ZAPRET
+    ZAPRET -->|"Десинхронизированные пакеты"| DIRECT_NET
 
-    MIHOMO -->|DIRECT (.ru / GEOIP RU / P2P)| DIRECT_NET
-    MIHOMO -->|PROXY (US-AUTO / Blocked)| PROXY_NET
+    MIHOMO -->|"DIRECT (.ru / GEOIP RU / P2P)"| DIRECT_NET
+    MIHOMO -->|"PROXY (US-AUTO / Blocked)"| PROXY_NET
 
-    PC & PHONE -->|HTTP :80 / HTTPS :443| CADDY
+    PC & PHONE -->|"HTTP :80 / HTTPS :443"| CADDY
     CADDY --> APPS
 ```
 
