@@ -93,14 +93,74 @@ TAG_ERR="${CLR_RED}✖${CLR_RESET}"
 TAG_BOLT="${CLR_NEON_GOLD}⚡${CLR_RESET}"
 TAG_DIAMOND="${CLR_NEON_PURPLE}◈${CLR_RESET}"
 
-log_info()  { echo -e "  ${TAG_INFO} ${CLR_CYAN}$*${CLR_RESET}"; }
-log_ok()    { echo -e "  ${TAG_OK} ${CLR_GREEN}$*${CLR_RESET}"; }
-log_warn()  { echo -e "  ${TAG_WARN} ${CLR_YELLOW}$*${CLR_RESET}"; }
-log_err()   { echo -e "  ${TAG_ERR} ${CLR_RED}$*${CLR_RESET}" >&2; }
+# ------------------------------------------------------------------------------
+# СИСТЕМА ЛОГИРОВАНИЯ И ПРОФИЛИРОВАНИЯ (INSTALLER LOGGING & STEP PROFILER)
+# ------------------------------------------------------------------------------
+INSTALL_LOG_FILE="/var/log/homelab-install.log"
+INSTALL_SYMLINK="/opt/homelab/install.log"
+SCRIPT_START_SECONDS=${SECONDS:-0}
+PREV_STEP_NAME=""
+PREV_STEP_START_SEC=0
+declare -a PROFILED_STEP_NAMES=()
+declare -a PROFILED_STEP_DURS=()
+
+_log_to_file() {
+    local level="$1"
+    shift
+    local msg="$*"
+    if [ -n "${INSTALL_LOG_FILE:-}" ]; then
+        local clean_msg
+        clean_msg=$(printf '%s' "${msg}" | sed -E 's/\x1B\[[0-9;]*[a-zA-Z]//g')
+        printf '[%s] [%-5s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${level}" "${clean_msg}" >> "${INSTALL_LOG_FILE}" 2>/dev/null || true
+    fi
+}
+
+init_install_logger() {
+    SCRIPT_START_SECONDS=$SECONDS
+    mkdir -p "/var/log" "/opt/homelab" 2>/dev/null || true
+
+    if [ -f "${INSTALL_LOG_FILE}" ]; then
+        mv -f "${INSTALL_LOG_FILE}" "${INSTALL_LOG_FILE}.prev" 2>/dev/null || true
+    fi
+
+    {
+        echo "============================================================================="
+        echo "         HOMELAB APPLIANCE & GATEWAY: ЖУРНАЛ РАЗВЕРТЫВАНИЯ / ОБНОВЛЕНИЯ     "
+        echo "                 Версия ядра: v${HOMELAB_VERSION:-2.8.16}                    "
+        echo "                 Дата и время: $(date '+%Y-%m-%d %H:%M:%S %Z')              "
+        echo "============================================================================="
+        echo "Хост:            $(hostname 2>/dev/null || uname -n)"
+        echo "Ядро / ОС:       $(uname -srm 2>/dev/null || uname -a)"
+        echo "Пользователь:    $(whoami 2>/dev/null || id -un 2>/dev/null || echo 'root')"
+        echo "Режим запуска:   $([ "${IS_UPGRADE_MODE:-0}" -eq 1 ] && echo 'ОБНОВЛЕНИЕ (Upgrade)' || echo 'ПЕРВИЧНАЯ УСТАНОВКА (Install)')"
+        echo "-----------------------------------------------------------------------------"
+    } > "${INSTALL_LOG_FILE}" 2>/dev/null || true
+
+    ln -sf "${INSTALL_LOG_FILE}" "${INSTALL_SYMLINK}" 2>/dev/null || cp -f "${INSTALL_LOG_FILE}" "${INSTALL_SYMLINK}" 2>/dev/null || true
+}
+
+log_info()  { echo -e "  ${TAG_INFO} ${CLR_CYAN}$*${CLR_RESET}"; _log_to_file "INFO" "$*"; }
+log_ok()    { echo -e "  ${TAG_OK} ${CLR_GREEN}$*${CLR_RESET}"; _log_to_file "OK" "$*"; }
+log_warn()  { echo -e "  ${TAG_WARN} ${CLR_YELLOW}$*${CLR_RESET}"; _log_to_file "WARN" "$*"; }
+log_err()   { echo -e "  ${TAG_ERR} ${CLR_RED}$*${CLR_RESET}" >&2; _log_to_file "ERROR" "$*"; }
 
 print_step_header() {
     local step_num="$1"
     local step_title="$2"
+    local now_sec=$SECONDS
+
+    if [ -n "${PREV_STEP_NAME}" ] && [ ${PREV_STEP_START_SEC} -gt 0 ]; then
+        local dur=$(( now_sec - PREV_STEP_START_SEC ))
+        [ $dur -lt 0 ] && dur=0
+        PROFILED_STEP_NAMES+=("${PREV_STEP_NAME}")
+        PROFILED_STEP_DURS+=("${dur}")
+        _log_to_file "TIMING" "Этап ${PREV_STEP_NAME} завершен за ${dur}с"
+    fi
+
+    PREV_STEP_NAME="[${step_num}] ${step_title}"
+    PREV_STEP_START_SEC=$now_sec
+    _log_to_file "STEP" "=== НАЧАЛО ШАГА: [${step_num}] ${step_title} ==="
+
     echo ""
     echo -e "${CLR_NEON_PURPLE}╭──${CLR_NEON_CYAN} [ ${CLR_WHITE}${CLR_BOLD}${step_num}${CLR_RESET}${CLR_NEON_CYAN} ] ${CLR_NEON_PURPLE}──────────────────────────────────────────────────────────────────╮${CLR_RESET}"
     echo -e "${CLR_NEON_PURPLE}│  ${CLR_NEON_GOLD}⚡${CLR_RESET} ${CLR_WHITE}${CLR_BOLD}${step_title}${CLR_RESET}"
@@ -127,6 +187,15 @@ run_spin() {
         "$@" >"${log_tmp}" 2>&1 || exit_code=$?
         if [ $exit_code -eq 0 ]; then
             printf "  ${CLR_GREEN}✔${CLR_RESET} ${CLR_WHITE}%-45s${CLR_RESET} ${CLR_GREEN}[ГОТОВО]${CLR_RESET}\n" "${disp_msg}"
+            if [ -s "${log_tmp}" ] && [ -n "${INSTALL_LOG_FILE:-}" ]; then
+                {
+                    echo "--- [SPINNER: ${full_msg}] OUTPUT (Exit 0) ---"
+                    cat "${log_tmp}"
+                    echo "--- [SPINNER: ${full_msg}] END ---"
+                } >> "${INSTALL_LOG_FILE}" 2>/dev/null || true
+            else
+                _log_to_file "INFO" "Действие '${full_msg}' выполнено успешно"
+            fi
             rm -f "${log_tmp}"
             CURRENT_SPIN_LOG=""
             return 0
@@ -135,6 +204,13 @@ run_spin() {
             echo -e "${CLR_RED}--- Журнал ошибки (${full_msg}): ---${CLR_RESET}" >&2
             tail -n 35 "${log_tmp}" >&2
             echo -e "${CLR_RED}-----------------------------------${CLR_RESET}" >&2
+            if [ -f "${log_tmp}" ] && [ -n "${INSTALL_LOG_FILE:-}" ]; then
+                {
+                    echo "--- [SPINNER: ${full_msg}] ERROR (Exit ${exit_code}) ---"
+                    cat "${log_tmp}"
+                    echo "--- [SPINNER: ${full_msg}] ERROR END ---"
+                } >> "${INSTALL_LOG_FILE}" 2>/dev/null || true
+            fi
             rm -f "${log_tmp}"
             CURRENT_SPIN_LOG=""
             return $exit_code
@@ -162,6 +238,15 @@ run_spin() {
 
     if [ $exit_code -eq 0 ]; then
         printf "\r\033[2K  ${CLR_GREEN}✔${CLR_RESET} ${CLR_WHITE}%-45s${CLR_RESET} ${CLR_GREEN}[ГОТОВО]${CLR_RESET}\n" "${disp_msg}"
+        if [ -s "${log_tmp}" ] && [ -n "${INSTALL_LOG_FILE:-}" ]; then
+            {
+                echo "--- [SPINNER: ${full_msg}] OUTPUT (Exit 0) ---"
+                cat "${log_tmp}"
+                echo "--- [SPINNER: ${full_msg}] END ---"
+            } >> "${INSTALL_LOG_FILE}" 2>/dev/null || true
+        else
+            _log_to_file "INFO" "Действие '${full_msg}' выполнено успешно"
+        fi
         rm -f "${log_tmp}"
         CURRENT_SPIN_LOG=""
         return 0
@@ -170,6 +255,13 @@ run_spin() {
         echo -e "${CLR_RED}--- Журнал ошибки (${full_msg}): ---${CLR_RESET}" >&2
         tail -n 35 "${log_tmp}" >&2
         echo -e "${CLR_RED}-----------------------------------${CLR_RESET}" >&2
+        if [ -f "${log_tmp}" ] && [ -n "${INSTALL_LOG_FILE:-}" ]; then
+            {
+                echo "--- [SPINNER: ${full_msg}] ERROR (Exit ${exit_code}) ---"
+                cat "${log_tmp}"
+                echo "--- [SPINNER: ${full_msg}] ERROR END ---"
+            } >> "${INSTALL_LOG_FILE}" 2>/dev/null || true
+        fi
         rm -f "${log_tmp}"
         CURRENT_SPIN_LOG=""
         return $exit_code
@@ -184,6 +276,45 @@ on_error() {
     echo ""
     log_err "Критическая ошибка (код ${exit_code}) на строке ${line_no}!"
     echo -e "      ${CLR_DIM}Команда: '${cmd}'${CLR_RESET}"
+
+    if [ -n "${INSTALL_LOG_FILE:-}" ]; then
+        {
+            echo ""
+            echo "============================================================================="
+            echo "                   АВАРИЙНЫЙ ДАМП СБОЯ (CRASH REPORT)                        "
+            echo "             Дата и время: $(date '+%Y-%m-%d %H:%M:%S %Z')                   "
+            echo "============================================================================="
+            echo "Код возврата:    ${exit_code}"
+            echo "Номер строки:    ${line_no}"
+            echo "Упавшая команда: ${cmd}"
+            echo "Текущий этап:    ${PREV_STEP_NAME:-N/A}"
+            echo "Стек вызовов:    ${FUNCNAME[*]}"
+            echo "Время работы:    $(( SECONDS - SCRIPT_START_SECONDS )) сек"
+            echo "ОС и ядро:       $(uname -srm 2>/dev/null || uname -a)"
+            echo "Init-система:    ${INIT_SYSTEM:-N/A}"
+            echo ""
+            echo "--- ИСПОЛЬЗОВАНИЕ ОЗУ И SWAP ---"
+            free -m 2>/dev/null || free 2>/dev/null || true
+            echo ""
+            echo "--- СВОБОДНОЕ МЕСТО НА ДИСКАХ ---"
+            df -h 2>/dev/null || true
+            echo ""
+            echo "--- НАГРУЗКА НА СИСТЕМУ ---"
+            uptime 2>/dev/null || true
+            if [ -n "${CURRENT_SPIN_LOG:-}" ] && [ -s "${CURRENT_SPIN_LOG}" ]; then
+                echo ""
+                echo "--- ВЫВОД ПОСЛЕДНЕГО СПИННЕРА ---"
+                tail -n 60 "${CURRENT_SPIN_LOG}" 2>/dev/null || true
+            fi
+            echo "============================================================================="
+        } >> "${INSTALL_LOG_FILE}" 2>/dev/null || true
+
+        echo ""
+        echo -e "  ${TAG_INFO} Подробный технический отчет об ошибке сохранен в:"
+        echo -e "      ${CLR_WHITE}${INSTALL_LOG_FILE}${CLR_RESET}"
+        [ -f "/opt/homelab/install.log" ] && echo -e "      ${CLR_WHITE}/opt/homelab/install.log${CLR_RESET}"
+        echo -e "  ${TAG_INFO} Для сбора полной диагностики выполните: ${CLR_GREEN}homelab dump-logs${CLR_RESET}"
+    fi
     exit "${exit_code}"
 }
 
@@ -195,6 +326,7 @@ cleanup_on_interrupt() {
     if [ -n "${CURRENT_SPIN_LOG:-}" ] && [ -f "${CURRENT_SPIN_LOG}" ]; then
         rm -f "${CURRENT_SPIN_LOG}" 2>/dev/null || true
     fi
+    _log_to_file "WARN" "Выполнение скрипта прервано пользователем (SIGINT/SIGTERM)"
     echo -e "\n${CLR_YELLOW}Выполнение скрипта прервано пользователем.${CLR_RESET}"
     exit 130
 }
@@ -319,7 +451,7 @@ SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.15"
+HOMELAB_VERSION="2.8.16"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -5329,7 +5461,7 @@ cmd_update() {
 
 cmd_version() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.15}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.16}"
     echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
 
     local REMOTE_VER=""
@@ -5363,7 +5495,7 @@ cmd_upgrade() {
     done
 
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.15}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.16}"
     echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
     echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
 
@@ -5663,6 +5795,16 @@ cmd_dump_logs() {
             grep -E -i 'oom|killed|panic|error|fatal|fail' /var/log/messages 2>/dev/null | tail -n 30 || true
         fi
 
+        local inst_log="/opt/homelab/install.log"
+        [ ! -f "$inst_log" ] && inst_log="/var/log/homelab-install.log"
+        if [ -f "$inst_log" ]; then
+            echo ""
+            echo "============================================================================="
+            echo "             ЖУРНАЛ РАЗВЕРТЫВАНИЯ / ОБНОВЛЕНИЯ (INSTALL.LOG)                 "
+            echo "============================================================================="
+            tail -n 120 "${inst_log}" 2>/dev/null || true
+        fi
+
         echo ""
         echo "============================================================================="
         echo "                            КОНЕЦ ДИАГНОСТИКИ                                "
@@ -5721,6 +5863,22 @@ except Exception:
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
 }
 
+cmd_install_log() {
+    local inst_log="/opt/homelab/install.log"
+    [ ! -f "$inst_log" ] && inst_log="/var/log/homelab-install.log"
+    if [ -f "$inst_log" ]; then
+        if [ "${1:-}" = "-f" ] || [ "${1:-}" = "--follow" ]; then
+            tail -f "$inst_log"
+        elif [ -n "${1:-}" ] && [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+            tail -n "${1}" "$inst_log"
+        else
+            cat "$inst_log"
+        fi
+    else
+        echo -e "  ${TAG_WARN} Журнал развертывания пока не создан (/opt/homelab/install.log)"
+    fi
+}
+
 cmd_help() {
     echo -e "${CLR_CYAN}${CLR_BOLD}Утилита управления комплексом Homelab & Transparent Gateway${CLR_RESET}"
     echo ""
@@ -5733,6 +5891,7 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}start [сервис]${CLR_RESET}      Запустить сервисы стека"
     echo -e "  ${CLR_WHITE}logs [сервис] [-f]${CLR_RESET}  Просмотр журналов логов (с ключом -f для реалтайма)"
     echo -e "  ${CLR_WHITE}dump-logs [файл]${CLR_RESET}    Собрать логи всех сервисов и системы в единый файл"
+    echo -e "  ${CLR_WHITE}install-log [-f]${CLR_RESET}    Просмотр журнала и таймингов развертывания ядра"
     echo -e "  ${CLR_WHITE}doctor${CLR_RESET}              Комплексная самодиагностика DNS, TUN, NAT и прав"
     echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
     echo -e "  ${CLR_WHITE}notify [текст]${CLR_RESET}      Отправить тестовое оповещение в Telegram"
@@ -5753,6 +5912,7 @@ case "${1:-status}" in
     start) shift; cmd_start "$@" ;;
     logs) shift; cmd_logs "$@" ;;
     dump|dump-logs|export-logs|collect|report) shift; cmd_dump_logs "$@" ;;
+    install-log|deploy-log|inst-log) shift; cmd_install_log "$@" ;;
     backup) cmd_backup ;;
     doctor|check) cmd_doctor ;;
     cookies|cookie) shift; cmd_cookies "$@" ;;
@@ -6131,6 +6291,7 @@ show_summary_dashboard() {
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Горячий бэкап баз данных:${CLR_RESET}    ${CLR_NEON_GREEN}homelab backup${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Тестовое оповещение в TG:${CLR_RESET}    ${CLR_NEON_GREEN}homelab notify [текст]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Управление cookies YouTube:${CLR_RESET}  ${CLR_NEON_GREEN}homelab cookies [файл]${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журнал развертывания ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab install-log [-f]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Безопасный апдейт образов:${CLR_RESET}   ${CLR_NEON_GREEN}homelab update${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Бесшовный апгрейд ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab upgrade${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Проверка версии и обновлений:${CLR_RESET} ${CLR_NEON_GREEN}homelab version${CLR_RESET}"
@@ -6138,7 +6299,76 @@ show_summary_dashboard() {
     echo ""
 }
 
+show_profiling_summary() {
+    local now_sec=$SECONDS
+
+    if [ -n "${PREV_STEP_NAME}" ] && [ ${PREV_STEP_START_SEC} -gt 0 ]; then
+        local dur=$(( now_sec - PREV_STEP_START_SEC ))
+        [ $dur -lt 0 ] && dur=0
+        PROFILED_STEP_NAMES+=("${PREV_STEP_NAME}")
+        PROFILED_STEP_DURS+=("${dur}")
+        _log_to_file "TIMING" "Этап ${PREV_STEP_NAME} завершен за ${dur}с"
+        PREV_STEP_NAME=""
+    fi
+
+    local total_dur=$(( now_sec - SCRIPT_START_SECONDS ))
+    [ $total_dur -lt 0 ] && total_dur=0
+
+    local total_min=$(( total_dur / 60 ))
+    local total_rem_sec=$(( total_dur % 60 ))
+    local total_str=""
+    if [ $total_min -gt 0 ]; then
+        total_str="${total_min} мин ${total_rem_sec} сек"
+    else
+        total_str="${total_dur} сек"
+    fi
+
+    local max_dur=0
+    local max_idx=-1
+    for i in "${!PROFILED_STEP_DURS[@]}"; do
+        if [ "${PROFILED_STEP_DURS[$i]}" -gt $max_dur ]; then
+            max_dur="${PROFILED_STEP_DURS[$i]}"
+            max_idx=$i
+        fi
+    done
+
+    echo ""
+    echo -e "  ${CLR_NEON_CYAN}╭── ТАЙМИНГИ И ПРОФИЛИРОВАНИЕ РАЗВЕРТЫВАНИЯ ──────────────────────╮${CLR_RESET}"
+    for i in "${!PROFILED_STEP_NAMES[@]}"; do
+        local s_name="${PROFILED_STEP_NAMES[$i]}"
+        local s_dur="${PROFILED_STEP_DURS[$i]}"
+        local tag=""
+        if [ $i -eq $max_idx ] && [ $max_dur -ge 5 ]; then
+            tag=" ${CLR_YELLOW}[TOP 1 / УЗКОЕ МЕСТО]${CLR_RESET}"
+        fi
+        printf "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• %-44s${CLR_RESET} ${CLR_GREEN}%3d сек${CLR_RESET}%b\n" "${s_name:0:44}" "$s_dur" "$tag"
+    done
+    echo -e "  ${CLR_NEON_CYAN}├─────────────────────────────────────────────────────────────────┤${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${TAG_BOLT} ${CLR_WHITE}${CLR_BOLD}Общее время:${CLR_RESET}       ${CLR_NEON_GREEN}${total_str}${CLR_RESET} (${total_dur} сек)"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${TAG_INFO} ${CLR_WHITE}Журнал развертывания:${CLR_RESET} ${CLR_CYAN}${INSTALL_LOG_FILE}${CLR_RESET}"
+    [ -f "/opt/homelab/install.log" ] && echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}                       ${CLR_CYAN}/opt/homelab/install.log${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}╰─────────────────────────────────────────────────────────────────╯${CLR_RESET}"
+    echo ""
+
+    if [ -n "${INSTALL_LOG_FILE:-}" ]; then
+        {
+            echo "============================================================================="
+            echo "                   ИТОГОВОЕ ПРОФИЛИРОВАНИЕ РАЗВЕРТЫВАНИЯ                     "
+            echo "============================================================================="
+            for i in "${!PROFILED_STEP_NAMES[@]}"; do
+                printf "  * %-50s %3d сек\n" "${PROFILED_STEP_NAMES[$i]}" "${PROFILED_STEP_DURS[$i]}"
+            done
+            echo "-----------------------------------------------------------------------------"
+            echo "Общее время выполнения: ${total_str} (${total_dur} сек)"
+            [ $max_idx -ge 0 ] && echo "Самый долгий этап: ${PROFILED_STEP_NAMES[$max_idx]} (${max_dur} сек)"
+            echo "============================================================================="
+        } >> "${INSTALL_LOG_FILE}" 2>/dev/null || true
+    fi
+}
+
 main() {
+    init_install_logger
+
     for arg in "$@"; do
         case "$arg" in
             --upgrade|--update-core|-u)
@@ -6169,6 +6399,7 @@ main() {
     configure_caddy_and_compose
     setup_backups_and_start
     diagnose_and_verify_system
+    show_profiling_summary
     show_summary_dashboard
     exit 0
 }

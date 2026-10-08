@@ -318,6 +318,7 @@ show_summary_dashboard() {
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Горячий бэкап баз данных:${CLR_RESET}    ${CLR_NEON_GREEN}homelab backup${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Тестовое оповещение в TG:${CLR_RESET}    ${CLR_NEON_GREEN}homelab notify [текст]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Управление cookies YouTube:${CLR_RESET}  ${CLR_NEON_GREEN}homelab cookies [файл]${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журнал развертывания ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab install-log [-f]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Безопасный апдейт образов:${CLR_RESET}   ${CLR_NEON_GREEN}homelab update${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Бесшовный апгрейд ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab upgrade${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Проверка версии и обновлений:${CLR_RESET} ${CLR_NEON_GREEN}homelab version${CLR_RESET}"
@@ -325,7 +326,76 @@ show_summary_dashboard() {
     echo ""
 }
 
+show_profiling_summary() {
+    local now_sec=$SECONDS
+
+    if [ -n "${PREV_STEP_NAME}" ] && [ ${PREV_STEP_START_SEC} -gt 0 ]; then
+        local dur=$(( now_sec - PREV_STEP_START_SEC ))
+        [ $dur -lt 0 ] && dur=0
+        PROFILED_STEP_NAMES+=("${PREV_STEP_NAME}")
+        PROFILED_STEP_DURS+=("${dur}")
+        _log_to_file "TIMING" "Этап ${PREV_STEP_NAME} завершен за ${dur}с"
+        PREV_STEP_NAME=""
+    fi
+
+    local total_dur=$(( now_sec - SCRIPT_START_SECONDS ))
+    [ $total_dur -lt 0 ] && total_dur=0
+
+    local total_min=$(( total_dur / 60 ))
+    local total_rem_sec=$(( total_dur % 60 ))
+    local total_str=""
+    if [ $total_min -gt 0 ]; then
+        total_str="${total_min} мин ${total_rem_sec} сек"
+    else
+        total_str="${total_dur} сек"
+    fi
+
+    local max_dur=0
+    local max_idx=-1
+    for i in "${!PROFILED_STEP_DURS[@]}"; do
+        if [ "${PROFILED_STEP_DURS[$i]}" -gt $max_dur ]; then
+            max_dur="${PROFILED_STEP_DURS[$i]}"
+            max_idx=$i
+        fi
+    done
+
+    echo ""
+    echo -e "  ${CLR_NEON_CYAN}╭── ТАЙМИНГИ И ПРОФИЛИРОВАНИЕ РАЗВЕРТЫВАНИЯ ──────────────────────╮${CLR_RESET}"
+    for i in "${!PROFILED_STEP_NAMES[@]}"; do
+        local s_name="${PROFILED_STEP_NAMES[$i]}"
+        local s_dur="${PROFILED_STEP_DURS[$i]}"
+        local tag=""
+        if [ $i -eq $max_idx ] && [ $max_dur -ge 5 ]; then
+            tag=" ${CLR_YELLOW}[TOP 1 / УЗКОЕ МЕСТО]${CLR_RESET}"
+        fi
+        printf "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• %-44s${CLR_RESET} ${CLR_GREEN}%3d сек${CLR_RESET}%b\n" "${s_name:0:44}" "$s_dur" "$tag"
+    done
+    echo -e "  ${CLR_NEON_CYAN}├─────────────────────────────────────────────────────────────────┤${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${TAG_BOLT} ${CLR_WHITE}${CLR_BOLD}Общее время:${CLR_RESET}       ${CLR_NEON_GREEN}${total_str}${CLR_RESET} (${total_dur} сек)"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${TAG_INFO} ${CLR_WHITE}Журнал развертывания:${CLR_RESET} ${CLR_CYAN}${INSTALL_LOG_FILE}${CLR_RESET}"
+    [ -f "/opt/homelab/install.log" ] && echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}                       ${CLR_CYAN}/opt/homelab/install.log${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}╰─────────────────────────────────────────────────────────────────╯${CLR_RESET}"
+    echo ""
+
+    if [ -n "${INSTALL_LOG_FILE:-}" ]; then
+        {
+            echo "============================================================================="
+            echo "                   ИТОГОВОЕ ПРОФИЛИРОВАНИЕ РАЗВЕРТЫВАНИЯ                     "
+            echo "============================================================================="
+            for i in "${!PROFILED_STEP_NAMES[@]}"; do
+                printf "  * %-50s %3d сек\n" "${PROFILED_STEP_NAMES[$i]}" "${PROFILED_STEP_DURS[$i]}"
+            done
+            echo "-----------------------------------------------------------------------------"
+            echo "Общее время выполнения: ${total_str} (${total_dur} сек)"
+            [ $max_idx -ge 0 ] && echo "Самый долгий этап: ${PROFILED_STEP_NAMES[$max_idx]} (${max_dur} сек)"
+            echo "============================================================================="
+        } >> "${INSTALL_LOG_FILE}" 2>/dev/null || true
+    fi
+}
+
 main() {
+    init_install_logger
+
     for arg in "$@"; do
         case "$arg" in
             --upgrade|--update-core|-u)
@@ -356,6 +426,7 @@ main() {
     configure_caddy_and_compose
     setup_backups_and_start
     diagnose_and_verify_system
+    show_profiling_summary
     show_summary_dashboard
     exit 0
 }

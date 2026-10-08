@@ -783,7 +783,7 @@ cmd_update() {
 
 cmd_version() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.15}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.16}"
     echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
 
     local REMOTE_VER=""
@@ -817,7 +817,7 @@ cmd_upgrade() {
     done
 
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.15}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.16}"
     echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
     echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
 
@@ -1117,6 +1117,16 @@ cmd_dump_logs() {
             grep -E -i 'oom|killed|panic|error|fatal|fail' /var/log/messages 2>/dev/null | tail -n 30 || true
         fi
 
+        local inst_log="/opt/homelab/install.log"
+        [ ! -f "$inst_log" ] && inst_log="/var/log/homelab-install.log"
+        if [ -f "$inst_log" ]; then
+            echo ""
+            echo "============================================================================="
+            echo "             ЖУРНАЛ РАЗВЕРТЫВАНИЯ / ОБНОВЛЕНИЯ (INSTALL.LOG)                 "
+            echo "============================================================================="
+            tail -n 120 "${inst_log}" 2>/dev/null || true
+        fi
+
         echo ""
         echo "============================================================================="
         echo "                            КОНЕЦ ДИАГНОСТИКИ                                "
@@ -1175,6 +1185,22 @@ except Exception:
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
 }
 
+cmd_install_log() {
+    local inst_log="/opt/homelab/install.log"
+    [ ! -f "$inst_log" ] && inst_log="/var/log/homelab-install.log"
+    if [ -f "$inst_log" ]; then
+        if [ "${1:-}" = "-f" ] || [ "${1:-}" = "--follow" ]; then
+            tail -f "$inst_log"
+        elif [ -n "${1:-}" ] && [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+            tail -n "${1}" "$inst_log"
+        else
+            cat "$inst_log"
+        fi
+    else
+        echo -e "  ${TAG_WARN} Журнал развертывания пока не создан (/opt/homelab/install.log)"
+    fi
+}
+
 cmd_help() {
     echo -e "${CLR_CYAN}${CLR_BOLD}Утилита управления комплексом Homelab & Transparent Gateway${CLR_RESET}"
     echo ""
@@ -1187,6 +1213,7 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}start [сервис]${CLR_RESET}      Запустить сервисы стека"
     echo -e "  ${CLR_WHITE}logs [сервис] [-f]${CLR_RESET}  Просмотр журналов логов (с ключом -f для реалтайма)"
     echo -e "  ${CLR_WHITE}dump-logs [файл]${CLR_RESET}    Собрать логи всех сервисов и системы в единый файл"
+    echo -e "  ${CLR_WHITE}install-log [-f]${CLR_RESET}    Просмотр журнала и таймингов развертывания ядра"
     echo -e "  ${CLR_WHITE}doctor${CLR_RESET}              Комплексная самодиагностика DNS, TUN, NAT и прав"
     echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
     echo -e "  ${CLR_WHITE}notify [текст]${CLR_RESET}      Отправить тестовое оповещение в Telegram"
@@ -1207,6 +1234,7 @@ case "${1:-status}" in
     start) shift; cmd_start "$@" ;;
     logs) shift; cmd_logs "$@" ;;
     dump|dump-logs|export-logs|collect|report) shift; cmd_dump_logs "$@" ;;
+    install-log|deploy-log|inst-log) shift; cmd_install_log "$@" ;;
     backup) cmd_backup ;;
     doctor|check) cmd_doctor ;;
     cookies|cookie) shift; cmd_cookies "$@" ;;
