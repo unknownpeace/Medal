@@ -238,9 +238,6 @@ show_summary_dashboard() {
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Navidrome (Hi-Fi Музыка / Spotify):${CLR_RESET}   ${CLR_NEON_CYAN}https://${MUSIC_DOMAIN}${CLR_RESET}"
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_DIM}    (Клиенты: Symfonium для Android / Substreamer для iOS / Feishin для ПК)${CLR_RESET}"
     fi
-    if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Telegram Управляющий бот:${CLR_RESET}        ${CLR_NEON_GREEN}АКТИВЕН (/menu, /status, OTA Upgrade, алерты)${CLR_RESET}"
-    fi
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Dozzle (Логи контейнеров):${CLR_RESET}       ${CLR_NEON_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_DIM}(Авторизация: ${ADMIN_USER})${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
@@ -251,10 +248,10 @@ show_summary_dashboard() {
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Токен Vaultwarden /admin:${CLR_RESET}       ${CLR_NEON_GOLD}${VAULT_ADMIN_TOKEN}${CLR_RESET}"
     fi
-    if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]] || [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
+    if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
         local TG_ST="АКТИВНЫ"
         [ -z "${TELEGRAM_BOT_TOKEN:-}" ] && TG_ST="ОЖИДАЮТ ТОКЕН В .env"
-        echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Telegram Бот и Оповещения:${CLR_RESET}        ${CLR_NEON_GREEN}${TG_ST} (Chat ID: ${TELEGRAM_CHAT_ID:-не указан})${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Telegram Оповещения:${CLR_RESET}             ${CLR_NEON_GREEN}${TG_ST} (Chat ID: ${TELEGRAM_CHAT_ID:-не указан})${CLR_RESET}"
     fi
     echo -e "  ${CLR_NEON_GOLD}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""

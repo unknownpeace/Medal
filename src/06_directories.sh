@@ -40,13 +40,13 @@ setup_directories() {
     apply_nocow_helper "${GITEA_DATA_DIR}"
     mkdir -p "${APP_DIR}/adguard/conf" 
 
-    mkdir -p "${APP_DIR}/scripts" "${APP_DIR}/configs/bot"
+    mkdir -p "${APP_DIR}/scripts"
     mkdir -p "${SAVE_DIR}/downloads"
     apply_nocow_helper "${SAVE_DIR}/downloads"
     chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/downloads" 2>/dev/null || true
     chmod 775 "${SAVE_DIR}/downloads" 2>/dev/null || true
 
-    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] || [[ "${ENABLE_TG_BOT:-Y}" =~ ^[Yy]$ ]]; then
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         mkdir -p "${SAVE_DIR}/music" "${APP_DIR}/configs/navidrome"
         apply_nocow_helper "${APP_DIR}/configs/navidrome"
         apply_nocow_helper "${SAVE_DIR}/music"
@@ -288,6 +288,10 @@ code { background: #1e293b; color: var(--accent); padding: 2px 6px; border-radiu
     </a>
     <a class="btn" href="https://adguard.lan" target="_blank" rel="noopener">
       <span>🛡️ AdGuard Home Dashboard</span>
+      <span>→</span>
+    </a>
+    <a class="btn" href="https://metube.lan" target="_blank" rel="noopener">
+      <span>📥 MeTube (Загрузка медиа)</span>
       <span>→</span>
     </a>
     <a class="btn" href="https://music.lan" target="_blank" rel="noopener">

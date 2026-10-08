@@ -8,8 +8,9 @@
 # Components: AdGuard Home (Schema 34+ & RU Filters), Mihomo TUN (Smart Routing,
 #             Mixed Stack & MRS Rulesets, YouTube/Discord/AI/RU-Direct Passthrough),
 #             Vaultwarden (Argon2id), Gitea (Git-Server), Samba (WSDD2),
-#             qBittorrent (VueTorrent WebUI), Telegram Bot (yt-dlp Media Downloader),
-#             Caddy (Internal/DuckDNS SSL), Watchtower (Docker API 1.45+)
+#             qBittorrent (VueTorrent WebUI), MeTube (Video/Audio Downloader),
+#             Navidrome (Hi-Fi Music Streaming), Caddy (Internal/DuckDNS SSL),
+#             Watchtower (Docker API 1.45+)
 # =============================================================================
 
 # Self-bootstrap into bash if started under /bin/sh or via pipe
@@ -277,13 +278,10 @@ SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 ENABLE_METUBE="Y"
 ENABLE_NAVIDROME="Y"
-ENABLE_TG_BOT="Y"
-TG_BOT_TOKEN=""
-TG_CHAT_ID=""
 METUBE_DOMAIN=""
 MUSIC_DOMAIN=""
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.2"
+HOMELAB_VERSION="2.8.3"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -322,7 +320,7 @@ EOF_LOGO
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   • Умный Fake-IP DNS + nftables: Прозрачный обход без настройки клиентов ║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}╠══════════════════════════════════════════════════════════════════════════╣${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ЯДРО:${CLR_RESET} ${CLR_CYAN}Mihomo TUN${CLR_RESET} │ ${CLR_CYAN}AdGuard Home${CLR_RESET} │ ${CLR_CYAN}nftables${CLR_RESET} │ ${CLR_CYAN}Caddy SSL${CLR_RESET} │ ${CLR_CYAN}Docker${CLR_RESET}              ${CLR_NEON_PURPLE}║${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ПРИЛОЖЕНИЯ:${CLR_RESET} ${CLR_CYAN}Navidrome (Spotify)${CLR_RESET} │ ${CLR_CYAN}MeTube${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}qBittorrent${CLR_RESET} │ ${CLR_CYAN}TG-Бот (Управление)${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Gitea${CLR_RESET} ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ПРИЛОЖЕНИЯ:${CLR_RESET} ${CLR_CYAN}Navidrome (Spotify)${CLR_RESET} │ ${CLR_CYAN}MeTube${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}qBittorrent${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Gitea${CLR_RESET}   ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ СИСТЕМА:${CLR_RESET} ${CLR_GRAY}Debian • Ubuntu • Arch Linux • Alpine Linux (OpenRC & Systemd)${CLR_RESET}   ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}╚══════════════════════════════════════════════════════════════════════════╝${CLR_RESET}"
     echo ""
@@ -458,9 +456,6 @@ load_previous_config() {
         [ -n "${SAVED_ENABLE_QBIT:-}" ] && ENABLE_QBIT="${SAVED_ENABLE_QBIT}"
         [ -n "${SAVED_ENABLE_METUBE:-}" ] && ENABLE_METUBE="${SAVED_ENABLE_METUBE}"
         [ -n "${SAVED_METUBE_DOMAIN:-}" ] && METUBE_DOMAIN="${SAVED_METUBE_DOMAIN}"
-        [ -n "${SAVED_ENABLE_TG_BOT:-}" ] && ENABLE_TG_BOT="${SAVED_ENABLE_TG_BOT}"
-        [ -n "${SAVED_TG_BOT_TOKEN:-}" ] && TG_BOT_TOKEN="${SAVED_TG_BOT_TOKEN}"
-        [ -n "${SAVED_TG_CHAT_ID:-}" ] && TG_CHAT_ID="${SAVED_TG_CHAT_ID}"
         [ -n "${SAVED_ENABLE_NAVIDROME:-}" ] && ENABLE_NAVIDROME="${SAVED_ENABLE_NAVIDROME}"
         [ -n "${SAVED_MUSIC_DOMAIN:-}" ] && MUSIC_DOMAIN="${SAVED_MUSIC_DOMAIN}"
         [ -n "${SAVED_SSL_MODE:-}" ] && SSL_MODE="${SAVED_SSL_MODE}"
@@ -859,25 +854,6 @@ EOF_ZRAM_RC
             fi
         fi
     fi
-
-    # Установка и обновление автономного движка yt-dlp (standalone binary)
-    log_info "Проверка и подготовка медиа-движка yt-dlp..."
-    local YTDLP_BIN="/usr/local/bin/yt-dlp"
-    if [ ! -x "${YTDLP_BIN}" ] || ! "${YTDLP_BIN}" --version >/dev/null 2>&1; then
-        run_spin "Загрузка официального релиза yt-dlp" bash -c '
-            curl -fsSL --connect-timeout 8 -m 60 "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp" || \
-            curl -fsSL --connect-timeout 8 -m 60 "https://ghproxy.net/https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp" || \
-            curl -fsSL --connect-timeout 8 -m 60 "https://mirror.ghproxy.com/https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp"
-        '
-        chmod a+rx "${YTDLP_BIN}" 2>/dev/null || true
-    else
-        "${YTDLP_BIN}" -U >/dev/null 2>&1 || true
-    fi
-    if [ -x "${YTDLP_BIN}" ]; then
-        log_ok "yt-dlp готов к работе ($("${YTDLP_BIN}" --version 2>/dev/null || echo "v2026"))"
-    else
-        log_warn "yt-dlp будет дополнительно загружен при инициализации Telegram-бота"
-    fi
 }
 
 # =============================================================================
@@ -1223,6 +1199,9 @@ prompt_configuration() {
             rc-update del homelab-bot default 2>/dev/null || true
             rm -f /etc/init.d/homelab-bot
         fi
+        pkill -9 -f "homelab-bot.py" 2>/dev/null || true
+        rm -f /usr/local/bin/yt-dlp
+        rm -rf "${APP_DIR}/configs/bot" "${APP_DIR}/scripts/homelab-bot.py" /var/log/homelab-bot.* /run/homelab-bot.pid
 
         log_info "Очистка служебных файлов и конфигураций..."
         local BACKUP_CERTS="/tmp/caddy_certificates_backup_$$"
@@ -1281,7 +1260,6 @@ prompt_configuration() {
         ENABLE_SAMBA="${SAVED_ENABLE_SAMBA:-Y}"
         ENABLE_QBIT="${SAVED_ENABLE_QBIT:-Y}"
         ENABLE_METUBE="${SAVED_ENABLE_METUBE:-Y}"
-        ENABLE_TG_BOT="${SAVED_ENABLE_TG_BOT:-Y}"
         ENABLE_NAVIDROME="${SAVED_ENABLE_NAVIDROME:-Y}"
         SSL_MODE="${SAVED_SSL_MODE:-1}"
 
@@ -1333,15 +1311,6 @@ prompt_configuration() {
         ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM:-N}"
         TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
         TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
-        if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]] && [ -z "${TELEGRAM_BOT_TOKEN}" ]; then
-            prompt_read "  [?] Telegram Bot Token (для управления сервером и оповещений) [Enter - пропустить]: " INPUT_TG_TOKEN
-            TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-}
-            if [ -n "${TELEGRAM_BOT_TOKEN}" ]; then
-                prompt_read "  [?] Telegram Chat ID владельца: " INPUT_TG_CHAT
-                TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-}
-                [ -n "${TELEGRAM_CHAT_ID}" ] && ENABLE_TELEGRAM="Y"
-            fi
-        fi
     else
         local ROOT_FSTYPE
         ROOT_FSTYPE=$(findmnt -n -o FSTYPE / 2>/dev/null || df -T / 2>/dev/null | awk 'NR==2{print $2}' || echo "ext4")
@@ -1612,9 +1581,6 @@ EOF_UNLOCK
         prompt_read "  [?] Установить Navidrome (Hi-Fi Музыкальный стриминг, аналог Spotify)? [Y/n] [${SAVED_ENABLE_NAVIDROME:-Y}]: " ENABLE_NAVIDROME
         ENABLE_NAVIDROME=$(normalize_yn "${ENABLE_NAVIDROME:-${SAVED_ENABLE_NAVIDROME:-Y}}" "Y")
 
-        prompt_read "  [?] Включить Telegram-бота для управления комплексом и оповещений? [Y/n] [${SAVED_ENABLE_TG_BOT:-Y}]: " ENABLE_TG_BOT
-        ENABLE_TG_BOT=$(normalize_yn "${ENABLE_TG_BOT:-${SAVED_ENABLE_TG_BOT:-Y}}" "Y")
-
         echo ""
         echo -e "  ${CLR_CYAN}--- Настройка SSL сертификатов ---${CLR_RESET}"
         echo "    1) Локальный Caddy (*.lan, доверие через CA сертификат root.crt)"
@@ -1705,40 +1671,24 @@ EOF_UNLOCK
         fi
 
         echo ""
-        echo -e "  ${CLR_CYAN}--- Telegram Интеграция (Медиа-бот и оповещения) ---${CLR_RESET}"
-        if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
-            echo -e "  ${CLR_WHITE}Для работы Telegram-бота и системных оповещений укажите токен и Chat ID.${CLR_RESET}"
-            echo -e "  ${CLR_DIM}(Токен от @BotFather, а ваш личный Chat ID — от @userinfobot)${CLR_RESET}"
+        echo -e "  ${CLR_CYAN}--- Системные оповещения в Telegram (Сбои и Бэкапы) ---${CLR_RESET}"
+        prompt_read "  [?] Настроить аварийные Telegram-оповещения? [y/N] [${SAVED_ENABLE_TELEGRAM:-N}]: " INPUT_ENABLE_TG
+        ENABLE_TELEGRAM=$(normalize_yn "${INPUT_ENABLE_TG:-${SAVED_ENABLE_TELEGRAM:-N}}" "N")
+        if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
             prompt_read "  [?] Telegram Bot Token [${SAVED_TELEGRAM_BOT_TOKEN:-}]: " INPUT_TG_TOKEN
             TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-${SAVED_TELEGRAM_BOT_TOKEN:-}}
-            prompt_read "  [?] Telegram Chat ID владельца [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT
+            prompt_read "  [?] Telegram Chat ID [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT
             TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-${SAVED_TELEGRAM_CHAT_ID:-}}
             if [ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]; then
-                log_ok "Telegram-бот и оповещения успешно настроены"
-                ENABLE_TELEGRAM="Y"
+                log_ok "Telegram-оповещения настроены"
             else
-                log_warn "Токен или Chat ID не заполнены. Бот будет ожидать настройки в ${ENV_FILE}"
+                log_warn "Токен или Chat ID не заполнены, оповещения отключены"
                 ENABLE_TELEGRAM="N"
             fi
         else
-            prompt_read "  [?] Настроить Telegram-оповещения (Сбои и Бэкапы)? [y/N] [${SAVED_ENABLE_TELEGRAM:-N}]: " INPUT_ENABLE_TG
-            ENABLE_TELEGRAM=$(normalize_yn "${INPUT_ENABLE_TG:-${SAVED_ENABLE_TELEGRAM:-N}}" "N")
-            if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
-                prompt_read "  [?] Telegram Bot Token [${SAVED_TELEGRAM_BOT_TOKEN:-}]: " INPUT_TG_TOKEN
-                TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-${SAVED_TELEGRAM_BOT_TOKEN:-}}
-                prompt_read "  [?] Telegram Chat ID [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT
-                TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-${SAVED_TELEGRAM_CHAT_ID:-}}
-                if [ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]; then
-                    log_ok "Telegram-оповещения настроены"
-                else
-                    log_warn "Токен или Chat ID не заполнены, оповещения отключены"
-                    ENABLE_TELEGRAM="N"
-                fi
-            else
-                ENABLE_TELEGRAM="N"
-                TELEGRAM_BOT_TOKEN=""
-                TELEGRAM_CHAT_ID=""
-            fi
+            ENABLE_TELEGRAM="N"
+            TELEGRAM_BOT_TOKEN=""
+            TELEGRAM_CHAT_ID=""
         fi
     fi
 
@@ -1773,7 +1723,6 @@ EOF_UNLOCK
         printf "SAVED_ENABLE_QBIT=%q\n" "${ENABLE_QBIT}"
         printf "SAVED_ENABLE_METUBE=%q\n" "${ENABLE_METUBE}"
         printf "SAVED_METUBE_DOMAIN=%q\n" "${METUBE_DOMAIN}"
-        printf "SAVED_ENABLE_TG_BOT=%q\n" "${ENABLE_TG_BOT}"
         printf "SAVED_ENABLE_NAVIDROME=%q\n" "${ENABLE_NAVIDROME}"
         printf "SAVED_MUSIC_DOMAIN=%q\n" "${MUSIC_DOMAIN}"
         printf "SAVED_SSL_MODE=%q\n" "${SSL_MODE}"
@@ -1929,6 +1878,19 @@ EOF_NM
         if command -v nft >/dev/null 2>&1; then
             nft delete table inet zapret2 >/dev/null 2>&1 || true
         fi
+
+        # Полная очистка и удаление любых следов Telegram-бота (служба, процессы, скрипт, конфиг)
+        if [ "${INIT_SYSTEM}" = "openrc" ]; then
+            rc-service homelab-bot stop >/dev/null 2>&1 || true
+            rc-update del homelab-bot default >/dev/null 2>&1 || true
+            rm -f /etc/init.d/homelab-bot
+        elif [ "${INIT_SYSTEM}" = "systemd" ]; then
+            systemctl disable --now homelab-bot.service >/dev/null 2>&1 || true
+            rm -f /etc/systemd/system/homelab-bot.service
+            systemctl daemon-reload >/dev/null 2>&1 || true
+        fi
+        pkill -9 -f "homelab-bot.py" >/dev/null 2>&1 || true
+        rm -rf "${APP_DIR}/scripts/homelab-bot.py" "${APP_DIR}/configs/bot" /var/log/homelab-bot.* /run/homelab-bot.pid /usr/local/bin/yt-dlp
 
         chattr -i /etc/resolv.conf 2>/dev/null || true
         rm -f /etc/resolv.conf
@@ -2242,8 +2204,7 @@ EOF_WD_TMR
     fi
 
     log_info "Регистрация локальных доменов в /etc/hosts..."
-    sed -i '/metube/d' /etc/hosts 2>/dev/null || true
-    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${MUSIC_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}"; do
+    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${METUBE_DOMAIN}" "tube.lan" "${MUSIC_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}"; do
         if [ -n "${DOMAIN}" ]; then
             local ESCAPED_DOMAIN
             ESCAPED_DOMAIN=$(printf '%s\n' "${DOMAIN}" | sed -e 's/[]\/$*.^[]/\\&/g')
@@ -2350,13 +2311,13 @@ setup_directories() {
     apply_nocow_helper "${GITEA_DATA_DIR}"
     mkdir -p "${APP_DIR}/adguard/conf" 
 
-    mkdir -p "${APP_DIR}/scripts" "${APP_DIR}/configs/bot"
+    mkdir -p "${APP_DIR}/scripts"
     mkdir -p "${SAVE_DIR}/downloads"
     apply_nocow_helper "${SAVE_DIR}/downloads"
     chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/downloads" 2>/dev/null || true
     chmod 775 "${SAVE_DIR}/downloads" 2>/dev/null || true
 
-    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] || [[ "${ENABLE_TG_BOT:-Y}" =~ ^[Yy]$ ]]; then
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         mkdir -p "${SAVE_DIR}/music" "${APP_DIR}/configs/navidrome"
         apply_nocow_helper "${APP_DIR}/configs/navidrome"
         apply_nocow_helper "${SAVE_DIR}/music"
@@ -2598,6 +2559,10 @@ code { background: #1e293b; color: var(--accent); padding: 2px 6px; border-radiu
     </a>
     <a class="btn" href="https://adguard.lan" target="_blank" rel="noopener">
       <span>🛡️ AdGuard Home Dashboard</span>
+      <span>→</span>
+    </a>
+    <a class="btn" href="https://metube.lan" target="_blank" rel="noopener">
+      <span>📥 MeTube (Загрузка медиа)</span>
       <span>→</span>
     </a>
     <a class="btn" href="https://music.lan" target="_blank" rel="noopener">
@@ -3052,6 +3017,11 @@ configure_gateway_services() {
       answer: ${LOCAL_IP}"
         [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${TORRENT_DOMAIN}
+      answer: ${LOCAL_IP}"
+        [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
+    - domain: ${METUBE_DOMAIN}
+      answer: ${LOCAL_IP}
+    - domain: tube.lan
       answer: ${LOCAL_IP}"
         [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${MUSIC_DOMAIN}
@@ -3764,10 +3734,6 @@ configure_caddy_and_compose() {
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>📥 MeTube (Загрузка видео)</span><a href=\"https://${METUBE_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${METUBE_DOMAIN}</a></li>"
     fi
-    if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
-        IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🤖 Telegram Control Bot</span><span style=\"color:#a0aec0;font-size:0.9em\">Управление комплексом, OTA-обновления, алерты</span></li>"
-    fi
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>🎵 Navidrome Music (Spotify)</span><a href=\"https://${MUSIC_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${MUSIC_DOMAIN}</a></li>"
@@ -4410,12 +4376,12 @@ start() {
 stop() {
     ebegin "Stopping Homelab Docker Compose Stack"
     cd "${APP_DIR}" && /usr/local/bin/dc stop
-    eend $?
+    eend \$?
 }
 restart() {
     ebegin "Restarting Homelab Docker Compose Stack"
     cd "${APP_DIR}" && /usr/local/bin/dc restart
-    eend $?
+    eend \$?
 }
 EOF_HOMELAB_RC
         chmod 755 /etc/init.d/homelab
@@ -4741,878 +4707,6 @@ for p in set(db_paths):
         done
     fi
 
-    if [[ "${ENABLE_TG_BOT:-Y}" =~ ^[Yy]$ ]]; then
-        log_info "Настройка и запуск службы Telegram-бота (Медиа-загрузчик yt-dlp)..."
-        mkdir -p "${APP_DIR}/scripts"
-
-        cat << 'EOF_TG_BOT' > "${APP_DIR}/scripts/homelab-bot.py"
-#!/usr/bin/env python3
-# ==============================================================================
-# Homelab Management & OTA Telegram Bot (2026 Native Daemon)
-# Zero external pip dependencies: Python 3 stdlib + UNIX docker.sock + curl
-# Features:
-# - Full server control: /menu, /status, /doctor, /restart, /backup, /upgrade
-# - Auto-update notification via Telegram with 1-click Inline Button upgrade
-# - Cross-platform metrics (/proc/uptime, /proc/meminfo, statvfs, Docker API)
-# - Compatible with Debian, Ubuntu, Arch, and Alpine Linux (Busybox/OpenRC)
-# ==============================================================================
-
-import os
-import sys
-import time
-import re
-import json
-import urllib.request
-import urllib.parse
-import urllib.error
-import subprocess
-import threading
-import logging
-import shutil
-import socket
-
-ENV_PATH = "/opt/homelab/.env"
-APP_DIR_DEFAULT = "/opt/homelab"
-STATE_DIR_DEFAULT = "/opt/homelab/configs/bot"
-STATE_FILE_DEFAULT = "/opt/homelab/configs/bot/bot_state.json"
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-
-ANSI_REGEX = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-
-def clean_ansi(text):
-    if not text:
-        return ""
-    return ANSI_REGEX.sub('', str(text))
-
-def parse_version_tuple(v):
-    cleaned = re.sub(r'^[^\d]*', '', str(v or '0').strip())
-    parts = []
-    for part in cleaned.split('.'):
-        m = re.match(r'^\d+', part)
-        parts.append(int(m.group(0)) if m else 0)
-    while len(parts) < 3:
-        parts.append(0)
-    return tuple(parts[:3])
-
-def get_installed_version(app_dir):
-    ver_path = os.path.join(app_dir, "VERSION")
-    if os.path.exists(ver_path):
-        try:
-            with open(ver_path, "r", encoding="utf-8", errors="ignore") as f:
-                v = f.read().strip()
-                if v:
-                    return v
-        except Exception:
-            pass
-    return "2.8.2"
-
-def parse_env():
-    conf = {
-        "BOT_TOKEN": "",
-        "CHAT_ID": "",
-        "SAVE_DIR": "/opt/homelab/save",
-        "APP_DIR": APP_DIR_DEFAULT,
-        "LOCAL_IP": "127.0.0.1",
-        "ADMIN_USER": "admin",
-        "VERSION": "2.8.2",
-        "METUBE_DOMAIN": "metube.lan",
-        "MUSIC_DOMAIN": "music.lan"
-    }
-    env_paths = [
-        ENV_PATH,
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
-    ]
-    for ep in env_paths:
-        if os.path.exists(ep):
-            try:
-                with open(ep, "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line or line.startswith("#") or "=" not in line:
-                            continue
-                        k, v = line.split("=", 1)
-                        k = k.strip()
-                        v = v.strip().strip("'\"")
-                        v = v.replace("\\n", "\n").replace("\\t", "\t")
-                        if k in ("SAVED_TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN"):
-                            conf["BOT_TOKEN"] = v
-                        elif k in ("SAVED_TELEGRAM_CHAT_ID", "TELEGRAM_CHAT_ID"):
-                            conf["CHAT_ID"] = str(v)
-                        elif k in ("SAVED_SAVE_DIR", "SAVE_DIR"):
-                            conf["SAVE_DIR"] = v
-                        elif k in ("SAVED_APP_DIR", "APP_DIR"):
-                            conf["APP_DIR"] = v
-                        elif k in ("SAVED_LOCAL_IP", "LOCAL_IP"):
-                            conf["LOCAL_IP"] = v
-                        elif k in ("SAVED_ADMIN_USER", "ADMIN_USER"):
-                            conf["ADMIN_USER"] = v
-                        elif k in ("SAVED_HOMELAB_VERSION", "HOMELAB_VERSION"):
-                            conf["VERSION"] = v
-                        elif k in ("SAVED_METUBE_DOMAIN", "METUBE_DOMAIN"):
-                            conf["METUBE_DOMAIN"] = v
-                        elif k in ("SAVED_MUSIC_DOMAIN", "MUSIC_DOMAIN"):
-                            conf["MUSIC_DOMAIN"] = v
-                break
-            except Exception as e:
-                logging.error(f"Error parsing {ep}: {e}")
-
-    if not conf["BOT_TOKEN"] and os.environ.get("TELEGRAM_BOT_TOKEN"):
-        conf["BOT_TOKEN"] = os.environ.get("TELEGRAM_BOT_TOKEN")
-    if not conf["CHAT_ID"] and os.environ.get("TELEGRAM_CHAT_ID"):
-        conf["CHAT_ID"] = str(os.environ.get("TELEGRAM_CHAT_ID"))
-
-    conf["VERSION"] = get_installed_version(conf.get("APP_DIR", APP_DIR_DEFAULT))
-    return conf
-
-def get_state_file(conf):
-    app_dir = conf.get("APP_DIR", APP_DIR_DEFAULT)
-    d = os.path.join(app_dir, "configs", "bot")
-    os.makedirs(d, exist_ok=True)
-    return os.path.join(d, "bot_state.json")
-
-def load_bot_state(conf):
-    sf = get_state_file(conf)
-    if os.path.exists(sf):
-        try:
-            with open(sf, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {}
-
-def save_bot_state(conf, state):
-    sf = get_state_file(conf)
-    try:
-        with open(sf, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        logging.error(f"Error saving bot state: {e}")
-
-def tg_call(token, method, payload=None, timeout=30):
-    url = f"https://api.telegram.org/bot{token}/{method}"
-    data = None
-    headers = {"Content-Type": "application/json"}
-    if payload is not None:
-        data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers=headers)
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-def send_msg(token, chat_id, text, reply_markup=None):
-    payload = {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True
-    }
-    if reply_markup:
-        payload["reply_markup"] = reply_markup
-    return tg_call(token, "sendMessage", payload, timeout=15)
-
-def edit_msg(token, chat_id, message_id, text, reply_markup=None):
-    payload = {
-        "chat_id": chat_id,
-        "message_id": message_id,
-        "text": text,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True
-    }
-    if reply_markup is not None:
-        payload["reply_markup"] = reply_markup
-    return tg_call(token, "editMessageText", payload, timeout=15)
-
-def answer_cb(token, query_id, text=None, alert=False):
-    payload = {"callback_query_id": query_id, "show_alert": alert}
-    if text:
-        payload["text"] = text
-    return tg_call(token, "answerCallbackQuery", payload, timeout=10)
-
-def setup_tg_commands(token):
-    commands = [
-        {"command": "menu", "description": "Панель управления Homelab"},
-        {"command": "status", "description": "Состояние сервера, RAM и дисков"},
-        {"command": "doctor", "description": "Диагностика DNS, TUN и контейнеров"},
-        {"command": "check_update", "description": "Проверить обновления ядра"},
-        {"command": "upgrade", "description": "Бесшовное OTA-обновление"},
-        {"command": "restart", "description": "Перезапуск комплекса или сервисов"},
-        {"command": "backup", "description": "Создать резервную копию БД"},
-        {"command": "help", "description": "Справка и доступные сервисы"}
-    ]
-    try:
-        tg_call(token, "setMyCommands", {"commands": commands}, timeout=10)
-    except Exception as e:
-        logging.warning(f"Failed to set bot commands: {e}")
-
-def get_main_menu_markup():
-    return {
-        "inline_keyboard": [
-            [
-                {"text": "📊 Статус системы", "callback_data": "cmd:status"},
-                {"text": "🩺 Homelab Doctor", "callback_data": "cmd:doctor"}
-            ],
-            [
-                {"text": "🔄 Проверить OTA", "callback_data": "cmd:check_update"},
-                {"text": "💾 Бэкап БД", "callback_data": "cmd:backup"}
-            ],
-            [
-                {"text": "🔄 Перезапуск служб", "callback_data": "cmd:restart_menu"},
-                {"text": "📖 Справка", "callback_data": "cmd:help"}
-            ]
-        ]
-    }
-
-def get_restart_menu_markup():
-    return {
-        "inline_keyboard": [
-            [
-                {"text": "🔄 Весь комплекс", "callback_data": "rst:all"},
-                {"text": "📥 MeTube", "callback_data": "rst:metube"}
-            ],
-            [
-                {"text": "🎵 Navidrome", "callback_data": "rst:navidrome"},
-                {"text": "🚀 Mihomo TUN", "callback_data": "rst:mihomo"}
-            ],
-            [
-                {"text": "🛡️ AdGuard Home", "callback_data": "rst:adguardhome"},
-                {"text": "🔒 Caddy Gateway", "callback_data": "rst:caddy"}
-            ],
-            [
-                {"text": "🤖 Telegram Бот", "callback_data": "rst:bot"},
-                {"text": "🔙 Назад в меню", "callback_data": "cmd:menu"}
-            ]
-        ]
-    }
-
-def get_server_status(conf):
-    # 1. Uptime directly from /proc/uptime (universal for Debian, Ubuntu, Arch, and Alpine)
-    uptime_str = "N/A"
-    try:
-        if os.path.exists("/proc/uptime"):
-            with open("/proc/uptime", "r") as f:
-                tot_sec = float(f.readline().split()[0])
-            d = int(tot_sec // 86400)
-            h = int((tot_sec % 86400) // 3600)
-            m = int((tot_sec % 3600) // 60)
-            parts = []
-            if d > 0:
-                parts.append(f"{d} дн.")
-            if h > 0 or d > 0:
-                parts.append(f"{h} ч.")
-            parts.append(f"{m} мин.")
-            uptime_str = " ".join(parts)
-        else:
-            uptime_str = subprocess.check_output(["uptime"]).decode().strip()
-    except Exception:
-        pass
-
-    # 2. RAM directly from /proc/meminfo (no dependence on free flags)
-    ram_str = "N/A"
-    try:
-        if os.path.exists("/proc/meminfo"):
-            mem = {}
-            with open("/proc/meminfo", "r") as f:
-                for line in f:
-                    p = line.split(":")
-                    if len(p) == 2:
-                        mem[p[0].strip()] = int(p[1].split()[0]) # in kB
-            tot_kb = mem.get("MemTotal", 0)
-            avail_kb = mem.get("MemAvailable", mem.get("MemFree", 0) + mem.get("Buffers", 0) + mem.get("Cached", 0))
-            used_kb = max(0, tot_kb - avail_kb)
-            def fmt_k(kb):
-                mb = kb / 1024
-                if mb >= 1024:
-                    return f"{mb/1024:.1f} ГБ"
-                return f"{int(mb)} МБ"
-            if tot_kb > 0:
-                ram_str = f"{fmt_k(used_kb)} / {fmt_k(tot_kb)}"
-        else:
-            out = subprocess.check_output(["free", "-m"]).decode()
-            for l in out.splitlines():
-                if "Mem:" in l:
-                    pts = l.split()
-                    ram_str = f"{pts[2]} МБ / {pts[1]} МБ"
-    except Exception:
-        pass
-
-    # 3. Disk directly from os.statvfs (no dependence on df format)
-    disk_str = "N/A"
-    save_dir = conf.get("SAVE_DIR", "/opt/homelab/save")
-    check_dir = save_dir if os.path.exists(save_dir) else "/"
-    try:
-        st = os.statvfs(check_dir)
-        tot_b = st.f_blocks * st.f_frsize
-        avail_b = st.f_bavail * st.f_frsize
-        used_b = max(0, tot_b - avail_b)
-        def fmt_b(b):
-            gb = b / (1024**3)
-            if gb >= 1:
-                return f"{gb:.1f} ГБ"
-            return f"{b/(1024**2):.0f} МБ"
-        disk_str = f"{fmt_b(used_b)} / {fmt_b(tot_b)} (свободно {fmt_b(avail_b)})"
-    except Exception:
-        pass
-
-    # 4. Docker active containers via /var/run/docker.sock or docker ps
-    containers_active = 0
-    try:
-        if os.path.exists("/var/run/docker.sock"):
-            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.settimeout(3)
-            s.connect("/var/run/docker.sock")
-            s.sendall(b"GET /containers/json HTTP/1.0\r\nHost: localhost\r\n\r\n")
-            raw = b""
-            while True:
-                chunk = s.recv(4096)
-                if not chunk:
-                    break
-                raw += chunk
-            s.close()
-            idx = raw.find(b"\r\n\r\n")
-            if idx != -1:
-                body = raw[idx+4:]
-                c_data = json.loads(body.decode("utf-8", errors="ignore"))
-                if isinstance(c_data, list):
-                    containers_active = len(c_data)
-    except Exception:
-        containers_active = 0
-
-    if containers_active == 0:
-        try:
-            env = os.environ.copy()
-            env["PATH"] = "/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
-            d_bin = shutil.which("docker") or "/usr/bin/docker"
-            out = subprocess.check_output([d_bin, "ps", "-q"], env=env, stderr=subprocess.DEV_NULL).decode().strip()
-            if out:
-                containers_active = len([c for c in out.splitlines() if c.strip()])
-        except Exception:
-            pass
-
-    cur_ver = conf.get("VERSION", "2.8.2")
-    local_ip = conf.get("LOCAL_IP", "127.0.0.1")
-    metube_url = f"https://{conf.get('METUBE_DOMAIN', 'metube.lan')}"
-    music_url = f"https://{conf.get('MUSIC_DOMAIN', 'music.lan')}"
-
-    msg = (
-        f"🖥 <b>Homelab Appliance v{cur_ver}</b>\n"
-        f"────────────────────────────\n"
-        f"• <b>Аптайм:</b> {uptime_str}\n"
-        f"• <b>ОЗУ:</b> {ram_str}\n"
-        f"• <b>Диск ({save_dir}):</b> {disk_str}\n"
-        f"• <b>Docker контейнеры:</b> {containers_active} активных\n"
-        f"• <b>IP адрес:</b> <code>{local_ip}</code>\n"
-        f"────────────────────────────\n"
-        f"📥 <b>MeTube (Загрузчик):</b> <a href='{metube_url}'>{conf.get('METUBE_DOMAIN', 'metube.lan')}</a>\n"
-        f"🎵 <b>Музыка:</b> <a href='{music_url}'>{conf.get('MUSIC_DOMAIN', 'music.lan')}</a> (Navidrome)\n"
-        f"📂 <b>Samba NAS:</b> <code>\\\\{local_ip}\\storage</code> &amp; <code>\\\\{local_ip}\\music</code>\n"
-    )
-    return msg
-
-def fetch_remote_version():
-    urls = [
-        "https://raw.githubusercontent.com/unknownpeace/Medal/main/VERSION",
-        "https://ghproxy.net/https://raw.githubusercontent.com/unknownpeace/Medal/main/VERSION"
-    ]
-    for u in urls:
-        try:
-            req = urllib.request.Request(u, headers={"User-Agent": "Homelab-Bot/2.8"})
-            with urllib.request.urlopen(req, timeout=6) as resp:
-                v = resp.read().decode().strip()
-                if v and len(v) < 20:
-                    return v
-        except Exception:
-            continue
-    return None
-
-def worker_check_update(token, chat_id, message_id, conf):
-    cur_ver = conf.get("VERSION", "2.8.2")
-    remote_ver = fetch_remote_version()
-    if not remote_ver:
-        edit_msg(token, chat_id, message_id,
-            "⚠️ <b>Не удалось связаться с репозиторием GitHub</b>\nПроверьте подключение к сети.",
-            reply_markup={"inline_keyboard": [[{"text": "🔙 В меню", "callback_data": "cmd:menu"}]]}
-        )
-        return
-
-    cur_t = parse_version_tuple(cur_ver)
-    rem_t = parse_version_tuple(remote_ver)
-    if rem_t > cur_t:
-        kbd = {
-            "inline_keyboard": [
-                [{"text": f"🔄 Обновить до v{remote_ver} (OTA)", "callback_data": f"upgrade:{remote_ver}"}],
-                [{"text": "📋 Что нового (Changelog)", "url": "https://github.com/unknownpeace/Medal/commits/main"}],
-                [{"text": "🔙 В меню", "callback_data": "cmd:menu"}]
-            ]
-        }
-        text = (
-            f"⚡ <b>Доступно новое обновление Homelab Appliance!</b>\n\n"
-            f"• Установленная версия: <code>v{cur_ver}</code>\n"
-            f"• Новая версия на GitHub: <b>v{remote_ver}</b>\n\n"
-            f"Обновление бесшовное — все ваши базы, пароли и медиафайлы сохраняются.\n"
-            f"Нажмите кнопку ниже для старта обновления:"
-        )
-        edit_msg(token, chat_id, message_id, text, reply_markup=kbd)
-    else:
-        kbd = {"inline_keyboard": [[{"text": "🔙 В меню", "callback_data": "cmd:menu"}]]}
-        text = (
-            f"✅ <b>У вас установлена самая актуальная версия комплекса!</b>\n\n"
-            f"• Текущая версия: <b>v{cur_ver}</b>\n"
-            f"• Версия на GitHub: <code>v{remote_ver}</code>"
-        )
-        edit_msg(token, chat_id, message_id, text, reply_markup=kbd)
-
-def worker_run_upgrade(token, chat_id, message_id, target_ver, conf):
-    edit_msg(token, chat_id, message_id,
-        f"⏳ <b>Запуск бесшовного обновления комплекса (OTA In-Place)...</b>\n\n"
-        f"• Целевая версия: <code>v{target_ver}</code>\n"
-        f"• Создание Pre-Upgrade снимка...\n"
-        f"• Загрузка свежего ядра из GitHub...\n"
-        f"• Перезапуск служб без разрыва сети...\n\n"
-        f"<i>Процесс занимает 1–2 минуты. Пожалуйста, подождите...</i>"
-    )
-    state = load_bot_state(conf)
-    state["pending_upgrade_version"] = target_ver
-    state["pending_upgrade_chat_id"] = str(chat_id)
-    save_bot_state(conf, state)
-
-    try:
-        proc = subprocess.run(["/usr/local/bin/homelab", "upgrade", "--force"],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=300)
-        if proc.returncode == 0:
-            edit_msg(token, chat_id, message_id,
-                f"🎉 <b>Комплекс Homelab успешно обновлен до v{target_ver}!</b>\n\n"
-                f"Все службы перезапущены и работают в штатном режиме.\n"
-                f"Для проверки состояния используйте команду /status."
-            )
-            state = load_bot_state(conf)
-            state.pop("pending_upgrade_version", None)
-            save_bot_state(conf, state)
-        else:
-            err = clean_ansi(proc.stderr or proc.stdout)[-450:]
-            edit_msg(token, chat_id, message_id,
-                f"❌ <b>Ошибка в процессе обновления:</b>\n<pre>{err}</pre>\n\n"
-                f"В случае необходимости выполните <code>homelab rollback</code> на сервере."
-            )
-    except Exception as e:
-        edit_msg(token, chat_id, message_id, f"❌ <b>Исключение при обновлении:</b> {str(e)}")
-
-def worker_doctor(token, chat_id, message_id):
-    edit_msg(token, chat_id, message_id, "⏳ <b>Выполняется самодиагностика Homelab Doctor...</b>\nПроверка DNS, TUN, MSS и контейнеров...")
-    try:
-        proc = subprocess.run(["/usr/local/bin/homelab", "doctor"],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=25)
-        out = clean_ansi(proc.stdout or proc.stderr)
-        lines = [line for line in out.splitlines() if line.strip() and not line.startswith("╭") and not line.startswith("╰")]
-        clean_text = "\n".join(lines[:25])
-        kbd = {"inline_keyboard": [[{"text": "🔙 В главное меню", "callback_data": "cmd:menu"}]]}
-        edit_msg(token, chat_id, message_id,
-            f"🩺 <b>Результаты диагностики Homelab Doctor:</b>\n\n<pre>{clean_text}</pre>",
-            reply_markup=kbd
-        )
-    except Exception as e:
-        edit_msg(token, chat_id, message_id, f"❌ Ошибка вызова doctor: {e}")
-
-def worker_backup(token, chat_id, message_id):
-    edit_msg(token, chat_id, message_id, "⏳ <b>Запуск горячего резервного копирования баз данных...</b>\nVaultwarden, Gitea, Navidrome...")
-    try:
-        proc = subprocess.run(["/usr/local/bin/homelab", "backup"],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=90)
-        out = clean_ansi(proc.stdout or proc.stderr)
-        kbd = {"inline_keyboard": [[{"text": "🔙 В главное меню", "callback_data": "cmd:menu"}]]}
-        edit_msg(token, chat_id, message_id,
-            f"💾 <b>Резервное копирование завершено:</b>\n\n<pre>{out[-500:]}</pre>",
-            reply_markup=kbd
-        )
-    except Exception as e:
-        edit_msg(token, chat_id, message_id, f"❌ Ошибка бэкапа: {e}")
-
-def worker_restart_service(token, chat_id, message_id, service_name):
-    if service_name == "all":
-        edit_msg(token, chat_id, message_id, "⏳ <b>Перезапуск всего комплекса Homelab...</b>")
-        cmd = ["/usr/local/bin/homelab", "restart"]
-    elif service_name == "bot":
-        edit_msg(token, chat_id, message_id, "⏳ <b>Перезапуск службы Telegram-бота...</b>")
-        cmd = ["/usr/local/bin/homelab", "bot", "restart"]
-    else:
-        edit_msg(token, chat_id, message_id, f"⏳ <b>Перезапуск службы {service_name}...</b>")
-        cmd = ["/usr/local/bin/homelab", "restart", service_name]
-
-    try:
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60)
-        kbd = {"inline_keyboard": [[{"text": "🔙 В главное меню", "callback_data": "cmd:menu"}]]}
-        if proc.returncode == 0:
-            edit_msg(token, chat_id, message_id, f"✅ <b>Служба {service_name} успешно перезапущена!</b>", reply_markup=kbd)
-        else:
-            err = clean_ansi(proc.stderr or proc.stdout)[-300:]
-            edit_msg(token, chat_id, message_id, f"❌ <b>Ошибка перезапуска:</b>\n<pre>{err}</pre>", reply_markup=kbd)
-    except Exception as e:
-        edit_msg(token, chat_id, message_id, f"❌ Исключение при перезапуске: {e}")
-
-def version_monitor_daemon(conf):
-    logging.info("Starting background Version Monitor daemon...")
-    time.sleep(45)
-    while True:
-        try:
-            token = conf.get("BOT_TOKEN")
-            chat_id = conf.get("CHAT_ID")
-            cur_ver = conf.get("VERSION", "2.8.2")
-            if token and chat_id:
-                remote_ver = fetch_remote_version()
-                if remote_ver:
-                    cur_t = parse_version_tuple(cur_ver)
-                    rem_t = parse_version_tuple(remote_ver)
-                    state = load_bot_state(conf)
-                    last_notified = state.get("last_notified_version", "")
-                    if rem_t > cur_t and last_notified != remote_ver:
-                        kbd = {
-                            "inline_keyboard": [
-                                [{"text": f"🔄 Обновить до v{remote_ver} (OTA)", "callback_data": f"upgrade:{remote_ver}"}],
-                                [
-                                    {"text": "📋 Что нового", "url": "https://github.com/unknownpeace/Medal/commits/main"},
-                                    {"text": "✖️ Отложить", "callback_data": "dismiss:update"}
-                                ]
-                            ]
-                        }
-                        text = (
-                            f"🚀 <b>Доступно обновление Homelab Appliance!</b>\n\n"
-                            f"• Текущая версия: <code>v{cur_ver}</code>\n"
-                            f"• Новая версия: <b>v{remote_ver}</b>\n\n"
-                            f"Все базы данных, конфигурации и пользовательские данные сохраняются.\n"
-                            f"Нажмите кнопку ниже, чтобы запустить процесс обновления:"
-                        )
-                        send_msg(token, chat_id, text, reply_markup=kbd)
-                        state["last_notified_version"] = remote_ver
-                        save_bot_state(conf, state)
-        except Exception as e:
-            logging.error(f"Version monitor exception: {e}")
-        time.sleep(3600)
-
-def handle_update(upd, conf):
-    token = conf["BOT_TOKEN"]
-    owner_chat = str(conf["CHAT_ID"]).strip()
-
-    if "callback_query" in upd:
-        cq = upd["callback_query"]
-        cq_id = cq["id"]
-        from_id = str(cq.get("from", {}).get("id", ""))
-        chat_id = str(cq.get("message", {}).get("chat", {}).get("id", ""))
-        msg_id = cq.get("message", {}).get("message_id")
-        data = cq.get("data", "")
-
-        if owner_chat and from_id != owner_chat and chat_id != owner_chat:
-            answer_cb(token, cq_id, "⛔ Доступ запрещен (чужой чат)")
-            return
-
-        if data == "cmd:menu":
-            answer_cb(token, cq_id)
-            edit_msg(token, chat_id, msg_id,
-                f"⚡ <b>Панель управления Homelab Appliance</b>\n"
-                f"Версия ядра: <code>v{conf.get('VERSION')}</code> │ Хост: <code>{conf.get('LOCAL_IP')}</code>\n\n"
-                f"Выберите команду для управления сервером:",
-                reply_markup=get_main_menu_markup()
-            )
-            return
-
-        if data == "cmd:status":
-            answer_cb(token, cq_id)
-            kbd = {
-                "inline_keyboard": [
-                    [{"text": "🔄 Обновить статус", "callback_data": "cmd:status"}],
-                    [{"text": "🔙 В главное меню", "callback_data": "cmd:menu"}]
-                ]
-            }
-            edit_msg(token, chat_id, msg_id, get_server_status(conf), reply_markup=kbd)
-            return
-
-        if data == "cmd:doctor":
-            answer_cb(token, cq_id, "Запуск диагностики...")
-            threading.Thread(target=worker_doctor, args=(token, chat_id, msg_id), daemon=True).start()
-            return
-
-        if data == "cmd:backup":
-            answer_cb(token, cq_id, "Запуск бэкапа...")
-            threading.Thread(target=worker_backup, args=(token, chat_id, msg_id), daemon=True).start()
-            return
-
-        if data == "cmd:restart_menu":
-            answer_cb(token, cq_id)
-            edit_msg(token, chat_id, msg_id,
-                "🔄 <b>Перезапуск компонентов Homelab</b>\nВыберите сервис для перезапуска:",
-                reply_markup=get_restart_menu_markup()
-            )
-            return
-
-        if data.startswith("rst:"):
-            svc = data.split(":", 1)[1]
-            answer_cb(token, cq_id, f"Перезапуск {svc}...")
-            threading.Thread(target=worker_restart_service, args=(token, chat_id, msg_id, svc), daemon=True).start()
-            return
-
-        if data == "cmd:check_update":
-            answer_cb(token, cq_id, "Проверка обновлений на GitHub...")
-            edit_msg(token, chat_id, msg_id, "⏳ <b>Проверка наличия обновлений на GitHub...</b>")
-            threading.Thread(target=worker_check_update, args=(token, chat_id, msg_id, conf), daemon=True).start()
-            return
-
-        if data.startswith("upgrade:"):
-            target_v = data.split(":", 1)[1]
-            answer_cb(token, cq_id, "Запуск обновления комплекса...")
-            threading.Thread(target=worker_run_upgrade, args=(token, chat_id, msg_id, target_v, conf), daemon=True).start()
-            return
-
-        if data == "dismiss:update":
-            answer_cb(token, cq_id, "Напоминание отложено")
-            edit_msg(token, chat_id, msg_id, "ℹ️ Напоминание об обновлении отложено. Вы можете обновиться в любое время через /upgrade.")
-            return
-
-        if data == "cmd:help":
-            answer_cb(token, cq_id)
-            help_text = (
-                "📖 <b>Справка и сервисы комплекса Homelab</b>\n\n"
-                "• 📥 <b>Загрузка медиа:</b> Откройте <a href='https://metube.lan'>https://metube.lan</a> (MeTube Web).\n"
-                "  Вставьте ссылку на YouTube, VK или RuTube — видео и аудио сохранятся в папку загрузок и библиотеку Navidrome!\n\n"
-                "• 🎵 <b>Hi-Fi Музыка:</b> <a href='https://music.lan'>https://music.lan</a> (Navidrome).\n"
-                "  Приложения: Symfonium (Android), Substreamer (iOS), Feishin (ПК).\n\n"
-                "• 📂 <b>Samba Хранилище:</b> <code>\\\\{LOCAL_IP}\\storage</code> и <code>\\\\{LOCAL_IP}\\music</code>\n\n"
-                "<b>Команды управления:</b>\n"
-                "/menu — Интерактивная панель управления\n"
-                "/status — Состояние сервера, RAM и дисков\n"
-                "/doctor — Глубокая диагностика DNS и служб\n"
-                "/check_update — Проверка новых версий\n"
-                "/upgrade — Запуск бесшовного OTA-обновления\n"
-                "/restart — Перезапуск комплекса или служб\n"
-                "/backup — Горячий бэкап баз данных"
-            ).replace("{LOCAL_IP}", conf.get("LOCAL_IP", "127.0.0.1"))
-            kbd = {"inline_keyboard": [[{"text": "🔙 В главное меню", "callback_data": "cmd:menu"}]]}
-            edit_msg(token, chat_id, msg_id, help_text, reply_markup=kbd)
-            return
-
-        return
-
-    if "message" in upd:
-        msg = upd["message"]
-        chat_id = str(msg.get("chat", {}).get("id", ""))
-        from_id = str(msg.get("from", {}).get("id", ""))
-        text = msg.get("text", "").strip()
-
-        if owner_chat and from_id != owner_chat and chat_id != owner_chat:
-            send_msg(token, chat_id, "⛔ <b>Доступ запрещен.</b>\nЭтот сервер Homelab привязан к другому владельцу.")
-            return
-
-        if text in ("/start", "/help"):
-            welcome = (
-                "👋 <b>Привет! Я управляющий бот вашего Homelab Appliance.</b>\n\n"
-                "• 📥 <b>Загрузка видео и музыки:</b> Откройте веб-загрузчик <a href='https://metube.lan'>https://metube.lan</a> (MeTube). "
-                "Там можно вставить любую ссылку, и файлы скачаются прямо на сервер в Samba и Navidrome!\n"
-                "• 🎵 <b>Музыкальный сервер:</b> <a href='https://music.lan'>https://music.lan</a> (Navidrome / OpenSubsonic)\n"
-                "• ⚡ <b>Управление комплексом:</b> Используйте меню ниже для мониторинга, диагностики и обновления сервера.\n\n"
-                "<b>Основные команды:</b>\n"
-                "/menu — Интерактивная панель управления\n"
-                "/status — Состояние сервера, RAM и дисков\n"
-                "/doctor — Диагностика сетевого стека и контейнеров\n"
-                "/check_update — Проверить OTA-обновления\n"
-                "/upgrade — Запустить бесшовное обновление\n"
-                "/backup — Сделать резервную копию БД"
-            )
-            kbd = {
-                "inline_keyboard": [
-                    [{"text": "⚡ Открыть панель управления", "callback_data": "cmd:menu"}],
-                    [{"text": "📊 Статус системы", "callback_data": "cmd:status"}]
-                ]
-            }
-            send_msg(token, chat_id, welcome, reply_markup=kbd)
-            return
-
-        if text in ("/menu", "/admin"):
-            send_msg(token, chat_id,
-                f"⚡ <b>Панель управления Homelab Appliance</b>\n"
-                f"Версия ядра: <code>v{conf.get('VERSION')}</code> │ Хост: <code>{conf.get('LOCAL_IP')}</code>\n\n"
-                f"Выберите команду:",
-                reply_markup=get_main_menu_markup()
-            )
-            return
-
-        if text == "/status":
-            kbd = {
-                "inline_keyboard": [
-                    [{"text": "🔄 Обновить статус", "callback_data": "cmd:status"}],
-                    [{"text": "⚡ Главное меню", "callback_data": "cmd:menu"}]
-                ]
-            }
-            send_msg(token, chat_id, get_server_status(conf), reply_markup=kbd)
-            return
-
-        if text == "/doctor":
-            resp = send_msg(token, chat_id, "⏳ Выполняется самодиагностика Homelab Doctor...")
-            if resp.get("ok"):
-                mid = resp["result"]["message_id"]
-                threading.Thread(target=worker_doctor, args=(token, chat_id, mid), daemon=True).start()
-            return
-
-        if text == "/backup":
-            resp = send_msg(token, chat_id, "⏳ Создание резервной копии...")
-            if resp.get("ok"):
-                mid = resp["result"]["message_id"]
-                threading.Thread(target=worker_backup, args=(token, chat_id, mid), daemon=True).start()
-            return
-
-        if text == "/restart":
-            send_msg(token, chat_id, "🔄 <b>Перезапуск служб Homelab</b>\nВыберите компонент:", reply_markup=get_restart_menu_markup())
-            return
-
-        if text == "/check_update":
-            resp = send_msg(token, chat_id, "⏳ Проверка обновлений на GitHub...")
-            if resp.get("ok"):
-                mid = resp["result"]["message_id"]
-                threading.Thread(target=worker_check_update, args=(token, chat_id, mid, conf), daemon=True).start()
-            return
-
-        if text == "/upgrade":
-            remote_v = fetch_remote_version() or "latest"
-            resp = send_msg(token, chat_id, f"⏳ Подготовка к обновлению до v{remote_v}...")
-            if resp.get("ok"):
-                mid = resp["result"]["message_id"]
-                threading.Thread(target=worker_run_upgrade, args=(token, chat_id, mid, remote_v, conf), daemon=True).start()
-            return
-
-        if text == "/ping":
-            send_msg(token, chat_id, "Pong! 🏓 Бот и сервер работают штатно.")
-            return
-
-        # If a URL is sent, direct user to MeTube
-        if "http://" in text or "https://" in text or "www." in text:
-            metube_url = f"https://{conf.get('METUBE_DOMAIN', 'metube.lan')}"
-            send_msg(token, chat_id,
-                f"📥 <b>Скачивание видео и музыки выполняется через MeTube!</b>\n\n"
-                f"Перейдите в веб-интерфейс: <a href='{metube_url}'>{metube_url}</a>\n"
-                f"Вставьте ссылку — MeTube автоматически загрузит файл прямо на сервер (в Samba и Navidrome).",
-                reply_markup={"inline_keyboard": [[{"text": "⚡ Панель управления", "callback_data": "cmd:menu"}]]}
-            )
-        elif text:
-            send_msg(token, chat_id,
-                "💡 Для управления сервером откройте панель управления: /menu или запросите статус: /status",
-                reply_markup={"inline_keyboard": [[{"text": "⚡ Панель управления", "callback_data": "cmd:menu"}]]}
-            )
-
-def main():
-    logging.info("Starting Homelab Telegram Management Bot Daemon...")
-    last_env_check = 0
-    conf = parse_env()
-    offset = 0
-
-    commands_set = False
-    monitor_started = False
-
-    while True:
-        now = time.time()
-        if now - last_env_check > 30:
-            last_env_check = now
-            conf = parse_env()
-
-        token = conf.get("BOT_TOKEN")
-        if not token:
-            logging.warning("TELEGRAM_BOT_TOKEN is not configured in .env. Waiting 30s...")
-            time.sleep(30)
-            continue
-
-        if not commands_set:
-            setup_tg_commands(token)
-            commands_set = True
-
-        if not monitor_started:
-            threading.Thread(target=version_monitor_daemon, args=(conf,), daemon=True).start()
-            monitor_started = True
-
-            state = load_bot_state(conf)
-            if state.get("pending_upgrade_version"):
-                target_v = state.get("pending_upgrade_version")
-                notify_chat = state.get("pending_upgrade_chat_id", conf.get("CHAT_ID"))
-                cur_v = conf.get("VERSION", "2.8.2")
-                if notify_chat and parse_version_tuple(cur_v) >= parse_version_tuple(target_v):
-                    send_msg(token, notify_chat,
-                        f"🎉 <b>Комплекс успешно обновлен до v{cur_v}!</b>\n\n"
-                        f"Все сетевые компоненты, контейнеры и базы данных работают в штатном режиме."
-                    )
-                state.pop("pending_upgrade_version", None)
-                state.pop("pending_upgrade_chat_id", None)
-                save_bot_state(conf, state)
-
-        try:
-            res = tg_call(token, "getUpdates", {"offset": offset, "timeout": 25}, timeout=35)
-            if res.get("ok"):
-                for upd in res.get("result", []):
-                    offset = upd["update_id"] + 1
-                    try:
-                        handle_update(upd, conf)
-                    except Exception as err:
-                        logging.error(f"Error handling update: {err}")
-            else:
-                logging.warning(f"Telegram API response: {res}")
-                time.sleep(5)
-        except Exception as e:
-            logging.error(f"Polling loop exception: {e}")
-            time.sleep(5)
-
-if __name__ == "__main__":
-    main()
-EOF_TG_BOT
-        chmod 750 "${APP_DIR}/scripts/homelab-bot.py"
-
-        if [ "${INIT_SYSTEM}" = "systemd" ]; then
-            cat <<EOF_BOT_SVC > /etc/systemd/system/homelab-bot.service
-[Unit]
-Description=Homelab Telegram Media Bot Daemon
-After=network.target docker.service
-Wants=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=${APP_DIR}
-ExecStart=/usr/bin/python3 ${APP_DIR}/scripts/homelab-bot.py
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF_BOT_SVC
-            systemctl daemon-reload >/dev/null 2>&1 || true
-            systemctl enable homelab-bot.service >/dev/null 2>&1 || true
-            systemctl restart homelab-bot.service >/dev/null 2>&1 || true
-            log_ok "Служба Telegram-бота активирована (systemd: homelab-bot.service)"
-        elif [ "${INIT_SYSTEM}" = "openrc" ]; then
-            cat <<EOF_BOT_RC > /etc/init.d/homelab-bot
-#!/sbin/openrc-run
-name="homelab-bot"
-description="Homelab Telegram Media Bot Daemon"
-command="/usr/bin/python3"
-command_args="${APP_DIR}/scripts/homelab-bot.py"
-command_background="yes"
-pidfile="/run/homelab-bot.pid"
-output_log="/var/log/homelab-bot.log"
-error_log="/var/log/homelab-bot.err"
-
-depend() {
-    need net
-    after firewall
-}
-EOF_BOT_RC
-            chmod 755 /etc/init.d/homelab-bot
-            rc-update add homelab-bot default >/dev/null 2>&1 || true
-            rc-service homelab-bot restart >/dev/null 2>&1 || rc-service homelab-bot start >/dev/null 2>&1 || true
-            log_ok "Служба Telegram-бота активирована (OpenRC: homelab-bot)"
-        fi
-    fi
-
     log_info "Установка консольной утилиты управления комплексом (/usr/local/bin/homelab)..."
     cat << 'EOF_HOMELAB_CLI' > /usr/local/bin/homelab
 #!/usr/bin/env bash
@@ -5664,6 +4758,8 @@ norm_service() {
         adguard|adguardhome) echo "adguardhome" ;;
         vault|vaultwarden) echo "vaultwarden" ;;
         torrent|qbittorrent) echo "qbittorrent" ;;
+        music|navidrome) echo "navidrome" ;;
+        tube|video|metube) echo "metube" ;;
         *) echo "$s" ;;
     esac
 }
@@ -5672,11 +4768,36 @@ cmd_status() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── HOMELAB APPLIANCE: СТАТУС СИСТЕМЫ И СЕРВИСОВ ───────────────${CLR_RESET}"
     echo -e "  ${CLR_WHITE}• Версия комплекса:${CLR_RESET}  ${CLR_GREEN}v${SAVED_HOMELAB_VERSION:-2.5.0}${CLR_RESET}"
     echo -e "  ${CLR_WHITE}• Ядро / ОС:${CLR_RESET}         $(uname -srm) [$(grep -E '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '\"' || echo 'Linux')]"
-    echo -e "  ${CLR_WHITE}• Аптайм хоста:${CLR_RESET}      $(uptime -p 2>/dev/null || uptime | awk '{print $3,$4}' | tr -d ',')"
-    local ram_usage
-    ram_usage=$(free -h 2>/dev/null | awk '/^Mem:/{print $3 " / " $2}')
-    local storage_usage
-    storage_usage=$(df -h "${SAVED_SAVE_DIR:-/opt/homelab/save}" 2>/dev/null | awk 'NR==2{print $3 " / " $2 " (свободно " $4 ")"}')
+    local host_uptime=""
+    if [ -r /proc/uptime ]; then
+        host_uptime=$(awk '{
+            secs=int($1);
+            days=int(secs/86400);
+            hours=int((secs%86400)/3600);
+            mins=int((secs%3600)/60);
+            if (days > 0) printf "%d дн. %d ч. %d мин.", days, hours, mins;
+            else if (hours > 0) printf "%d ч. %d мин.", hours, mins;
+            else printf "%d мин.", mins;
+        }' /proc/uptime 2>/dev/null)
+    fi
+    [ -z "${host_uptime}" ] && host_uptime=$(uptime -p 2>/dev/null || uptime 2>/dev/null | awk '{print $3,$4}' | tr -d ',')
+    echo -e "  ${CLR_WHITE}• Аптайм хоста:${CLR_RESET}      ${host_uptime:-N/A}"
+    local ram_usage=""
+    if [ -r /proc/meminfo ]; then
+        ram_usage=$(awk '
+            /^MemTotal:/ { total=$2 }
+            /^MemAvailable:/ { avail=$2 }
+            END {
+                used = total - avail;
+                printf "%.1fG / %.1fG (%.0f%%)", used/1048576, total/1048576, (used/total)*100
+            }
+        ' /proc/meminfo 2>/dev/null)
+    fi
+    [ -z "${ram_usage}" ] && ram_usage=$(free -h 2>/dev/null | awk '/^Mem:/{print $3 " / " $2}')
+    local storage_usage=""
+    local target_save="${SAVED_SAVE_DIR:-/opt/homelab/save}"
+    [ ! -d "${target_save}" ] && target_save="/"
+    storage_usage=$(df -h "${target_save}" 2>/dev/null | awk 'NR==2{print $3 " / " $2 " (свободно " $4 ")"}')
     echo -e "  ${CLR_WHITE}• Использование ОЗУ:${CLR_RESET} ${ram_usage:-N/A}"
     echo -e "  ${CLR_WHITE}• Хранилище:${CLR_RESET}         ${storage_usage:-N/A}"
     
@@ -5685,16 +4806,6 @@ cmd_status() {
         FW_STATUS="${CLR_GREEN}nftables (таблица inet homelab)${CLR_RESET}"
     fi
     echo -e "  ${CLR_WHITE}• Фаервол / NAT:${CLR_RESET}     ${FW_STATUS}"
-
-    local BOT_STATUS="${CLR_DIM}не настроен${CLR_RESET}"
-    if [ -f /etc/systemd/system/homelab-bot.service ] || [ -f /etc/init.d/homelab-bot ]; then
-        if pgrep -f "homelab-bot.py" >/dev/null 2>&1; then
-            BOT_STATUS="${CLR_GREEN}Активен (Telegram Media Bot)${CLR_RESET}"
-        else
-            BOT_STATUS="${CLR_YELLOW}Остановлен / Ожидает токен в .env${CLR_RESET}"
-        fi
-    fi
-    echo -e "  ${CLR_WHITE}• Telegram-бот:${CLR_RESET}      ${BOT_STATUS}"
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
     echo ""
 
@@ -5702,7 +4813,7 @@ cmd_status() {
     printf "  %-18s %-12s %-14s %-10s\n" "СЕРВИС" "СТАТУС" "ЗДОРОВЬЕ" "ПАМЯТЬ"
     echo -e "  ─────────────────────────────────────────────────────────────"
     
-    local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "navidrome" "samba" "dozzle" "watchtower" "autoheal")
+    local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "metube" "navidrome" "samba" "dozzle" "watchtower" "autoheal")
     for c in "${CONTAINERS[@]}"; do
         if docker inspect "$c" >/dev/null 2>&1; then
             local state
@@ -5911,21 +5022,10 @@ cmd_doctor() {
         if [ -f /opt/homelab/adguard/conf/AdGuardHome.yaml ] && grep -q 'anonymize_client_ip: false' /opt/homelab/adguard/conf/AdGuardHome.yaml 2>/dev/null; then
             echo -e "  ${TAG_OK} Идентификация клиентов LAN (AdGuard):     ${CLR_GREEN}[АКТИВНА (полные IP и имена устройств)]${CLR_RESET}"
         fi
-        fi
     fi
 
-    if [ -x /usr/local/bin/yt-dlp ] || command -v yt-dlp >/dev/null 2>&1; then
-        local YV
-        YV=$(yt-dlp --version 2>/dev/null || /usr/local/bin/yt-dlp --version 2>/dev/null || echo "v2026")
-        echo -e "  ${TAG_OK} Медиа-загрузчик yt-dlp (standalone):     ${CLR_GREEN}[ГОТОВ (${YV})]${CLR_RESET}"
-    fi
-
-    if [ -f /etc/systemd/system/homelab-bot.service ] || [ -f /etc/init.d/homelab-bot ]; then
-        if pgrep -f "homelab-bot.py" >/dev/null 2>&1; then
-            echo -e "  ${TAG_OK} Telegram Медиа-бот (homelab-bot):         ${CLR_GREEN}[АКТИВЕН И СЛУШАЕТ ЧАТ]${CLR_RESET}"
-        else
-            echo -e "  ${TAG_WARN} Telegram Медиа-бот (homelab-bot):         ${CLR_YELLOW}[ОСТАНОВЛЕН / ОЖИДАЕТ НАСТРОЙКИ В .env]${CLR_RESET}"
-        fi
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^metube$'; then
+        echo -e "  ${TAG_OK} Видео-загрузчик MeTube:                     ${CLR_GREEN}[АКТИВЕН (порт 8081)]${CLR_RESET}"
     fi
 
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
@@ -6013,7 +5113,7 @@ cmd_upgrade() {
 
     tar -czf "${SNAP_TAR}" \
         -C "${APP_DIR}" \
-        .env compose.yaml Caddyfile \
+        .env docker-compose.yml compose.yaml Caddyfile caddy/Caddyfile \
         2>/dev/null || true
     [ -d "${APP_DIR}/mihomo" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" mihomo/config.yaml 2>/dev/null || true
     [ -d "${APP_DIR}/adguard/conf" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" adguard/conf/AdGuardHome.yaml 2>/dev/null || true
@@ -6159,15 +5259,7 @@ cmd_dump_logs() {
             journalctl -u network-gateway-watchdog.service -n 50 --no-pager 2>/dev/null || echo "Записей watchdog в journald не обнаружено"
         fi
 
-        echo ""
-        echo "============================================================================="
-        echo "                  ЖУРНАЛ TELEGRAM-БОТА (HOMELAB-BOT)                         "
-        echo "============================================================================="
-        if [ -f /var/log/homelab-bot.log ]; then
-            tail -n 100 /var/log/homelab-bot.log 2>/dev/null || echo "Лог бота пуст"
-        elif command -v journalctl >/dev/null 2>&1; then
-            journalctl -u homelab-bot.service -n 100 --no-pager 2>/dev/null || echo "Записей бота в journald не обнаружено"
-        fi
+
         echo ""
         echo "============================================================================="
         echo "                            КОНЕЦ ДИАГНОСТИКИ                                "
@@ -6195,59 +5287,6 @@ cmd_dump_logs() {
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
 }
 
-cmd_bot() {
-    local action="${1:-status}"
-    shift || true
-    case "$action" in
-        status)
-            echo -e "  ${TAG_INFO} Статус службы Homelab Telegram Bot:"
-            if command -v systemctl >/dev/null 2>&1; then
-                systemctl status homelab-bot.service --no-pager 2>/dev/null || echo "Служба homelab-bot не активна"
-            elif command -v rc-service >/dev/null 2>&1; then
-                rc-service homelab-bot status 2>/dev/null || echo "Служба homelab-bot не активна"
-            fi
-            ;;
-        start)
-            echo -e "  ${TAG_INFO} Запуск службы Telegram-бота..."
-            if command -v systemctl >/dev/null 2>&1; then
-                systemctl start homelab-bot.service
-            elif command -v rc-service >/dev/null 2>&1; then
-                rc-service homelab-bot start
-            fi
-            echo -e "  ${TAG_OK} Служба запущена"
-            ;;
-        stop)
-            echo -e "  ${TAG_INFO} Остановка службы Telegram-бота..."
-            if command -v systemctl >/dev/null 2>&1; then
-                systemctl stop homelab-bot.service
-            elif command -v rc-service >/dev/null 2>&1; then
-                rc-service homelab-bot stop
-            fi
-            echo -e "  ${TAG_OK} Служба остановлена"
-            ;;
-        restart)
-            echo -e "  ${TAG_INFO} Перезапуск службы Telegram-бота..."
-            if command -v systemctl >/dev/null 2>&1; then
-                systemctl restart homelab-bot.service
-            elif command -v rc-service >/dev/null 2>&1; then
-                rc-service homelab-bot restart
-            fi
-            echo -e "  ${TAG_OK} Служба перезапущена"
-            ;;
-        logs)
-            echo -e "  ${TAG_INFO} Просмотр журналов Telegram-бота:"
-            if command -v journalctl >/dev/null 2>&1; then
-                journalctl -u homelab-bot.service "$@" --no-pager
-            elif [ -f /var/log/homelab-bot.log ]; then
-                tail "$@" /var/log/homelab-bot.log
-            fi
-            ;;
-        *)
-            echo -e "Использование: ${CLR_GREEN}homelab bot [status|start|stop|restart|logs]${CLR_RESET}"
-            ;;
-    esac
-}
-
 cmd_help() {
     echo -e "${CLR_CYAN}${CLR_BOLD}Утилита управления комплексом Homelab & Transparent Gateway${CLR_RESET}"
     echo ""
@@ -6260,7 +5299,6 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}start [сервис]${CLR_RESET}      Запустить сервисы стека"
     echo -e "  ${CLR_WHITE}logs [сервис] [-f]${CLR_RESET}  Просмотр журналов логов (с ключом -f для реалтайма)"
     echo -e "  ${CLR_WHITE}dump-logs [файл]${CLR_RESET}    Собрать логи всех сервисов и системы в единый файл"
-    echo -e "  ${CLR_WHITE}bot [действие]${CLR_RESET}      Управление Telegram-ботом медиа (start|stop|restart|logs|status)"
     echo -e "  ${CLR_WHITE}doctor${CLR_RESET}              Комплексная самодиагностика DNS, TUN, NAT и прав"
     echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
     echo -e "  ${CLR_WHITE}notify [текст]${CLR_RESET}      Отправить тестовое оповещение в Telegram"
@@ -6280,7 +5318,6 @@ case "${1:-status}" in
     start) shift; cmd_start "$@" ;;
     logs) shift; cmd_logs "$@" ;;
     dump|dump-logs|export-logs|collect|report) shift; cmd_dump_logs "$@" ;;
-    bot|tg-bot) shift; cmd_bot "$@" ;;
     backup) cmd_backup ;;
     doctor|check) cmd_doctor ;;
     upgrade|self-update|ota) shift; cmd_upgrade "$@" ;;
@@ -6573,9 +5610,6 @@ show_summary_dashboard() {
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Navidrome (Hi-Fi Музыка / Spotify):${CLR_RESET}   ${CLR_NEON_CYAN}https://${MUSIC_DOMAIN}${CLR_RESET}"
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_DIM}    (Клиенты: Symfonium для Android / Substreamer для iOS / Feishin для ПК)${CLR_RESET}"
     fi
-    if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Telegram Управляющий бот:${CLR_RESET}        ${CLR_NEON_GREEN}АКТИВЕН (/menu, /status, OTA Upgrade, алерты)${CLR_RESET}"
-    fi
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Dozzle (Логи контейнеров):${CLR_RESET}       ${CLR_NEON_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_DIM}(Авторизация: ${ADMIN_USER})${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
@@ -6586,10 +5620,10 @@ show_summary_dashboard() {
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Токен Vaultwarden /admin:${CLR_RESET}       ${CLR_NEON_GOLD}${VAULT_ADMIN_TOKEN}${CLR_RESET}"
     fi
-    if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]] || [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
+    if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
         local TG_ST="АКТИВНЫ"
         [ -z "${TELEGRAM_BOT_TOKEN:-}" ] && TG_ST="ОЖИДАЮТ ТОКЕН В .env"
-        echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Telegram Бот и Оповещения:${CLR_RESET}        ${CLR_NEON_GREEN}${TG_ST} (Chat ID: ${TELEGRAM_CHAT_ID:-не указан})${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GOLD}│${CLR_RESET}  ${CLR_WHITE}⚡ Telegram Оповещения:${CLR_RESET}             ${CLR_NEON_GREEN}${TG_ST} (Chat ID: ${TELEGRAM_CHAT_ID:-не указан})${CLR_RESET}"
     fi
     echo -e "  ${CLR_NEON_GOLD}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""

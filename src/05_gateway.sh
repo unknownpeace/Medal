@@ -42,6 +42,19 @@ EOF_NM
             nft delete table inet zapret2 >/dev/null 2>&1 || true
         fi
 
+        # Полная очистка и удаление любых следов Telegram-бота (служба, процессы, скрипт, конфиг)
+        if [ "${INIT_SYSTEM}" = "openrc" ]; then
+            rc-service homelab-bot stop >/dev/null 2>&1 || true
+            rc-update del homelab-bot default >/dev/null 2>&1 || true
+            rm -f /etc/init.d/homelab-bot
+        elif [ "${INIT_SYSTEM}" = "systemd" ]; then
+            systemctl disable --now homelab-bot.service >/dev/null 2>&1 || true
+            rm -f /etc/systemd/system/homelab-bot.service
+            systemctl daemon-reload >/dev/null 2>&1 || true
+        fi
+        pkill -9 -f "homelab-bot.py" >/dev/null 2>&1 || true
+        rm -rf "${APP_DIR}/scripts/homelab-bot.py" "${APP_DIR}/configs/bot" /var/log/homelab-bot.* /run/homelab-bot.pid /usr/local/bin/yt-dlp
+
         chattr -i /etc/resolv.conf 2>/dev/null || true
         rm -f /etc/resolv.conf
         # На этапе инсталляции используем надежные внешние DNS, чтобы избежать таймаутов до старта AdGuard Home
@@ -354,8 +367,7 @@ EOF_WD_TMR
     fi
 
     log_info "Регистрация локальных доменов в /etc/hosts..."
-    sed -i '/metube/d' /etc/hosts 2>/dev/null || true
-    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${MUSIC_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}"; do
+    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${METUBE_DOMAIN}" "tube.lan" "${MUSIC_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}"; do
         if [ -n "${DOMAIN}" ]; then
             local ESCAPED_DOMAIN
             ESCAPED_DOMAIN=$(printf '%s\n' "${DOMAIN}" | sed -e 's/[]\/$*.^[]/\\&/g')

@@ -328,23 +328,4 @@ EOF_ZRAM_RC
             fi
         fi
     fi
-
-    # Установка и обновление автономного движка yt-dlp (standalone binary)
-    log_info "Проверка и подготовка медиа-движка yt-dlp..."
-    local YTDLP_BIN="/usr/local/bin/yt-dlp"
-    if [ ! -x "${YTDLP_BIN}" ] || ! "${YTDLP_BIN}" --version >/dev/null 2>&1; then
-        run_spin "Загрузка официального релиза yt-dlp" bash -c '
-            curl -fsSL --connect-timeout 8 -m 60 "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp" || \
-            curl -fsSL --connect-timeout 8 -m 60 "https://ghproxy.net/https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp" || \
-            curl -fsSL --connect-timeout 8 -m 60 "https://mirror.ghproxy.com/https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "/usr/local/bin/yt-dlp"
-        '
-        chmod a+rx "${YTDLP_BIN}" 2>/dev/null || true
-    else
-        "${YTDLP_BIN}" -U >/dev/null 2>&1 || true
-    fi
-    if [ -x "${YTDLP_BIN}" ]; then
-        log_ok "yt-dlp готов к работе ($("${YTDLP_BIN}" --version 2>/dev/null || echo "v2026"))"
-    else
-        log_warn "yt-dlp будет дополнительно загружен при инициализации Telegram-бота"
-    fi
 }

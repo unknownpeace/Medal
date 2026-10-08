@@ -78,6 +78,9 @@ prompt_configuration() {
             rc-update del homelab-bot default 2>/dev/null || true
             rm -f /etc/init.d/homelab-bot
         fi
+        pkill -9 -f "homelab-bot.py" 2>/dev/null || true
+        rm -f /usr/local/bin/yt-dlp
+        rm -rf "${APP_DIR}/configs/bot" "${APP_DIR}/scripts/homelab-bot.py" /var/log/homelab-bot.* /run/homelab-bot.pid
 
         log_info "Очистка служебных файлов и конфигураций..."
         local BACKUP_CERTS="/tmp/caddy_certificates_backup_$$"
@@ -136,7 +139,6 @@ prompt_configuration() {
         ENABLE_SAMBA="${SAVED_ENABLE_SAMBA:-Y}"
         ENABLE_QBIT="${SAVED_ENABLE_QBIT:-Y}"
         ENABLE_METUBE="${SAVED_ENABLE_METUBE:-Y}"
-        ENABLE_TG_BOT="${SAVED_ENABLE_TG_BOT:-Y}"
         ENABLE_NAVIDROME="${SAVED_ENABLE_NAVIDROME:-Y}"
         SSL_MODE="${SAVED_SSL_MODE:-1}"
 
@@ -188,15 +190,6 @@ prompt_configuration() {
         ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM:-N}"
         TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
         TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
-        if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]] && [ -z "${TELEGRAM_BOT_TOKEN}" ]; then
-            prompt_read "  [?] Telegram Bot Token (для управления сервером и оповещений) [Enter - пропустить]: " INPUT_TG_TOKEN
-            TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-}
-            if [ -n "${TELEGRAM_BOT_TOKEN}" ]; then
-                prompt_read "  [?] Telegram Chat ID владельца: " INPUT_TG_CHAT
-                TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-}
-                [ -n "${TELEGRAM_CHAT_ID}" ] && ENABLE_TELEGRAM="Y"
-            fi
-        fi
     else
         local ROOT_FSTYPE
         ROOT_FSTYPE=$(findmnt -n -o FSTYPE / 2>/dev/null || df -T / 2>/dev/null | awk 'NR==2{print $2}' || echo "ext4")
@@ -467,9 +460,6 @@ EOF_UNLOCK
         prompt_read "  [?] Установить Navidrome (Hi-Fi Музыкальный стриминг, аналог Spotify)? [Y/n] [${SAVED_ENABLE_NAVIDROME:-Y}]: " ENABLE_NAVIDROME
         ENABLE_NAVIDROME=$(normalize_yn "${ENABLE_NAVIDROME:-${SAVED_ENABLE_NAVIDROME:-Y}}" "Y")
 
-        prompt_read "  [?] Включить Telegram-бота для управления комплексом и оповещений? [Y/n] [${SAVED_ENABLE_TG_BOT:-Y}]: " ENABLE_TG_BOT
-        ENABLE_TG_BOT=$(normalize_yn "${ENABLE_TG_BOT:-${SAVED_ENABLE_TG_BOT:-Y}}" "Y")
-
         echo ""
         echo -e "  ${CLR_CYAN}--- Настройка SSL сертификатов ---${CLR_RESET}"
         echo "    1) Локальный Caddy (*.lan, доверие через CA сертификат root.crt)"
@@ -560,40 +550,24 @@ EOF_UNLOCK
         fi
 
         echo ""
-        echo -e "  ${CLR_CYAN}--- Telegram Интеграция (Медиа-бот и оповещения) ---${CLR_RESET}"
-        if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
-            echo -e "  ${CLR_WHITE}Для работы Telegram-бота и системных оповещений укажите токен и Chat ID.${CLR_RESET}"
-            echo -e "  ${CLR_DIM}(Токен от @BotFather, а ваш личный Chat ID — от @userinfobot)${CLR_RESET}"
+        echo -e "  ${CLR_CYAN}--- Системные оповещения в Telegram (Сбои и Бэкапы) ---${CLR_RESET}"
+        prompt_read "  [?] Настроить аварийные Telegram-оповещения? [y/N] [${SAVED_ENABLE_TELEGRAM:-N}]: " INPUT_ENABLE_TG
+        ENABLE_TELEGRAM=$(normalize_yn "${INPUT_ENABLE_TG:-${SAVED_ENABLE_TELEGRAM:-N}}" "N")
+        if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
             prompt_read "  [?] Telegram Bot Token [${SAVED_TELEGRAM_BOT_TOKEN:-}]: " INPUT_TG_TOKEN
             TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-${SAVED_TELEGRAM_BOT_TOKEN:-}}
-            prompt_read "  [?] Telegram Chat ID владельца [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT
+            prompt_read "  [?] Telegram Chat ID [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT
             TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-${SAVED_TELEGRAM_CHAT_ID:-}}
             if [ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]; then
-                log_ok "Telegram-бот и оповещения успешно настроены"
-                ENABLE_TELEGRAM="Y"
+                log_ok "Telegram-оповещения настроены"
             else
-                log_warn "Токен или Chat ID не заполнены. Бот будет ожидать настройки в ${ENV_FILE}"
+                log_warn "Токен или Chat ID не заполнены, оповещения отключены"
                 ENABLE_TELEGRAM="N"
             fi
         else
-            prompt_read "  [?] Настроить Telegram-оповещения (Сбои и Бэкапы)? [y/N] [${SAVED_ENABLE_TELEGRAM:-N}]: " INPUT_ENABLE_TG
-            ENABLE_TELEGRAM=$(normalize_yn "${INPUT_ENABLE_TG:-${SAVED_ENABLE_TELEGRAM:-N}}" "N")
-            if [[ "${ENABLE_TELEGRAM}" =~ ^[Yy]$ ]]; then
-                prompt_read "  [?] Telegram Bot Token [${SAVED_TELEGRAM_BOT_TOKEN:-}]: " INPUT_TG_TOKEN
-                TELEGRAM_BOT_TOKEN=${INPUT_TG_TOKEN:-${SAVED_TELEGRAM_BOT_TOKEN:-}}
-                prompt_read "  [?] Telegram Chat ID [${SAVED_TELEGRAM_CHAT_ID:-}]: " INPUT_TG_CHAT
-                TELEGRAM_CHAT_ID=${INPUT_TG_CHAT:-${SAVED_TELEGRAM_CHAT_ID:-}}
-                if [ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]; then
-                    log_ok "Telegram-оповещения настроены"
-                else
-                    log_warn "Токен или Chat ID не заполнены, оповещения отключены"
-                    ENABLE_TELEGRAM="N"
-                fi
-            else
-                ENABLE_TELEGRAM="N"
-                TELEGRAM_BOT_TOKEN=""
-                TELEGRAM_CHAT_ID=""
-            fi
+            ENABLE_TELEGRAM="N"
+            TELEGRAM_BOT_TOKEN=""
+            TELEGRAM_CHAT_ID=""
         fi
     fi
 
@@ -628,7 +602,6 @@ EOF_UNLOCK
         printf "SAVED_ENABLE_QBIT=%q\n" "${ENABLE_QBIT}"
         printf "SAVED_ENABLE_METUBE=%q\n" "${ENABLE_METUBE}"
         printf "SAVED_METUBE_DOMAIN=%q\n" "${METUBE_DOMAIN}"
-        printf "SAVED_ENABLE_TG_BOT=%q\n" "${ENABLE_TG_BOT}"
         printf "SAVED_ENABLE_NAVIDROME=%q\n" "${ENABLE_NAVIDROME}"
         printf "SAVED_MUSIC_DOMAIN=%q\n" "${MUSIC_DOMAIN}"
         printf "SAVED_SSL_MODE=%q\n" "${SSL_MODE}"

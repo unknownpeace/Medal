@@ -37,10 +37,6 @@ configure_caddy_and_compose() {
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>📥 MeTube (Загрузка видео)</span><a href=\"https://${METUBE_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${METUBE_DOMAIN}</a></li>"
     fi
-    if [[ "${ENABLE_TG_BOT}" =~ ^[Yy]$ ]]; then
-        IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🤖 Telegram Control Bot</span><span style=\"color:#a0aec0;font-size:0.9em\">Управление комплексом, OTA-обновления, алерты</span></li>"
-    fi
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>🎵 Navidrome Music (Spotify)</span><a href=\"https://${MUSIC_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${MUSIC_DOMAIN}</a></li>"
@@ -683,12 +679,12 @@ start() {
 stop() {
     ebegin "Stopping Homelab Docker Compose Stack"
     cd "${APP_DIR}" && /usr/local/bin/dc stop
-    eend $?
+    eend \$?
 }
 restart() {
     ebegin "Restarting Homelab Docker Compose Stack"
     cd "${APP_DIR}" && /usr/local/bin/dc restart
-    eend $?
+    eend \$?
 }
 EOF_HOMELAB_RC
         chmod 755 /etc/init.d/homelab

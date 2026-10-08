@@ -93,7 +93,6 @@ flowchart TD
             GIT["🐙 Gitea<br/>(git.lan)"]
             QBIT["📥 qBittorrent<br/>+ VueTorrent (torrent.lan)"]
             METUBE["📥 MeTube<br/>(metube.lan)"]
-            BOT["🤖 Telegram Control Bot<br/>(Панель /menu & OTA)"]
             DOZZLE["📋 Dozzle Logs<br/>(logs.lan)"]
             SMB["📂 Samba NAS<br/>(\\IP\storage и \\IP\music)"]
             HEAL["🩺 Autoheal<br/>(Автоперезапуск)"]
@@ -106,17 +105,24 @@ flowchart TD
         PROXY_NET["🌍 Зарубежный прокси-туннель (VLESS / SS / Hysteria2)<br/>• OpenAI ChatGPT, Claude, Gemini (US-AUTO)<br/>• YouTube 4K, Discord Voice, X, Instagram, Резерв"]
     end
 
-    TV & PC & PHONE & CONSOLE -->|"DNS (UDP/TCP 53)"| NFT
+    TV -->|"DNS (UDP/TCP 53)"| NFT
+    PC -->|"DNS (UDP/TCP 53)"| NFT
+    PHONE -->|"DNS (UDP/TCP 53)"| NFT
+    CONSOLE -->|"DNS (UDP/TCP 53)"| NFT
     NFT --> AGH
     AGH -->|"Upstream :1053"| MIHOMO
     
-    TV & PC & PHONE & CONSOLE -->|"Трафик LAN"| NFT
+    TV -->|"Трафик LAN"| NFT
+    PC -->|"Трафик LAN"| NFT
+    PHONE -->|"Трафик LAN"| NFT
+    CONSOLE -->|"Трафик LAN"| NFT
     NFT --> MIHOMO
 
     MIHOMO -->|"DIRECT (.ru / GEOIP RU / P2P)"| DIRECT_NET
     MIHOMO -->|"PROXY (US-AUTO / YouTube / Discord / Blocked)"| PROXY_NET
 
-    PC & PHONE -->|"HTTP :80 / HTTPS :443"| CADDY
+    PC -->|"HTTP :80 / HTTPS :443"| CADDY
+    PHONE -->|"HTTP :80 / HTTPS :443"| CADDY
     CADDY --> APPS
 ```
 
@@ -130,12 +136,12 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | **Портал навигации** | `http://<IP-сервера>/` | Главная страница со ссылками на все службы и кнопкой скачивания Root CA | Открытый (LAN) |
 | **Navidrome Music** | `https://music.lan` | Музыкальный стриминг Hi-Fi (свой Spotify, Subsonic API, тексты песен) | `admin` / Мастер-пароль |
+| **MeTube** | `https://metube.lan` | Загрузка видео и аудио с YouTube, VK, RuTube и 100+ сайтов | Открытый (LAN) |
 | **AdGuard Home** | `https://adguard.lan` | Панель DNS-сервера, статистика блокировок, управление правилами | `admin` / Мастер-пароль |
 | **Mihomo Web UI** | `https://proxy.lan` | Премиум веб-интерфейс MetaCubeXD: мониторинг задержек, переключение прокси | Секрет (Мастер-пароль) |
 | **Vaultwarden** | `https://vault.lan` | Персональный менеджер паролей (совместим с приложениями Bitwarden) | Личная регистрация + `/admin` токен |
 | **Gitea** | `https://git.lan` | Персональный Git-сервер (SSH на порту `2222`, веб-интерфейс) | `admin` / Мастер-пароль |
 | **qBittorrent** | `https://torrent.lan` | Торрент-клиент с современным веб-интерфейсом **VueTorrent** | `admin` / Мастер-пароль |
-| **Telegram Медиа-бот** | Прямо в Telegram | Скачивание видео в `/downloads` (Samba), аудио с обложками в `/music` (Navidrome), или отправка MP3 в чат | Защита по Telegram Chat ID |
 | **Dozzle Logs** | `https://logs.lan` | Просмотр живых логов всех Docker-контейнеров в реальном времени | `admin` / Мастер-пароль |
 | **Samba (Хранилище)** | `\\<IP-сервера>\storage` | Сетевая папка Windows / macOS / Android TV (авто-дискавери WSDD2) | `admin` / Мастер-пароль |
 | **Samba (Медиатека)** | `\\<IP-сервера>\music` | Прямой сетевой доступ к музыкальной медиатеке Navidrome | `admin` / Мастер-пароль |
@@ -177,7 +183,7 @@ sudo ./install.sh
 
 ### Режимы установки в интерактивном меню:
 1. **Экспресс-установка [Enter]:** Все сервисы включаются автоматически, генерируется надёжный единый мастер-пароль, настраивается локальный доверенный CA.
-2. **Расширенная настройка:** Выбор отдельных сервисов, умная настройка накопителей (Btrfs No-COW, шифрование LUKS2 с Argon2id), привязка DuckDNS и Telegram-бота.
+2. **Расширенная настройка:** Выбор отдельных сервисов, умная настройка накопителей (Btrfs No-COW, шифрование LUKS2 с Argon2id), привязка DuckDNS и Telegram-оповещений.
 3. **Сброс стека (--reset):** Чистое удаление всех компонентов и правил без следов в операционной системе.
 
 ---
@@ -216,12 +222,9 @@ sudo ./install.sh
 Комплекс включает полноценный Hi-Fi аудио-сервер **Navidrome**, совместимый с открытым протоколом **OpenSubsonic API**. Он потребляет всего **~40 МБ ОЗУ** и превращает сервер в персональный стриминг без ограничений и платных подписок.
 
 ### 🔄 Автоматический музыкальный конвейер
-1. **Загрузка через персонального Telegram-бота (yt-dlp):**
-   * Отправьте ссылку на любой трек, альбом или видео (YouTube, VK, RuTube, TikTok, SoundCloud и 100+ сайтов) боту в Telegram.
-   * Нажмите интерактивную кнопку:
-     - `[ 🎵 В Navidrome (Hi-Fi) ]` — бот автоматически извлечет аудио максимального качества, скачает обложку высокого разрешения и вошьёт ID3-теги прямо в `/music`. Navidrome мгновенно добавит его в медиатеку!
-     - `[ 🎬 Видео (MP4) ]` — скачает видео в папку `/downloads` (доступно в сетевой папке Samba `\\<IP-сервера>\storage\downloads`).
-     - `[ 📥 Аудио прямо в чат TG ]` — конвертирует и пришлет MP3 прямо в диалог Telegram.
+1. **Загрузка через веб-интерфейс MeTube (`https://metube.lan`):**
+   * Вставьте ссылку на любой трек, альбом или видео (YouTube, VK, RuTube, TikTok, SoundCloud и 100+ сайтов) в веб-интерфейсе MeTube.
+   * Треки и видео автоматически скачиваются в максимальном качестве прямо на ваш сервер.
 2. **Lossless FLAC через qBittorrent:**
    * Качайте дискографии в FLAC с RuTracker или других трекеров прямо в сетевую папку музыки (`\\<IP-сервера>\music`).
 3. **Прямой перенос с ПК через Samba:**
@@ -250,22 +253,6 @@ sudo ./install.sh
 - **Интерфейс:** веб-панель в браузере, доступная с любого смартфона, ПК или ТВ.
 - **Автоматическое сохранение:** видео сохраняются в папку `/downloads` (доступную по сети через Samba), а музыкальные треки — прямо в библиотеку `/music` для плееров Navidrome.
 - **Оптимизация:** встроенные параметры десинхронизации и анти-троттлинга (`extractor_args: player_client: android, web`).
-
----
-
-## 🤖 Telegram Бот: Удаленное управление & OTA Обновления
-
-Бот работает как нативный фоновый демон без внешних зависимостей. Предоставляет полное удаленное управление сервером и мгновенное применение обновлений:
-
-### ⚡ Команды управления:
-- **/menu** — интерактивная панель управления сервером с Inline-кнопками.
-- **/status** — подробный кросс-платформенный дашборд состояния сервера (Uptime, точный расход ОЗУ из `/proc/meminfo`, свободное место на дисках через `statvfs`, количество работающих Docker-контейнеров).
-- **/doctor** — глубокая самодиагностика DNS (53), Mihomo TUN (1053) и контейнеров.
-- **/check_update** — проверка выхода свежих релизов ядра на GitHub.
-- **/upgrade** — запуск бесшовного обновления комплекса (OTA In-Place) прямо из Telegram!
-- **Авто-уведомления об обновлениях:** при релизе новой версии бот автоматически присылает уведомление с кнопкой `[ 🔄 Обновить сейчас (OTA) ]`. Достаточно одного нажатия кнопки!
-- **/restart** — интерактивное меню перезапуска любого сервиса (MeTube, Navidrome, Mihomo, Caddy и др.) или всего комплекса.
-- **/backup** — создание горячих снимков баз данных (Vaultwarden, Gitea, Navidrome).
 
 ---
 
@@ -310,15 +297,12 @@ homelab doctor
 # Перезапустить стек или отдельный сервис
 homelab restart
 homelab restart mihomo
+homelab restart metube
+homelab restart navidrome
 
 # Посмотреть живые логи Caddy или AdGuard
 homelab logs caddy -f
 homelab logs adguard -f
-
-# Управление Telegram-ботом загрузки медиа (yt-dlp)
-homelab bot status
-homelab bot logs
-homelab bot restart
 
 # Сделать резервную копию прямо сейчас
 homelab backup

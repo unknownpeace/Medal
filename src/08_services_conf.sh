@@ -27,6 +27,11 @@ configure_gateway_services() {
         [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${TORRENT_DOMAIN}
       answer: ${LOCAL_IP}"
+        [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
+    - domain: ${METUBE_DOMAIN}
+      answer: ${LOCAL_IP}
+    - domain: tube.lan
+      answer: ${LOCAL_IP}"
         [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${MUSIC_DOMAIN}
       answer: ${LOCAL_IP}"
