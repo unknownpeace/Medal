@@ -127,20 +127,19 @@ if os.path.exists(path):
         data = {}
 mirrors = data.get('registry-mirrors', [])
 target_mirrors = [
-    'https://dockerhub.cloud.ru',
     'https://dockerhub.timeweb.cloud',
     'https://dockerproxy.net',
-    'https://docker.m.daocloud.io',
-    'https://huecker.io'
+    'https://docker.m.daocloud.io'
 ]
 changed = False
 for m in target_mirrors:
     if m not in mirrors:
         mirrors.append(m)
         changed = True
-if 'https://mirror.gcr.io' in mirrors:
-    mirrors.remove('https://mirror.gcr.io')
-    changed = True
+for bad in ['https://huecker.io', 'https://mirror.gcr.io', 'https://dockerhub.cloud.ru']:
+    if bad in mirrors:
+        mirrors.remove(bad)
+        changed = True
 if 'log-driver' not in data:
     data['log-driver'] = 'json-file'
     data['log-opts'] = {'max-size': '10m', 'max-file': '3'}

@@ -226,19 +226,78 @@ EOF_NAVI_BKP_TMR
     cd "${APP_DIR}"
 
     if [ "${IS_UPGRADE_MODE:-0}" -ne 1 ]; then
-        run_spin "Загрузка Docker-образов стека" bash -c '
-            if dc config --images >/dev/null 2>&1; then
-                for img in $(dc config --images 2>/dev/null); do
-                    docker pull "${img}" >/dev/null 2>&1 || true
-                done
-            else
-                dc pull -q 2>/dev/null || dc pull
+        log_info "Загрузка Docker-образов стека с поддержкой зеркал и докачки..."
+        local IMAGES=()
+        if dc config --images >/dev/null 2>&1; then
+            while IFS= read -r line; do
+                [ -n "$line" ] && IMAGES+=("$line")
+            done < <(dc config --images 2>/dev/null | sort -u)
+        fi
+        [ ${#IMAGES[@]} -eq 0 ] && IMAGES=("caddy:alpine" "servercontainers/samba:latest" "adguard/adguardhome:latest" "metacubex/mihomo:latest" "vaultwarden/server:latest" "gitea/gitea:latest" "linuxserver/qbittorrent:latest" "alexta69/metube:latest" "deluan/navidrome:latest" "containrrr/watchtower:latest" "willfarrell/autoheal:latest" "amir20/dozzle:latest")
+
+        for img in "${IMAGES[@]}"; do
+            if docker image inspect "${img}" >/dev/null 2>&1; then
+                log_ok "Образ ${img} уже готов"
+                continue
             fi
-        '
+
+            local PULL_DONE=0
+            for att in 1 2 3; do
+                log_info "Загрузка ${img} (попытка ${att}/3)..."
+                if docker pull "${img}"; then
+                    PULL_DONE=1
+                    log_ok "Образ ${img} успешно загружен"
+                    break
+                else
+                    log_warn "Сбой загрузки ${img} на попытке ${att}. Повтор через 3 сек..."
+                    sleep 3
+                fi
+            done
+
+            # Если образ не загрузился с Docker Hub, пробуем прямой fallback на ghcr.io / lscr.io
+            if [ $PULL_DONE -eq 0 ]; then
+                local FALLBACK_IMG=""
+                case "${img}" in
+                    *alexta69/metube*) FALLBACK_IMG="ghcr.io/alexta69/metube:latest" ;;
+                    *linuxserver/qbittorrent*) FALLBACK_IMG="lscr.io/linuxserver/qbittorrent:latest" ;;
+                    *metacubex/mihomo*) FALLBACK_IMG="ghcr.io/metacubex/mihomo:latest" ;;
+                    *adguard/adguardhome*) FALLBACK_IMG="ghcr.io/adguardteam/adguardhome:latest" ;;
+                    *amir20/dozzle*) FALLBACK_IMG="ghcr.io/amir20/dozzle:latest" ;;
+                    *containrrr/watchtower*) FALLBACK_IMG="ghcr.io/containrrr/watchtower:latest" ;;
+                    *willfarrell/autoheal*) FALLBACK_IMG="ghcr.io/willfarrell/autoheal:latest" ;;
+                    *servercontainers/samba*) FALLBACK_IMG="ghcr.io/servercontainers/samba:latest" ;;
+                esac
+
+                if [ -n "${FALLBACK_IMG}" ]; then
+                    log_info "Попытка загрузки через резервный реестр: ${FALLBACK_IMG}..."
+                    if docker pull "${FALLBACK_IMG}"; then
+                        docker tag "${FALLBACK_IMG}" "${img}" 2>/dev/null || true
+                        PULL_DONE=1
+                        log_ok "Образ ${img} успешно получен из резервного реестра (${FALLBACK_IMG})"
+                    fi
+                fi
+            fi
+        done
     else
         log_info "Режим обновления ядра: повторная загрузка образов пропущена (образы сохранены)"
     fi
-    run_spin "Запуск контейнеров стека (Docker Compose)" bash -c "dc up -d --quiet-pull 2>/dev/null || dc up -d"
+
+    log_info "Запуск контейнеров стека (Docker Compose)..."
+    local UP_OK=0
+    for up_att in 1 2 3 4; do
+        if dc up -d; then
+            UP_OK=1
+            log_ok "Все контейнеры стека успешно запущены"
+            break
+        else
+            log_warn "Попытка запуска ${up_att}/4 завершилась с ошибкой, повторная попытка через 5 сек..."
+            sleep 5
+        fi
+    done
+    if [ $UP_OK -eq 0 ]; then
+        log_err "Критическая ошибка запуска контейнеров через Docker Compose!"
+        return 1
+    fi
 
     if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
         if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
@@ -394,7 +453,7 @@ norm_service() {
 
 cmd_status() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── HOMELAB APPLIANCE: СТАТУС СИСТЕМЫ И СЕРВИСОВ ───────────────${CLR_RESET}"
-    echo -e "  ${CLR_WHITE}• Версия комплекса:${CLR_RESET}  ${CLR_GREEN}v${SAVED_HOMELAB_VERSION:-2.8.9}${CLR_RESET}"
+    echo -e "  ${CLR_WHITE}• Версия комплекса:${CLR_RESET}  ${CLR_GREEN}v${SAVED_HOMELAB_VERSION:-2.8.10}${CLR_RESET}"
     echo -e "  ${CLR_WHITE}• Ядро / ОС:${CLR_RESET}         $(uname -srm) [$(grep -E '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '\"' || echo 'Linux')]"
     local host_uptime=""
     if [ -r /proc/uptime ]; then
@@ -704,7 +763,7 @@ cmd_update() {
 
 cmd_version() {
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── ВЕРСИЯ И СТАТУС ОБНОВЛЕНИЙ HOMELAB ───────────────────────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.9}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.10}"
     echo -e "  ${TAG_INFO} Установленная версия ядра:   ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
 
     local REMOTE_VER=""
@@ -738,7 +797,7 @@ cmd_upgrade() {
     done
 
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── БЕСШОВНОЕ ОБНОВЛЕНИЕ КОМПЛЕКСА (IN-PLACE OTA UPGRADE) ─────${CLR_RESET}"
-    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.9}"
+    local CUR_VER="${SAVED_HOMELAB_VERSION:-2.8.10}"
     echo -e "  ${TAG_INFO} Текущая установленная версия: ${CLR_GREEN}v${CUR_VER}${CLR_RESET}"
     echo -e "  ${TAG_INFO} Проверка доступности свежего релиза на GitHub..."
 
