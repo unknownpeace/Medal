@@ -46,12 +46,17 @@ setup_directories() {
     chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/downloads" 2>/dev/null || true
     chmod 775 "${SAVE_DIR}/downloads" 2>/dev/null || true
 
-    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
-        mkdir -p "${SAVE_DIR}/music" "${APP_DIR}/configs/navidrome"
-        apply_nocow_helper "${APP_DIR}/configs/navidrome"
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] || [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+        mkdir -p "${SAVE_DIR}/music"
         apply_nocow_helper "${SAVE_DIR}/music"
-        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/music" "${APP_DIR}/configs/navidrome" 2>/dev/null || true
+        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/music" 2>/dev/null || true
         chmod 775 "${SAVE_DIR}/music" 2>/dev/null || true
+    fi
+
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+        mkdir -p "${APP_DIR}/configs/navidrome"
+        apply_nocow_helper "${APP_DIR}/configs/navidrome"
+        chown -R "${USER_UID}:${USER_GID}" "${APP_DIR}/configs/navidrome" 2>/dev/null || true
     fi
 
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then

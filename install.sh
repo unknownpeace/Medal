@@ -281,7 +281,7 @@ ENABLE_NAVIDROME="Y"
 METUBE_DOMAIN=""
 MUSIC_DOMAIN=""
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.4"
+HOMELAB_VERSION="2.8.5"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -2274,12 +2274,17 @@ setup_directories() {
     chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/downloads" 2>/dev/null || true
     chmod 775 "${SAVE_DIR}/downloads" 2>/dev/null || true
 
-    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
-        mkdir -p "${SAVE_DIR}/music" "${APP_DIR}/configs/navidrome"
-        apply_nocow_helper "${APP_DIR}/configs/navidrome"
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] || [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+        mkdir -p "${SAVE_DIR}/music"
         apply_nocow_helper "${SAVE_DIR}/music"
-        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/music" "${APP_DIR}/configs/navidrome" 2>/dev/null || true
+        chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/music" 2>/dev/null || true
         chmod 775 "${SAVE_DIR}/music" 2>/dev/null || true
+    fi
+
+    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+        mkdir -p "${APP_DIR}/configs/navidrome"
+        apply_nocow_helper "${APP_DIR}/configs/navidrome"
+        chown -R "${USER_UID}:${USER_GID}" "${APP_DIR}/configs/navidrome" 2>/dev/null || true
     fi
 
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
@@ -4159,11 +4164,15 @@ EOF_COMPOSE
       - "GID=${USER_GID}"
       - "ALLOW_PRIVATE_ADDRESSES=true"
       - "DOWNLOAD_DIR=/downloads"
+      - "AUDIO_DOWNLOAD_DIR=/music"
+      - "CUSTOM_DIRS=true"
+      - "CREATE_CUSTOM_DIRS=true"
       - "STATE_DIR=/downloads/.metube"
       - "TEMP_DIR=/downloads/tmp"
       - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["android","web"]}}}'
     volumes:
       - ${SAVE_DIR}/downloads:/downloads
+      - ${SAVE_DIR}/music:/music
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/ 2>/dev/null || curl -fs http://localhost:8081/ >/dev/null 2>&1 || exit 1"]
       interval: 30s

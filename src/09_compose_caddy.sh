@@ -505,11 +505,15 @@ EOF_COMPOSE
       - "GID=${USER_GID}"
       - "ALLOW_PRIVATE_ADDRESSES=true"
       - "DOWNLOAD_DIR=/downloads"
+      - "AUDIO_DOWNLOAD_DIR=/music"
+      - "CUSTOM_DIRS=true"
+      - "CREATE_CUSTOM_DIRS=true"
       - "STATE_DIR=/downloads/.metube"
       - "TEMP_DIR=/downloads/tmp"
       - 'YTDL_OPTIONS={"extractor_args":{"youtube":{"player_client":["android","web"]}}}'
     volumes:
       - ${SAVE_DIR}/downloads:/downloads
+      - ${SAVE_DIR}/music:/music
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/ 2>/dev/null || curl -fs http://localhost:8081/ >/dev/null 2>&1 || exit 1"]
       interval: 30s
