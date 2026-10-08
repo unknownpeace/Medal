@@ -3,6 +3,8 @@
 Thumbs.db
 *.tmp
 *.log
+*_logs.txt
+homelab_logs.txt
 
 # Environment and secrets
 .env
