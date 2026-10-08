@@ -276,6 +276,12 @@ SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 
+
+# =============================================================================
+# Module: 01_system.sh
+# Banner, System Privileges, Hardware & OS Detection, Configuration Loader, NTP
+# =============================================================================
+
 show_banner() {
     clear 2>/dev/null || true
     echo -e "${CLR_NEON_CYAN}"
@@ -485,6 +491,12 @@ EOF_TIMESYNC
     fi
 }
 
+
+# =============================================================================
+# Module: 02_packages.sh
+# System Package Installation (Alpine, Arch, Debian, Ubuntu), Docker CE, zRAM
+# =============================================================================
+
 install_pkgs() {
     print_step_header "01/11" "УСТАНОВКА ЗАВИСИМОСТЕЙ И СТЕКА DOCKER"
 
@@ -524,11 +536,20 @@ install_pkgs() {
         export DEBIAN_FRONTEND=noninteractive
         run_spin "Обновление индексов пакетов APT" bash -c "apt-get update -o Acquire::Check-Valid-Until=false -y || apt-get update -y"
 
+        local ZRAM_PKG="systemd-zram-generator"
+        if [[ "${OS_ID}" =~ ubuntu ]] || [[ "${OS_ID_LIKE}" =~ ubuntu ]]; then
+            ZRAM_PKG="zram-generator"
+        fi
+
         run_spin "Установка системных пакетов и утилит" \
             apt-get install -y --no-install-recommends \
-                systemd-timesyncd systemd-zram-generator python3 python3-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g \
+                systemd-timesyncd python3 python3-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g \
                 util-linux curl openssl ca-certificates jq nftables apache2-utils \
                 unzip tar sqlite3 argon2 iputils-ping
+
+        # Установка генератора zram с безопасным fallback для Ubuntu/Debian
+        apt-get install -y --no-install-recommends "${ZRAM_PKG}" 2>/dev/null || \
+        apt-get install -y --no-install-recommends zram-tools 2>/dev/null || true
 
         if ! command -v docker >/dev/null 2>&1; then
             log_info "Установка официального Docker CE..."
@@ -803,6 +824,12 @@ EOF_ZRAM_RC
     fi
 }
 
+
+# =============================================================================
+# Module: 03_network.sh
+# Network Environment Analysis & Disk Safety Management
+# =============================================================================
+
 detect_network() {
     print_step_header "02/11" "ИНТЕЛЛЕКТУАЛЬНЫЙ АНАЛИЗ СЕТЕВОГО ОКРУЖЕНИЯ"
 
@@ -1060,6 +1087,12 @@ select_disk_device() {
     assert_safe_device "${CHOSEN_DEV}"
     log_ok "Выбрано целевое устройство: ${CHOSEN_DEV}"
 }
+
+
+# =============================================================================
+# Module: 04_config.sh
+# Interactive Configuration Wizard (Express / Custom / Reset) & Password Hashes
+# =============================================================================
 
 prompt_configuration() {
     print_step_header "03/11" "КОНФИГУРАЦИЯ И ВЫБОР РЕЖИМА УСТАНОВКИ"
@@ -1737,6 +1770,12 @@ sys.exit(1)
     log_ok "Криптографические хэши сервисов подготовлены"
 }
 
+
+# =============================================================================
+# Module: 05_gateway.sh
+# Routing, nftables, Anti-Loop Protection, Watchdog Daemon & Notifications
+# =============================================================================
+
 setup_gateway_networking() {
     print_step_header "05/11" "МАРШРУТИЗАЦИЯ, NFTABLES И ЗАЩИТА ОТ ПЕТЕЛЬ"
 
@@ -1762,10 +1801,11 @@ EOF_NM
 
         chattr -i /etc/resolv.conf 2>/dev/null || true
         rm -f /etc/resolv.conf
+        # На этапе инсталляции используем надежные внешние DNS, чтобы избежать таймаутов до старта AdGuard Home
         cat <<EOF_DNS > /etc/resolv.conf
-nameserver 127.0.0.1
 nameserver 77.88.8.8
 nameserver 1.1.1.1
+nameserver 8.8.8.8
 EOF_DNS
 
         modprobe tcp_bbr 2>/dev/null || true
@@ -1833,7 +1873,7 @@ table inet homelab {
 
     chain input {
         type filter hook input priority filter; policy accept;
-        iifname "${DEFAULT_IFACE}" tcp dport { 8083, 9090 } drop
+        ip saddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8 } tcp dport { 8083, 9090 } drop
     }
 }
 EOF_NFT
@@ -1859,12 +1899,16 @@ EOF_NFT
             rc-update add nftables default >/dev/null 2>&1 || true
         fi
 
-        # Гарантированное открытие транзита в цепочках Docker через nftables
+        # Гарантированное открытие транзита в цепочках Docker через nftables без дубликатов
         if nft list chain ip filter DOCKER-USER >/dev/null 2>&1; then
-            nft insert rule ip filter DOCKER-USER counter accept 2>/dev/null || true
+            if ! nft list chain ip filter DOCKER-USER 2>/dev/null | grep -q 'counter accept'; then
+                nft insert rule ip filter DOCKER-USER counter accept 2>/dev/null || true
+            fi
         fi
         if nft list chain ip filter FORWARD >/dev/null 2>&1; then
-            nft insert rule ip filter FORWARD counter accept 2>/dev/null || true
+            if ! nft list chain ip filter FORWARD 2>/dev/null | grep -q 'counter accept'; then
+                nft insert rule ip filter FORWARD counter accept 2>/dev/null || true
+            fi
         fi
 
         log_info "Установка интеллектуального сторожевого таймера защиты от петель маршрутизации..."
@@ -1960,23 +2004,29 @@ table inet homelab {
 
     chain input {
         type filter hook input priority filter; policy accept;
-        iifname "$IFACE" tcp dport { 8083, 9090 } drop
+        ip saddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8 } tcp dport { 8083, 9090 } drop
     }
 }
 EOF_NFT_WD
-    nft delete table inet homelab 2>/dev/null || true
-    if nft -f /etc/nftables.d/homelab.nft 2>/dev/null; then
+    # Пересоздавать таблицу ТОЛЬКО если она отсутствует в ядре (защита от сброса сессий каждую минуту)
+    if ! nft list table inet homelab >/dev/null 2>&1; then
+        logger -t gateway-watchdog "Восстановление отсутствующей таблицы inet homelab в nftables" 2>/dev/null || true
+        nft -f /etc/nftables.d/homelab.nft 2>/dev/null || true
         APPLIED_NFT=1
     fi
 fi
 
-if [ "$APPLIED_NFT" -eq 1 ]; then
-    # Гарантированное открытие транзита в цепочках Docker через nftables
+if [ "$APPLIED_NFT" -eq 1 ] || ! nft list chain ip filter DOCKER-USER 2>/dev/null | grep -q 'counter accept'; then
+    # Гарантированное открытие транзита в цепочках Docker через nftables без дублирования
     if nft list chain ip filter DOCKER-USER >/dev/null 2>&1; then
-        nft insert rule ip filter DOCKER-USER counter accept 2>/dev/null || true
+        if ! nft list chain ip filter DOCKER-USER 2>/dev/null | grep -q 'counter accept'; then
+            nft insert rule ip filter DOCKER-USER counter accept 2>/dev/null || true
+        fi
     fi
     if nft list chain ip filter FORWARD >/dev/null 2>&1; then
-        nft insert rule ip filter FORWARD counter accept 2>/dev/null || true
+        if ! nft list chain ip filter FORWARD 2>/dev/null | grep -q 'counter accept'; then
+            nft insert rule ip filter FORWARD counter accept 2>/dev/null || true
+        fi
     fi
 fi
 
@@ -2126,6 +2176,11 @@ EOF_NOTIFY
 
     log_ok "Сетевой стек, сторож маршрутизации и служба оповещений настроены"
 }
+
+
+# ==============================================================================
+# МОДУЛЬ 06: СТРУКТУРА КАТАЛОГОВ И ОПТИМИЗАЦИЯ ХРАНИЛИЩА (NO-COW / BTRFS)
+# ==============================================================================
 
 setup_directories() {
     local CURRENT_FS="${SAVE_FSTYPE:-${SAVED_SAVE_FSTYPE:-}}"
@@ -2413,6 +2468,11 @@ EOF_FALLBACK_UI
 
     log_ok "Структура каталогов и параметры No-COW подготовлены"
 }
+
+
+# ==============================================================================
+# МОДУЛЬ 07: ТЕСТИРОВАНИЕ И ВЫБОР БЫСТРЫХ И БЕЗОПАСНЫХ DOH / DOT РЕЗОЛВЕРОВ
+# ==============================================================================
 
 benchmark_dns_servers() {
     print_step_header "07/11" "ТЕСТИРОВАНИЕ И ВЫБОР БЫСТРЫХ И БЕЗОПАСНЫХ DOH / DOT РЕЗОЛВЕРОВ"
@@ -2745,6 +2805,11 @@ EOF_PRINT_BENCH
     fi
 }
 
+
+# ==============================================================================
+# МОДУЛЬ 08: ГЕНЕРАЦИЯ КОНФИГУРАЦИЙ ADGUARD HOME И MIHOMO TUN
+# ==============================================================================
+
 configure_gateway_services() {
     print_step_header "08/11" "ГЕНЕРАЦИЯ КОНФИГУРАЦИЙ ADGUARD HOME И MIHOMO TUN"
 
@@ -2784,6 +2849,12 @@ schema_version: 34
 http:
   address: 0.0.0.0:8083
   session_ttl: 720h
+  trusted_proxies:
+    - 127.0.0.1
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+    - 10.0.0.0/8
+    - ::1
 users:
   - name: ${ADMIN_USER}
     password: "${AGH_HASH}"
@@ -2796,6 +2867,7 @@ dns:
     - 0.0.0.0
   port: 53
   block_ipv6: true
+  block_ech: true
   anonymize_client_ip: false
   ratelimit: 0
   refuse_any: true
@@ -2812,8 +2884,7 @@ ${BOOTSTRAP_YAML_LINES}
   use_private_ptr_resolvers: true
   local_ptr_upstreams:
 ${PTR_UPSTREAMS_YAML}
-  cache_size: 4194304
-  cache_enabled: false
+  cache_size: 0
   cache_ttl_min: 0
   cache_ttl_max: 0
   cache_optimistic: false
@@ -2859,6 +2930,12 @@ filters:
     id: 4
 whitelist_filters: []
 user_rules:
+  # Блокировка канареечных доменов DoH и Apple Private Relay (предотвращение скрытого обхода шлюза)
+  - '||use-application-dns.net^'
+  - '||mask.icloud.com^'
+  - '||mask-h2.icloud.com^'
+  # Блокировка ECH (HTTPS type 65) для защиты от скрытого сброса TLS рукопожатий цензурой ТСПУ
+  - '|*^$dnstype=HTTPS'
   - '@@||connectivitycheck.gstatic.com^\$important'
   - '@@||*.connectivitycheck.gstatic.com^\$important'
   - '@@||connectivitycheck.android.com^\$important'
@@ -2923,8 +3000,9 @@ proxy-providers:
     interval: 86400
     health-check:
       enable: true
-      url: https://www.gstatic.com/generate_204
-      interval: 300"
+      url: https://cp.cloudflare.com/generate_204
+      interval: 300
+      lazy: true"
 
             PROXY_GROUPS_CONFIG="
 proxy-groups:
@@ -2940,9 +3018,10 @@ proxy-groups:
     type: url-test
     use:
       - my-sub
-    url: https://www.gstatic.com/generate_204
+    url: https://cp.cloudflare.com/generate_204
     interval: 300
     tolerance: 50
+    lazy: true
 
   - name: YouTube
     type: select
@@ -3128,24 +3207,8 @@ dns:
     - "time.*.com"
     - "time.*.gov"
     - "time.*.apple.com"
-    # Captive Portal и проверка доступности сети (Android, Google, Apple, Xiaomi, Samsung, Huawei, Windows)
-    - "+.connectivitycheck.gstatic.com"
-    - "connectivitycheck.gstatic.com"
-    - "+.connectivitycheck.android.com"
-    - "connectivitycheck.android.com"
-    - "clients3.google.com"
-    - "play.googleapis.com"
-    - "+.gvt2.com"
-    - "captive.apple.com"
-    - "+.apple.com"
-    - "connect.rom.miui.com"
-    - "wifi.miui.com"
-    - "connectivity.samsung.com.cn"
-    - "connectivitycheck.platform.hicloud.com"
-    - "+.msftconnecttest.com"
-    - "+.msftncsi.com"
-    - "detectportal.firefox.com"
-    # Российские домены и порталы (не назначать Fake-IP во избежание сбоев в банках и ТВ)
+    # Автоматическое прямое разрешение для всей базы российских доменов
+    - "rule-set:ru_site"
     - "+.ru"
     - "+.su"
     - "+.xn--p1ai"
@@ -3161,6 +3224,21 @@ dns:
     - "+.userapi.com"
     - "+.vk-portal.net"
     - "+.2gis.com"
+    # Captive Portal и проверка доступности сети (Android, Apple, Windows, Xiaomi, Samsung, Huawei)
+    - "+.connectivitycheck.gstatic.com"
+    - "+.connectivitycheck.android.com"
+    - "clients3.google.com"
+    - "play.googleapis.com"
+    - "+.gvt2.com"
+    - "captive.apple.com"
+    - "+.apple.com"
+    - "connect.rom.miui.com"
+    - "wifi.miui.com"
+    - "connectivity.samsung.com.cn"
+    - "connectivitycheck.platform.hicloud.com"
+    - "+.msftconnecttest.com"
+    - "+.msftncsi.com"
+    - "detectportal.firefox.com"
   nameserver-policy:
     "rule-set:ru_site":
       - 77.88.8.8
@@ -3238,10 +3316,8 @@ ${PROXY_PROVIDERS_CONFIG}
 ${PROXY_GROUPS_CONFIG}
 
 rules:
-  # Проверка доступности сети (Captive Portal Android, Apple, Xiaomi, Samsung, Windows) — МГНОВЕННО НАПРЯМУЮ!
-  - DOMAIN,connectivitycheck.gstatic.com,DIRECT
+  # Проверка доступности сети (Captive Portal Android, Apple, Windows, Xiaomi, Samsung) — МГНОВЕННО НАПРЯМУЮ!
   - DOMAIN-SUFFIX,connectivitycheck.gstatic.com,DIRECT
-  - DOMAIN,connectivitycheck.android.com,DIRECT
   - DOMAIN-SUFFIX,connectivitycheck.android.com,DIRECT
   - DOMAIN,clients3.google.com,DIRECT
   - DOMAIN,play.googleapis.com,DIRECT
@@ -3252,6 +3328,8 @@ rules:
   - DOMAIN,wifi.miui.com,DIRECT
   - DOMAIN,connectivity.samsung.com.cn,DIRECT
   - DOMAIN,connectivitycheck.platform.hicloud.com,DIRECT
+  - DOMAIN-SUFFIX,msftconnecttest.com,DIRECT
+  - DOMAIN-SUFFIX,msftncsi.com,DIRECT
   - DOMAIN-KEYWORD,connectivitycheck,DIRECT
 
   # Блокировка QUIC (UDP 443) для форсирования надежного TCP/HTTP2 (YouTube/браузеры)
@@ -3293,7 +3371,7 @@ rules:
   - RULE-SET,steam_site,DIRECT
   - RULE-SET,github_site,DIRECT
 
-  # Нейросети и искусственный интеллект (OpenAI, Anthropic, Gemini, Copilot, Perplexity и др.)
+  # Нейросети и искусственный интеллект (OpenAI, Anthropic, Gemini, Copilot, Perplexity, Cursor и др.)
   - DOMAIN-SUFFIX,openai.com,AI-Services
   - DOMAIN-SUFFIX,chatgpt.com,AI-Services
   - DOMAIN-SUFFIX,oaistatic.com,AI-Services
@@ -3304,13 +3382,17 @@ rules:
   - DOMAIN-SUFFIX,gemini.google.com,AI-Services
   - DOMAIN-SUFFIX,aistudio.google.com,AI-Services
   - DOMAIN-SUFFIX,generativelanguage.googleapis.com,AI-Services
+  - DOMAIN-SUFFIX,alkalimakersuite-pa.clients6.google.com,AI-Services
   - DOMAIN-SUFFIX,cursor.com,AI-Services
   - DOMAIN-SUFFIX,cursor.sh,AI-Services
   - DOMAIN-SUFFIX,copilot.microsoft.com,AI-Services
   - DOMAIN-SUFFIX,suno.com,AI-Services
+  - DOMAIN-SUFFIX,suno.ai,AI-Services
   - DOMAIN-SUFFIX,midjourney.com,AI-Services
   - DOMAIN-SUFFIX,x.ai,AI-Services
   - DOMAIN-SUFFIX,grok.com,AI-Services
+  - DOMAIN-SUFFIX,deepseek.com,AI-Services
+  - DOMAIN-SUFFIX,v0.dev,AI-Services
   - DOMAIN-SUFFIX,huggingface.co,AI-Services
   - DOMAIN-KEYWORD,gemini.google,AI-Services
   - RULE-SET,gemini_site,AI-Services
@@ -3327,13 +3409,14 @@ rules:
   - DOMAIN-SUFFIX,youtubekids.com,YouTube
   - RULE-SET,youtube_site,YouTube
 
-  # Discord (голосовые серверы, чаты, вебхуки, шлюз) — через группу Discord
+  # Discord (голосовые серверы RTC, чаты, вложения, шлюз) — через группу Discord
   - DOMAIN-SUFFIX,discord.com,Discord
   - DOMAIN-SUFFIX,discord.gg,Discord
   - DOMAIN-SUFFIX,discordapp.com,Discord
   - DOMAIN-SUFFIX,discordapp.net,Discord
   - DOMAIN-SUFFIX,discord.media,Discord
   - DOMAIN-SUFFIX,discordcdn.com,Discord
+  - DOMAIN-KEYWORD,discord,Discord
   - RULE-SET,discord_site,Discord
 
   # Telegram — через группу Telegram
@@ -3399,6 +3482,11 @@ EOF_MIHOMO
     log_ok "Конфигурации шлюза AdGuard и Mihomo сгенерированы"
 }
 
+
+# ==============================================================================
+# МОДУЛЬ 09: ГЕНЕРАЦИЯ CADDYFILE И DOCKER-COMPOSE.YML
+# ==============================================================================
+
 configure_caddy_and_compose() {
     print_step_header "09/11" "ГЕНЕРАЦИЯ CADDYFILE И DOCKER-COMPOSE.YML"
     
@@ -3409,6 +3497,32 @@ configure_caddy_and_compose() {
     SAMBA_PASS_COMPOSE="${SAMBA_PASS_COMPOSE#\"}"
     local SAMBA_ENV_SHARE="${SHARE_NAME//-/_}"
     local MIHOMO_SECRET_VAL="${MIHOMO_SECRET:-${SAVED_MIHOMO_SECRET:-}}"
+
+    # Формирование элементов портала прямого IP-доступа
+    local IP_PORTAL_ITEMS=""
+    if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
+        IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
+    <li><span>🛡️ AdGuard Home</span><a href=\"https://${ADGUARD_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${ADGUARD_DOMAIN}</a></li>
+    <li><span>🚀 Mihomo Gateway UI</span><a href=\"https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET_VAL}\" target=\"_blank\" rel=\"noopener\">https://${PROXY_DOMAIN} [Вход]</a></li>"
+    fi
+    if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
+        IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
+    <li><span>🔑 Vaultwarden</span><a href=\"https://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${VAULT_DOMAIN}</a></li>"
+    fi
+    if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
+        IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
+    <li><span>🐙 Gitea Git Server</span><a href=\"https://${GITEA_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${GITEA_DOMAIN}</a></li>"
+    fi
+    if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
+        IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
+    <li><span>📥 qBittorrent (VueTorrent)</span><a href=\"https://${TORRENT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${TORRENT_DOMAIN}</a></li>"
+    fi
+    if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+        IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
+    <li><span>🎬 MeTube yt-dlp</span><a href=\"https://${METUBE_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${METUBE_DOMAIN}</a></li>"
+    fi
+    IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
+    <li><span>📋 Dozzle Web Logs</span><a href=\"https://${LOGS_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${LOGS_DOMAIN}</a></li>"
 
     cat <<EOF_CADDY > "${APP_DIR}/caddy/Caddyfile"
 {
@@ -3423,6 +3537,56 @@ configure_caddy_and_compose() {
         X-XSS-Protection "0"
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+    }
+}
+
+http://${LOCAL_IP} {
+    @cert path /caddy-root.crt /root.crt
+    handle @cert {
+        root * /data/caddy/pki/authorities/local
+        rewrite * /root.crt
+        file_server
+    }
+
+    handle {
+        respond <<EOF_HTML
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Homelab Appliance &amp; Gateway</title>
+<style>
+body { background: #080d1a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; box-sizing: border-box; }
+.card { background: #0f172a; border: 1px solid #1e293b; border-radius: 16px; padding: 32px; max-width: 600px; width: 100%; box-shadow: 0 20px 45px rgba(0,0,0,0.7); }
+h1 { color: #38bdf8; font-size: 24px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+.badge { background: #065f46; color: #6ee7b7; font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: bold; }
+p { color: #94a3b8; font-size: 14px; line-height: 1.6; margin: 8px 0 16px; }
+.list { list-style: none; padding: 0; margin: 16px 0; }
+.list li { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #131e36; border-radius: 8px; border: 1px solid #1e293b; font-size: 14px; }
+.list a { color: #38bdf8; text-decoration: none; font-weight: 600; font-family: monospace; font-size: 13px; background: rgba(56, 189, 248, 0.1); padding: 4px 8px; border-radius: 4px; }
+.list a:hover { background: rgba(56, 189, 248, 0.25); text-decoration: underline; }
+.btn-cert { display: block; text-align: center; background: #0284c7; color: #fff; text-decoration: none; font-weight: 600; font-size: 13px; padding: 10px 16px; border-radius: 8px; margin: 18px 0 10px; transition: background 0.2s; }
+.btn-cert:hover { background: #0369a1; }
+.tip { background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; padding: 12px; font-size: 13px; color: #cbd5e1; border-radius: 4px; margin-top: 14px; line-height: 1.5; }
+code { background: #1e293b; color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>⚡ Homelab Appliance <span class="badge">ONLINE</span></h1>
+  <p>Сервер успешно развернут. Для доступа к защищенным веб-сервисам перейдите по ссылкам:</p>
+  <ul class="list">
+${IP_PORTAL_ITEMS}
+  </ul>
+  <a class="btn-cert" href="/caddy-root.crt" download>📥 Скачать Root CA Сертификат (caddy-root.crt)</a>
+  <div class="tip">
+    💡 <b>Настройка роутера:</b> Укажите в DHCP вашего роутера <code>DNS: ${LOCAL_IP}</code> и <code>Gateway: ${LOCAL_IP}</code>, чтобы все устройства домашней сети автоматически переходили по доменам <code>*.lan</code> и получили чистый интернет без рекламы и блокировок.
+  </div>
+</div>
+</body>
+</html>
+EOF_HTML 200
     }
 }
 EOF_CADDY
@@ -3848,7 +4012,7 @@ EOF_COMPOSE
     container_name: watchtower
     restart: unless-stopped
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - "DOCKER_API_VERSION=${DETECTED_DOCKER_API:-1.45}"
       - "WATCHTOWER_CLEANUP=true"
@@ -3866,7 +4030,7 @@ EOF_COMPOSE
       - "AUTOHEAL_START_PERIOD=30"
       - "AUTOHEAL_DEFAULT_STOP_TIMEOUT=10"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
 
   dozzle:
     image: amir20/dozzle:latest
@@ -3949,6 +4113,11 @@ EOF_HOMELAB_RC
 
     log_ok "Caddyfile, docker-compose.yml и служба автозапуска успешно сформированы"
 }
+
+
+# ==============================================================================
+# МОДУЛЬ 10: РЕЗЕРВНОЕ КОПИРОВАНИЕ, СТАРТ И CLI-ИНТЕРФЕЙС УПРАВЛЕНИЯ
+# ==============================================================================
 
 setup_backups_and_start() {
     print_step_header "10/11" "РЕЗЕРВНОЕ КОПИРОВАНИЕ, СТАРТ И АВТО-ИНИЦИАЛИЗАЦИЯ"
@@ -4388,6 +4557,12 @@ cmd_doctor() {
         else
             echo -e "  ${TAG_WARN} REST API Mihomo (порт 9090):            ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
         fi
+
+        if ip link show Meta >/dev/null 2>&1; then
+            echo -e "  ${TAG_OK} Сетевой TUN интерфейс ядра (Meta):      ${CLR_GREEN}[АКТИВЕН И ПОДНЯТ]${CLR_RESET}"
+        else
+            echo -e "  ${TAG_WARN} Сетевой TUN интерфейс ядра (Meta):      ${CLR_YELLOW}[НЕ СОЗДАН/ОЖИДАНИЕ]${CLR_RESET}"
+        fi
     else
         echo -e "  ${TAG_INFO} Сетевой шлюз (AdGuard + Mihomo):       ${CLR_DIM}[ОТКЛЮЧЕН В КОНФИГУРАЦИИ]${CLR_RESET}"
     fi
@@ -4641,6 +4816,11 @@ EOF_ADGUARD_BIN
     log_ok "Службы автозапуска и горячего резервного копирования активированы"
 }
 
+
+# ==============================================================================
+# МОДУЛЬ 11: АВТОМАТИЧЕСКАЯ ДИАГНОСТИКА СЕРВИСОВ И ИТОГОВЫЙ ДАШБОРД
+# ==============================================================================
+
 diagnose_and_verify_system() {
     print_step_header "11/11" "АВТОМАТИЧЕСКАЯ ДИАГНОСТИКА СЕРВИСОВ И СИСТЕМЫ"
 
@@ -4754,14 +4934,23 @@ EOF_DIAG
         echo "Firewall status: ${FW_STATUS}" >> "${DIAG_LOG}"
     fi
 
+    local DNS_TEST=0
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
-        local DNS_TEST=0
         if python3 -c "import socket, sys; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 53)); data, _ = s.recvfrom(512); sys.exit(0 if len(data) > 12 else 1)" 2>/dev/null; then
             DNS_TEST=1
         fi
         if [ "${DNS_TEST}" -eq 1 ]; then
             echo -e "    ${TAG_OK} DNS Резолвер (порт 53):   ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
             echo "DNS Port 53 Check: OK" >> "${DIAG_LOG}"
+
+            # Безопасное переключение хоста на локальный AdGuard Home после подтверждения работоспособности
+            log_info "Фиксация локального DNS AdGuard Home (127.0.0.1) в /etc/resolv.conf хоста..."
+            {
+                echo "# Сгенерировано Homelab Gateway (локальный резолвер AdGuard Home)"
+                echo "nameserver 127.0.0.1"
+                echo "nameserver 77.88.8.8"
+                echo "options timeout:2 attempts:2"
+            } > /etc/resolv.conf 2>/dev/null || true
         else
             echo -e "    ${TAG_WARN} DNS Резолвер (порт 53):   ${CLR_YELLOW}[ОЖИДАНИЕ ИНИЦИАЛИЗАЦИИ]${CLR_RESET}"
             echo "DNS Port 53 Check: PENDING" >> "${DIAG_LOG}"
@@ -4828,8 +5017,9 @@ show_summary_dashboard() {
 
     echo -e "  ${CLR_NEON_PURPLE}╭── СЕТЕВОЙ ШЛЮЗ И МАРШРУТИЗАЦИЯ (RUSSIA PRO 2026) ──────────────────────────╮${CLR_RESET}"
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Портал навигации по IP:${CLR_RESET}      ${CLR_NEON_GREEN}http://${LOCAL_IP}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ AdGuard Home (DNS & AdBlock):${CLR_RESET}    ${CLR_NEON_CYAN}https://${ADGUARD_DOMAIN}${CLR_RESET}"
-        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Mihomo Smart Routing UI:${CLR_RESET}         ${CLR_NEON_CYAN}https://${PROXY_DOMAIN}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Mihomo Smart Routing UI:${CLR_RESET}         ${CLR_NEON_CYAN}https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Секрет API панели управления:${CLR_RESET}    ${CLR_NEON_GOLD}${MIHOMO_SECRET}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Госуслуги, банки и сервисы РФ:${CLR_RESET}   ${CLR_NEON_GREEN}100% ПРЯМОЙ ДОСТУП (DIRECT, без капч и задержек)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Маршрутизация YouTube & Media:${CLR_RESET}  ${CLR_NEON_GREEN}АКТИВНА (Туннелирование -> AUTO / PROXY)${CLR_RESET}"
@@ -4842,6 +5032,7 @@ show_summary_dashboard() {
             echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Защищенный DoT (TLS):${CLR_RESET}            ${CLR_NEON_CYAN}${SELECTED_DOT_1}${CLR_RESET}"
         fi
     else
+        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Портал навигации по IP:${CLR_RESET}      ${CLR_NEON_GREEN}http://${LOCAL_IP}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_MUTED}• Прозрачный сетевой шлюз отключен в конфигурации${CLR_RESET}"
     fi
     echo -e "  ${CLR_NEON_PURPLE}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
