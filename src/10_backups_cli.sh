@@ -719,13 +719,15 @@ cmd_upgrade() {
     mkdir -p "${SNAPSHOT_DIR}"
     local SNAP_TAR="${SNAPSHOT_DIR}/homelab_snapshot_pre_upgrade.tar.gz"
 
-    tar -czf "${SNAP_TAR}" \
-        -C "${APP_DIR}" \
-        .env docker-compose.yml compose.yaml Caddyfile caddy/Caddyfile \
-        2>/dev/null || true
-    [ -d "${APP_DIR}/mihomo" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" mihomo/config.yaml 2>/dev/null || true
-    [ -d "${APP_DIR}/adguard/conf" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" adguard/conf/AdGuardHome.yaml 2>/dev/null || true
-    [ -d "${APP_DIR}/configs/navidrome" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" configs/navidrome 2>/dev/null || true
+    local SNAP_FILES=(".env")
+    [ -f "${APP_DIR}/docker-compose.yml" ] && SNAP_FILES+=("docker-compose.yml")
+    [ -f "${APP_DIR}/Caddyfile" ] && SNAP_FILES+=("Caddyfile")
+    [ -d "${APP_DIR}/caddy" ] && SNAP_FILES+=("caddy")
+    [ -f "${APP_DIR}/mihomo/config.yaml" ] && SNAP_FILES+=("mihomo/config.yaml")
+    [ -f "${APP_DIR}/adguard/conf/AdGuardHome.yaml" ] && SNAP_FILES+=("adguard/conf/AdGuardHome.yaml")
+    [ -d "${APP_DIR}/configs/navidrome" ] && SNAP_FILES+=("configs/navidrome")
+
+    tar -czf "${SNAP_TAR}" -C "${APP_DIR}" "${SNAP_FILES[@]}" 2>/dev/null || tar -czf "${SNAP_TAR}" -C "${APP_DIR}" .env 2>/dev/null || true
     chmod 600 "${SNAP_TAR}" 2>/dev/null || true
     echo -e "  ${TAG_OK} Снимок конфигураций сохранен в: ${SNAP_TAR}"
 

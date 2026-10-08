@@ -339,7 +339,7 @@ EOF_WD_TMR
     fi
 
     log_info "Регистрация локальных доменов в /etc/hosts..."
-    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${METUBE_DOMAIN}" "tube.lan" "${MUSIC_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}"; do
+    for DOMAIN in "${VAULT_DOMAIN:-}" "${GITEA_DOMAIN:-}" "${ADGUARD_DOMAIN:-}" "${TORRENT_DOMAIN:-}" "${METUBE_DOMAIN:-}" "tube.lan" "${MUSIC_DOMAIN:-}" "${PROXY_DOMAIN:-}" "${LOGS_DOMAIN:-}"; do
         if [ -n "${DOMAIN}" ]; then
             local ESCAPED_DOMAIN
             ESCAPED_DOMAIN=$(printf '%s\n' "${DOMAIN}" | sed -e 's/[]\/$*.^[]/\\&/g')

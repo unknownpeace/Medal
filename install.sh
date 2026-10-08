@@ -253,13 +253,55 @@ USER_UID=""
 USER_GID=""
 SAVE_FSTYPE=""
 
+DEFAULT_IFACE=""
+LOCAL_IP=""
+ROUTER_GATEWAY=""
+LAN_SUBNET=""
+INSTALL_MODE="1"
+
+ENABLE_GATEWAY="Y"
+ENABLE_VAULT="Y"
+ENABLE_GITEA="Y"
+ENABLE_SAMBA="Y"
+ENABLE_QBIT="Y"
+ENABLE_METUBE="Y"
+ENABLE_NAVIDROME="Y"
+ENABLE_TELEGRAM="N"
+TELEGRAM_BOT_TOKEN=""
+TELEGRAM_CHAT_ID=""
+
+SSL_MODE="1"
+DUCKDNS_NAME=""
+DUCKDNS_TOKEN=""
+BASE_DOMAIN=""
+VAULT_DOMAIN="vault.lan"
+GITEA_DOMAIN="git.lan"
+ADGUARD_DOMAIN="adguard.lan"
+TORRENT_DOMAIN="torrent.lan"
+METUBE_DOMAIN="metube.lan"
+MUSIC_DOMAIN="music.lan"
+PROXY_DOMAIN="proxy.lan"
+LOGS_DOMAIN="logs.lan"
+
+STORAGE_MODE="1"
+SUBDIR_NAME=""
+SHARE_NAME="storage"
+SAVE_DIR="/opt/homelab/save"
+SAVE_FSTYPE="ext4"
+
+SUB_URL="none"
+ADMIN_USER="admin"
+ADMIN_USER_SAFE="admin"
 MASTER_PASS=""
 MIHOMO_SECRET=""
 SAMBA_PASS=""
 AGH_PASS=""
+AGH_HASH=""
+AGH_HASH_CADDY=""
 VAULT_ADMIN_TOKEN=""
-ADMIN_USER=""
-ADMIN_USER_SAFE=""
+VAULT_ADMIN_HASH=""
+VAULT_ADMIN_HASH_ESCAPED=""
+
 DETECTED_DOCKER_API=""
 VAULT_DATA_DIR=""
 GITEA_DATA_DIR=""
@@ -276,12 +318,8 @@ SELECTED_DOT_1=""
 SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
-ENABLE_METUBE="Y"
-ENABLE_NAVIDROME="Y"
-METUBE_DOMAIN=""
-MUSIC_DOMAIN=""
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.5"
+HOMELAB_VERSION="2.8.6"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -464,6 +502,17 @@ load_previous_config() {
         [ -n "${SAVED_SUB_URL:-}" ] && SUB_URL="${SAVED_SUB_URL}"
         [ -n "${SAVED_TARGET_USER:-}" ] && TARGET_USER="${SAVED_TARGET_USER}"
         [ -n "${SAVED_SHARE_NAME:-}" ] && SHARE_NAME="${SAVED_SHARE_NAME}"
+        [ -n "${SAVED_BASE_DOMAIN:-}" ] && BASE_DOMAIN="${SAVED_BASE_DOMAIN}"
+        [ -n "${SAVED_VAULT_DOMAIN:-}" ] && VAULT_DOMAIN="${SAVED_VAULT_DOMAIN}"
+        [ -n "${SAVED_GITEA_DOMAIN:-}" ] && GITEA_DOMAIN="${SAVED_GITEA_DOMAIN}"
+        [ -n "${SAVED_ADGUARD_DOMAIN:-}" ] && ADGUARD_DOMAIN="${SAVED_ADGUARD_DOMAIN}"
+        [ -n "${SAVED_TORRENT_DOMAIN:-}" ] && TORRENT_DOMAIN="${SAVED_TORRENT_DOMAIN}"
+        [ -n "${SAVED_PROXY_DOMAIN:-}" ] && PROXY_DOMAIN="${SAVED_PROXY_DOMAIN}"
+        [ -n "${SAVED_VAULT_DATA_DIR:-}" ] && VAULT_DATA_DIR="${SAVED_VAULT_DATA_DIR}"
+        [ -n "${SAVED_GITEA_DATA_DIR:-}" ] && GITEA_DATA_DIR="${SAVED_GITEA_DATA_DIR}"
+        [ -n "${SAVED_ADGUARD_WORK_DIR:-}" ] && ADGUARD_WORK_DIR="${SAVED_ADGUARD_WORK_DIR}"
+        [ -n "${SAVED_VAULT_ADMIN_TOKEN:-}" ] && VAULT_ADMIN_TOKEN="${SAVED_VAULT_ADMIN_TOKEN}"
+        [ -n "${SAVED_SUBDIR_NAME:-}" ] && SUBDIR_NAME="${SAVED_SUBDIR_NAME}"
     fi
 }
 
@@ -1124,6 +1173,64 @@ select_disk_device() {
 # Interactive Configuration Wizard (Express / Custom / Reset) & Password Hashes
 # =============================================================================
 
+save_configuration() {
+    mkdir -p "${APP_DIR}"
+    {
+        printf "SAVED_PHYS_IFACE=%q\n" "${DEFAULT_IFACE}"
+        printf "SAVED_LOCAL_IP=%q\n" "${LOCAL_IP}"
+        printf "SAVED_ROUTER_GATEWAY=%q\n" "${ROUTER_GATEWAY}"
+        printf "SAVED_LAN_SUBNET=%q\n" "${LAN_SUBNET}"
+        printf "SAVED_ENABLE_GATEWAY=%q\n" "${ENABLE_GATEWAY}"
+        printf "SAVED_ENABLE_VAULT=%q\n" "${ENABLE_VAULT}"
+        printf "SAVED_ENABLE_GITEA=%q\n" "${ENABLE_GITEA}"
+        printf "SAVED_ENABLE_SAMBA=%q\n" "${ENABLE_SAMBA}"
+        printf "SAVED_ENABLE_QBIT=%q\n" "${ENABLE_QBIT}"
+        printf "SAVED_ENABLE_METUBE=%q\n" "${ENABLE_METUBE}"
+        printf "SAVED_METUBE_DOMAIN=%q\n" "${METUBE_DOMAIN}"
+        printf "SAVED_ENABLE_NAVIDROME=%q\n" "${ENABLE_NAVIDROME}"
+        printf "SAVED_MUSIC_DOMAIN=%q\n" "${MUSIC_DOMAIN}"
+        printf "SAVED_SSL_MODE=%q\n" "${SSL_MODE}"
+        printf "SAVED_DUCKDNS_NAME=%q\n" "${DUCKDNS_NAME}"
+        printf "SAVED_DUCKDNS_TOKEN=%q\n" "${DUCKDNS_TOKEN}"
+        printf "SAVED_SUB_URL=%q\n" "${SUB_URL}"
+        printf "SAVED_TARGET_USER=%q\n" "${TARGET_USER}"
+        printf "SAVED_ADMIN_USER=%q\n" "${ADMIN_USER}"
+        printf "SAVED_MASTER_PASS=%q\n" "${MASTER_PASS}"
+        printf "SAVED_MIHOMO_SECRET=%q\n" "${MIHOMO_SECRET}"
+        printf "SAVED_VAULT_ADMIN_TOKEN=%q\n" "${VAULT_ADMIN_TOKEN}"
+        printf "SAVED_STORAGE_MODE=%q\n" "${STORAGE_MODE}"
+        printf "SAVED_SUBDIR_NAME=%q\n" "${SUBDIR_NAME}"
+        printf "SAVED_SAVE_DIR=%q\n" "${SAVE_DIR}"
+        printf "SAVED_SAVE_FSTYPE=%q\n" "${SAVE_FSTYPE}"
+        printf "SAVED_SHARE_NAME=%q\n" "${SHARE_NAME}"
+        printf "SAVED_BASE_DOMAIN=%q\n" "${BASE_DOMAIN}"
+        printf "SAVED_VAULT_DOMAIN=%q\n" "${VAULT_DOMAIN}"
+        printf "SAVED_GITEA_DOMAIN=%q\n" "${GITEA_DOMAIN}"
+        printf "SAVED_ADGUARD_DOMAIN=%q\n" "${ADGUARD_DOMAIN}"
+        printf "SAVED_TORRENT_DOMAIN=%q\n" "${TORRENT_DOMAIN}"
+        printf "SAVED_PROXY_DOMAIN=%q\n" "${PROXY_DOMAIN}"
+        printf "SAVED_VAULT_DATA_DIR=%q\n" "${VAULT_DATA_DIR}"
+        printf "SAVED_GITEA_DATA_DIR=%q\n" "${GITEA_DATA_DIR}"
+        printf "SAVED_ADGUARD_WORK_DIR=%q\n" "${ADGUARD_WORK_DIR}"
+        printf "SAVED_INIT_SYSTEM=%q\n" "${INIT_SYSTEM}"
+        printf "SAVED_SELECTED_DOH_1=%q\n" "${SELECTED_DOH_1}"
+        printf "SAVED_SELECTED_DOH_2=%q\n" "${SELECTED_DOH_2}"
+        printf "SAVED_SELECTED_DOH_3=%q\n" "${SELECTED_DOH_3}"
+        printf "SAVED_SELECTED_DOT_1=%q\n" "${SELECTED_DOT_1}"
+        printf "SAVED_SELECTED_DOT_2=%q\n" "${SELECTED_DOT_2}"
+        printf "SAVED_SELECTED_BOOTSTRAP_IPS=%q\n" "${SELECTED_BOOTSTRAP_IPS}"
+        printf "SAVED_SELECTED_BOOTSTRAP_IP_1=%q\n" "${SELECTED_BOOTSTRAP_IP_1}"
+        printf "SAVED_LOGS_DOMAIN=%q\n" "${LOGS_DOMAIN}"
+        printf "SAVED_ENABLE_TELEGRAM=%q\n" "${ENABLE_TELEGRAM}"
+        printf "SAVED_TELEGRAM_BOT_TOKEN=%q\n" "${TELEGRAM_BOT_TOKEN}"
+        printf "SAVED_TELEGRAM_CHAT_ID=%q\n" "${TELEGRAM_CHAT_ID}"
+        printf "SAVED_HOMELAB_VERSION=%q\n" "${HOMELAB_VERSION}"
+    } > "${ENV_FILE}"
+    chmod 600 "${ENV_FILE}"
+    chown root:root "${ENV_FILE}" 2>/dev/null || true
+    log_ok "Конфигурация успешно сохранена в ${ENV_FILE}"
+}
+
 prompt_configuration() {
     print_step_header "03/11" "КОНФИГУРАЦИЯ И ВЫБОР РЕЖИМА УСТАНОВКИ"
 
@@ -1131,6 +1238,97 @@ prompt_configuration() {
         log_info "Режим бесшовного обновления ядра (In-Place Upgrade): интерактивные вопросы пропущены."
         log_info "Все текущие параметры, учетные записи и пути к данным сохранены без изменений."
         INSTALL_MODE=1
+
+        # Восстановление и нормализация параметров из сохраненной конфигурации
+        ENABLE_GATEWAY="${SAVED_ENABLE_GATEWAY:-${ENABLE_GATEWAY:-Y}}"
+        ENABLE_VAULT="${SAVED_ENABLE_VAULT:-${ENABLE_VAULT:-Y}}"
+        ENABLE_GITEA="${SAVED_ENABLE_GITEA:-${ENABLE_GITEA:-Y}}"
+        ENABLE_SAMBA="${SAVED_ENABLE_SAMBA:-${ENABLE_SAMBA:-Y}}"
+        ENABLE_QBIT="${SAVED_ENABLE_QBIT:-${ENABLE_QBIT:-Y}}"
+        ENABLE_METUBE="${SAVED_ENABLE_METUBE:-${ENABLE_METUBE:-Y}}"
+        ENABLE_NAVIDROME="${SAVED_ENABLE_NAVIDROME:-${ENABLE_NAVIDROME:-Y}}"
+        SSL_MODE="${SAVED_SSL_MODE:-${SSL_MODE:-1}}"
+        SUB_URL="${SAVED_SUB_URL:-${SUB_URL:-none}}"
+
+        ADMIN_USER="${SAVED_ADMIN_USER:-${ADMIN_USER:-admin}}"
+        ADMIN_USER=$(echo "${ADMIN_USER}" | tr -cd "[:alnum:]_-")
+        [ -z "${ADMIN_USER}" ] && ADMIN_USER="admin"
+        ADMIN_USER_SAFE=$(echo "${ADMIN_USER}" | tr '[:upper:]' '[:lower:]' | tr '-' '_')
+        [[ "${ADMIN_USER_SAFE}" =~ ^[0-9] ]] && ADMIN_USER_SAFE="u_${ADMIN_USER_SAFE}"
+
+        MASTER_PASS="${SAVED_MASTER_PASS:-${MASTER_PASS:-}}"
+        MIHOMO_SECRET="${SAVED_MIHOMO_SECRET:-${MASTER_PASS}}"
+        SAMBA_PASS="${SAVED_SAMBA_PASS:-${MASTER_PASS}}"
+        AGH_PASS="${SAVED_AGH_PASS:-${MASTER_PASS}}"
+        VAULT_ADMIN_TOKEN="${SAVED_VAULT_ADMIN_TOKEN:-${MASTER_PASS}}"
+
+        SAVE_DIR="${SAVED_SAVE_DIR:-${SAVE_DIR:-/opt/homelab/save}}"
+        SAVE_FSTYPE="${SAVED_SAVE_FSTYPE:-${SAVE_FSTYPE:-ext4}}"
+        STORAGE_MODE="${SAVED_STORAGE_MODE:-${STORAGE_MODE:-1}}"
+        SUBDIR_NAME="${SAVED_SUBDIR_NAME:-${SUBDIR_NAME:-}}"
+        SHARE_NAME="${SAVED_SHARE_NAME:-$(basename "${SAVE_DIR}" | tr -cd '[:alnum:]_-')}"
+        [ -z "${SHARE_NAME}" ] && SHARE_NAME="storage"
+
+        DUCKDNS_NAME="${SAVED_DUCKDNS_NAME:-}"
+        DUCKDNS_TOKEN="${SAVED_DUCKDNS_TOKEN:-}"
+
+        if [ "${SSL_MODE}" = "2" ] && [ -n "${DUCKDNS_NAME}" ]; then
+            BASE_DOMAIN="${DUCKDNS_NAME}.duckdns.org"
+            VAULT_DOMAIN="${SAVED_VAULT_DOMAIN:-vault.${BASE_DOMAIN}}"
+            GITEA_DOMAIN="${SAVED_GITEA_DOMAIN:-git.${BASE_DOMAIN}}"
+            ADGUARD_DOMAIN="${SAVED_ADGUARD_DOMAIN:-adguard.${BASE_DOMAIN}}"
+            TORRENT_DOMAIN="${SAVED_TORRENT_DOMAIN:-torrent.${BASE_DOMAIN}}"
+            METUBE_DOMAIN="${SAVED_METUBE_DOMAIN:-metube.${BASE_DOMAIN}}"
+            MUSIC_DOMAIN="${SAVED_MUSIC_DOMAIN:-music.${BASE_DOMAIN}}"
+            PROXY_DOMAIN="${SAVED_PROXY_DOMAIN:-proxy.${BASE_DOMAIN}}"
+            LOGS_DOMAIN="${SAVED_LOGS_DOMAIN:-logs.${BASE_DOMAIN}}"
+        else
+            SSL_MODE="1"
+            BASE_DOMAIN=""
+            VAULT_DOMAIN="${SAVED_VAULT_DOMAIN:-vault.lan}"
+            GITEA_DOMAIN="${SAVED_GITEA_DOMAIN:-git.lan}"
+            ADGUARD_DOMAIN="${SAVED_ADGUARD_DOMAIN:-adguard.lan}"
+            TORRENT_DOMAIN="${SAVED_TORRENT_DOMAIN:-torrent.lan}"
+            METUBE_DOMAIN="${SAVED_METUBE_DOMAIN:-metube.lan}"
+            MUSIC_DOMAIN="${SAVED_MUSIC_DOMAIN:-music.lan}"
+            PROXY_DOMAIN="${SAVED_PROXY_DOMAIN:-proxy.lan}"
+            LOGS_DOMAIN="${SAVED_LOGS_DOMAIN:-logs.lan}"
+        fi
+
+        ENABLE_TELEGRAM="${SAVED_ENABLE_TELEGRAM:-N}"
+        TELEGRAM_BOT_TOKEN="${SAVED_TELEGRAM_BOT_TOKEN:-}"
+        TELEGRAM_CHAT_ID="${SAVED_TELEGRAM_CHAT_ID:-}"
+
+        local ROOT_DEV
+        ROOT_DEV=$(df -P / 2>/dev/null | awk 'NR==2{print $1}' || echo "/dev/root")
+        local SAVE_DEV
+        SAVE_DEV=$(df -P "${SAVE_DIR}" 2>/dev/null | awk 'NR==2{print $1}' || echo "${ROOT_DEV}")
+
+        if [ -n "${SAVED_VAULT_DATA_DIR:-}" ]; then
+            VAULT_DATA_DIR="${SAVED_VAULT_DATA_DIR}"
+        elif [ "${ROOT_DEV}" != "${SAVE_DEV}" ] || [ -n "${STORAGE_DEP_LINE}" ]; then
+            VAULT_DATA_DIR="${SAVE_DIR}/services/vaultwarden"
+        else
+            VAULT_DATA_DIR="${APP_DIR}/vaultwarden"
+        fi
+
+        if [ -n "${SAVED_GITEA_DATA_DIR:-}" ]; then
+            GITEA_DATA_DIR="${SAVED_GITEA_DATA_DIR}"
+        elif [ "${ROOT_DEV}" != "${SAVE_DEV}" ] || [ -n "${STORAGE_DEP_LINE}" ]; then
+            GITEA_DATA_DIR="${SAVE_DIR}/services/gitea"
+        else
+            GITEA_DATA_DIR="${APP_DIR}/gitea"
+        fi
+
+        if [ -n "${SAVED_ADGUARD_WORK_DIR:-}" ]; then
+            ADGUARD_WORK_DIR="${SAVED_ADGUARD_WORK_DIR}"
+        elif [ "${ROOT_DEV}" != "${SAVE_DEV}" ] || [ -n "${STORAGE_DEP_LINE}" ]; then
+            ADGUARD_WORK_DIR="${SAVE_DIR}/services/adguard_work"
+        else
+            ADGUARD_WORK_DIR="${APP_DIR}/adguard/work"
+        fi
+
+        save_configuration
         return 0
     fi
 
@@ -1695,55 +1893,7 @@ EOF_UNLOCK
         ADGUARD_WORK_DIR="${APP_DIR}/adguard/work"
     fi
 
-    mkdir -p "${APP_DIR}"
-    {
-        printf "SAVED_PHYS_IFACE=%q\n" "${DEFAULT_IFACE}"
-        printf "SAVED_LOCAL_IP=%q\n" "${LOCAL_IP}"
-        printf "SAVED_ROUTER_GATEWAY=%q\n" "${ROUTER_GATEWAY}"
-        printf "SAVED_LAN_SUBNET=%q\n" "${LAN_SUBNET}"
-        printf "SAVED_ENABLE_GATEWAY=%q\n" "${ENABLE_GATEWAY}"
-        printf "SAVED_ENABLE_VAULT=%q\n" "${ENABLE_VAULT}"
-        printf "SAVED_ENABLE_GITEA=%q\n" "${ENABLE_GITEA}"
-        printf "SAVED_ENABLE_SAMBA=%q\n" "${ENABLE_SAMBA}"
-        printf "SAVED_ENABLE_QBIT=%q\n" "${ENABLE_QBIT}"
-        printf "SAVED_ENABLE_METUBE=%q\n" "${ENABLE_METUBE}"
-        printf "SAVED_METUBE_DOMAIN=%q\n" "${METUBE_DOMAIN}"
-        printf "SAVED_ENABLE_NAVIDROME=%q\n" "${ENABLE_NAVIDROME}"
-        printf "SAVED_MUSIC_DOMAIN=%q\n" "${MUSIC_DOMAIN}"
-        printf "SAVED_SSL_MODE=%q\n" "${SSL_MODE}"
-        printf "SAVED_DUCKDNS_NAME=%q\n" "${DUCKDNS_NAME}"
-        printf "SAVED_DUCKDNS_TOKEN=%q\n" "${DUCKDNS_TOKEN}"
-        printf "SAVED_SUB_URL=%q\n" "${SUB_URL}"
-        printf "SAVED_TARGET_USER=%q\n" "${TARGET_USER}"
-        printf "SAVED_ADMIN_USER=%q\n" "${ADMIN_USER}"
-        printf "SAVED_MASTER_PASS=%q\n" "${MASTER_PASS}"
-        printf "SAVED_MIHOMO_SECRET=%q\n" "${MIHOMO_SECRET}"
-        printf "SAVED_VAULT_ADMIN_TOKEN=%q\n" "${VAULT_ADMIN_TOKEN}"
-        printf "SAVED_STORAGE_MODE=%q\n" "${STORAGE_MODE}"
-        printf "SAVED_SUBDIR_NAME=%q\n" "${SUBDIR_NAME}"
-        printf "SAVED_SAVE_DIR=%q\n" "${SAVE_DIR}"
-        printf "SAVED_SAVE_FSTYPE=%q\n" "${SAVE_FSTYPE}"
-        printf "SAVED_SHARE_NAME=%q\n" "${SHARE_NAME}"
-        printf "SAVED_VAULT_DATA_DIR=%q\n" "${VAULT_DATA_DIR}"
-        printf "SAVED_GITEA_DATA_DIR=%q\n" "${GITEA_DATA_DIR}"
-        printf "SAVED_ADGUARD_WORK_DIR=%q\n" "${ADGUARD_WORK_DIR}"
-        printf "SAVED_INIT_SYSTEM=%q\n" "${INIT_SYSTEM}"
-        printf "SAVED_SELECTED_DOH_1=%q\n" "${SELECTED_DOH_1}"
-        printf "SAVED_SELECTED_DOH_2=%q\n" "${SELECTED_DOH_2}"
-        printf "SAVED_SELECTED_DOH_3=%q\n" "${SELECTED_DOH_3}"
-        printf "SAVED_SELECTED_DOT_1=%q\n" "${SELECTED_DOT_1}"
-        printf "SAVED_SELECTED_DOT_2=%q\n" "${SELECTED_DOT_2}"
-        printf "SAVED_SELECTED_BOOTSTRAP_IPS=%q\n" "${SELECTED_BOOTSTRAP_IPS}"
-        printf "SAVED_SELECTED_BOOTSTRAP_IP_1=%q\n" "${SELECTED_BOOTSTRAP_IP_1}"
-        printf "SAVED_LOGS_DOMAIN=%q\n" "${LOGS_DOMAIN}"
-        printf "SAVED_ENABLE_TELEGRAM=%q\n" "${ENABLE_TELEGRAM}"
-        printf "SAVED_TELEGRAM_BOT_TOKEN=%q\n" "${TELEGRAM_BOT_TOKEN}"
-        printf "SAVED_TELEGRAM_CHAT_ID=%q\n" "${TELEGRAM_CHAT_ID}"
-        printf "SAVED_HOMELAB_VERSION=%q\n" "${HOMELAB_VERSION}"
-    } > "${ENV_FILE}"
-    chmod 600 "${ENV_FILE}"
-    chown root:root "${ENV_FILE}" 2>/dev/null || true
-    log_ok "Конфигурация успешно сохранена в ${ENV_FILE}"
+    save_configuration
 }
 
 setup_credentials() {
@@ -2161,7 +2311,7 @@ EOF_WD_TMR
     fi
 
     log_info "Регистрация локальных доменов в /etc/hosts..."
-    for DOMAIN in "${VAULT_DOMAIN}" "${GITEA_DOMAIN}" "${ADGUARD_DOMAIN}" "${TORRENT_DOMAIN}" "${METUBE_DOMAIN}" "tube.lan" "${MUSIC_DOMAIN}" "${PROXY_DOMAIN}" "${LOGS_DOMAIN}"; do
+    for DOMAIN in "${VAULT_DOMAIN:-}" "${GITEA_DOMAIN:-}" "${ADGUARD_DOMAIN:-}" "${TORRENT_DOMAIN:-}" "${METUBE_DOMAIN:-}" "tube.lan" "${MUSIC_DOMAIN:-}" "${PROXY_DOMAIN:-}" "${LOGS_DOMAIN:-}"; do
         if [ -n "${DOMAIN}" ]; then
             local ESCAPED_DOMAIN
             ESCAPED_DOMAIN=$(printf '%s\n' "${DOMAIN}" | sed -e 's/[]\/$*.^[]/\\&/g')
@@ -5077,13 +5227,15 @@ cmd_upgrade() {
     mkdir -p "${SNAPSHOT_DIR}"
     local SNAP_TAR="${SNAPSHOT_DIR}/homelab_snapshot_pre_upgrade.tar.gz"
 
-    tar -czf "${SNAP_TAR}" \
-        -C "${APP_DIR}" \
-        .env docker-compose.yml compose.yaml Caddyfile caddy/Caddyfile \
-        2>/dev/null || true
-    [ -d "${APP_DIR}/mihomo" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" mihomo/config.yaml 2>/dev/null || true
-    [ -d "${APP_DIR}/adguard/conf" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" adguard/conf/AdGuardHome.yaml 2>/dev/null || true
-    [ -d "${APP_DIR}/configs/navidrome" ] && tar -rf "${SNAP_TAR}" -C "${APP_DIR}" configs/navidrome 2>/dev/null || true
+    local SNAP_FILES=(".env")
+    [ -f "${APP_DIR}/docker-compose.yml" ] && SNAP_FILES+=("docker-compose.yml")
+    [ -f "${APP_DIR}/Caddyfile" ] && SNAP_FILES+=("Caddyfile")
+    [ -d "${APP_DIR}/caddy" ] && SNAP_FILES+=("caddy")
+    [ -f "${APP_DIR}/mihomo/config.yaml" ] && SNAP_FILES+=("mihomo/config.yaml")
+    [ -f "${APP_DIR}/adguard/conf/AdGuardHome.yaml" ] && SNAP_FILES+=("adguard/conf/AdGuardHome.yaml")
+    [ -d "${APP_DIR}/configs/navidrome" ] && SNAP_FILES+=("configs/navidrome")
+
+    tar -czf "${SNAP_TAR}" -C "${APP_DIR}" "${SNAP_FILES[@]}" 2>/dev/null || tar -czf "${SNAP_TAR}" -C "${APP_DIR}" .env 2>/dev/null || true
     chmod 600 "${SNAP_TAR}" 2>/dev/null || true
     echo -e "  ${TAG_OK} Снимок конфигураций сохранен в: ${SNAP_TAR}"
 
