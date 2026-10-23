@@ -5818,8 +5818,10 @@ cmd_status() {
 
     if [ "${SAVED_ROUTER_MODE:-1}" = "2" ]; then
         echo -e "  ${CLR_WHITE}• Топология сети:${CLR_RESET}    ${CLR_GREEN}Домашний маршрутизатор (WAN: ${SAVED_WAN_IFACE:-eth0}, LAN: ${SAVED_LAN_IFACE:-eth1}, MAC: ${SAVED_WAN_MAC:-})${CLR_RESET}"
+        echo -e "  ${CLR_WHITE}• DHCP сервер:${CLR_RESET}       ${CLR_GREEN}ВКЛЮЧЕН (AdGuard Home на ${SAVED_LAN_IFACE:-eth1}, пул .50-.250)${CLR_RESET}"
     else
         echo -e "  ${CLR_WHITE}• Топология сети:${CLR_RESET}    ${CLR_GREEN}Прозрачный шлюз (LAN: ${SAVED_PHYS_IFACE:-eth0})${CLR_RESET}"
+        echo -e "  ${CLR_WHITE}• DHCP сервер:${CLR_RESET}       ${CLR_CYAN}ВЫКЛЮЧЕН (работает роутер Keenetic)${CLR_RESET}"
     fi
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
     echo ""
@@ -6560,22 +6562,51 @@ cmd_dump_logs() {
             echo "nftables: утилита nft не найдена"
         fi
         echo ""
-        echo "============================================================================="
-        echo "                         ЖУРНАЛЫ КОНТЕЙНЕРОВ DOCKER                          "
-        echo "============================================================================="
-
-        local ALL_CONTAINERS=("adguardhome" "mihomo" "caddy" "dozzle" "watchtower" "autoheal" "vaultwarden" "gitea" "qbittorrent" "metube" "navidrome" "samba")
-        for c in "${ALL_CONTAINERS[@]}"; do
-            if docker inspect "$c" >/dev/null 2>&1; then
-                local st
-                st=$(docker inspect -f '{{.State.Status}} (Health: {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}})' "$c" 2>/dev/null || echo "unknown")
+        if is_native; then
+            echo "============================================================================="
+            echo "                   ЖУРНАЛЫ СЛУЖБ OPENRC (NATIVE BARE-METAL)                  "
+            echo "============================================================================="
+            local NATIVE_LOGS=(
+                "sing-box:/var/log/sing-box.log"
+                "adguardhome:/var/log/adguardhome.log"
+                "caddy:/var/log/caddy.log"
+                "vaultwarden:/var/log/vaultwarden.log"
+                "navidrome:/var/log/navidrome.log"
+                "ytdlp-web:/var/log/ytdlp-web.log"
+                "forgejo:/var/log/forgejo/http.log"
+                "wsdd:/var/log/wsdd.log"
+            )
+            for item in "${NATIVE_LOGS[@]}"; do
+                local sname="${item%%:*}"
+                local lpath="${item##*:}"
                 echo ""
                 echo "-----------------------------------------------------------------------------"
-                echo ">>> СЕРВИС: ${c} [Статус: ${st}] (последние ${lines} строк):"
+                echo ">>> СЛУЖБА: ${sname} (${lpath}) [последние ${lines} строк]:"
                 echo "-----------------------------------------------------------------------------"
-                docker logs --tail "${lines}" "$c" 2>&1 || echo "Не удалось получить логи для ${c}"
-            fi
-        done
+                if [ -f "$lpath" ]; then
+                    tail -n "${lines}" "$lpath" 2>/dev/null || echo "Не удалось прочитать ${lpath}"
+                else
+                    echo "Файл логов ${lpath} не найден"
+                fi
+            done
+        else
+            echo "============================================================================="
+            echo "                         ЖУРНАЛЫ КОНТЕЙНЕРОВ DOCKER                          "
+            echo "============================================================================="
+
+            local ALL_CONTAINERS=("adguardhome" "mihomo" "caddy" "dozzle" "watchtower" "autoheal" "vaultwarden" "gitea" "qbittorrent" "metube" "navidrome" "samba")
+            for c in "${ALL_CONTAINERS[@]}"; do
+                if docker inspect "$c" >/dev/null 2>&1; then
+                    local st
+                    st=$(docker inspect -f '{{.State.Status}} (Health: {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}})' "$c" 2>/dev/null || echo "unknown")
+                    echo ""
+                    echo "-----------------------------------------------------------------------------"
+                    echo ">>> СЕРВИС: ${c} [Статус: ${st}] (последние ${lines} строк):"
+                    echo "-----------------------------------------------------------------------------"
+                    docker logs --tail "${lines}" "$c" 2>&1 || echo "Не удалось получить логи для ${c}"
+                fi
+            done
+        fi
 
         echo ""
         echo "============================================================================="
@@ -6682,6 +6713,202 @@ cmd_install_log() {
     fi
 }
 
+cmd_mode() {
+    local target="${1:-}"
+    # shellcheck disable=SC1091
+    source /opt/homelab/.env 2>/dev/null || true
+    local current_mode="${ROUTER_MODE:-${SAVED_ROUTER_MODE:-1}}"
+
+    if [ -z "$target" ]; then
+        echo -e "${CLR_CYAN}${CLR_BOLD}╭── ПЕРЕКЛЮЧЕНИЕ РЕЖИМА СЕТИ HOMELAB ──────────────────────────${CLR_RESET}"
+        if [ "$current_mode" = "2" ]; then
+            echo -e "  ${CLR_WHITE}• Текущий режим:${CLR_RESET}      ${CLR_YELLOW}2) Домашний роутер (WAN + LAN)${CLR_RESET}"
+            echo -e "  ${CLR_WHITE}• WAN (Интернет):${CLR_RESET}     ${CLR_CYAN}${SAVED_WAN_IFACE:-eth0}${CLR_RESET}"
+            echo -e "  ${CLR_WHITE}• LAN (Домашняя сеть):${CLR_RESET}${CLR_CYAN}${SAVED_LAN_IFACE:-wlan0}${CLR_RESET}"
+            echo -e "  ${CLR_WHITE}• DHCP сервер:${CLR_RESET}        ${CLR_GREEN}ВКЛЮЧЕН (AdGuard Home на ${SAVED_LAN_IFACE:-wlan0})${CLR_RESET}"
+        else
+            echo -e "  ${CLR_WHITE}• Текущий режим:${CLR_RESET}      ${CLR_GREEN}1) Прозрачный шлюз (1 сетевой адаптер)${CLR_RESET}"
+            echo -e "  ${CLR_WHITE}• LAN интерфейс:${CLR_RESET}      ${CLR_CYAN}${SAVED_PHYS_IFACE:-eth0}${CLR_RESET}"
+            echo -e "  ${CLR_WHITE}• DHCP сервер:${CLR_RESET}        ${CLR_CYAN}ВЫКЛЮЧЕН (работает DHCP роутера Keenetic)${CLR_RESET}"
+        fi
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+        echo ""
+        echo -e "  ${CLR_WHITE}Доступные варианты:${CLR_RESET}"
+        echo -e "    ${CLR_GREEN}1) Прозрачный шлюз${CLR_RESET} (DHCP в AdGuard выключен, работает рядом с Keenetic)"
+        echo -e "    ${CLR_YELLOW}2) Домашний роутер${CLR_RESET} (DHCP в AdGuard включен, WAN + LAN, заменяет роутер)"
+        echo ""
+        read -r -p "  [?] Выберите режим сети [1/2] [текущий: $current_mode]: " target
+        target="${target:-$current_mode}"
+    fi
+
+    case "$target" in
+        1|gateway|gw)
+            echo -e "  ${TAG_INFO} Переключение в режим: ${CLR_GREEN}Прозрачный шлюз (Gateway)${CLR_RESET}..."
+
+            local agh_conf="/var/lib/adguardhome/AdGuardHome.yaml"
+            [ ! -f "$agh_conf" ] && agh_conf="/opt/homelab/adguardhome/AdGuardHome.yaml"
+            if [ -f "$agh_conf" ]; then
+                python3 -c "
+import sys, re
+fpath = '$agh_conf'
+with open(fpath, 'r', encoding='utf-8') as f:
+    text = f.read()
+text = re.sub(r'(dhcp:\s*\n\s*enabled:\s*)\w+', r'\g<1>false', text)
+with open(fpath, 'w', encoding='utf-8') as f:
+    f.write(text)
+" 2>/dev/null || sed -i '/dhcp:/!b;n;c\  enabled: false' "$agh_conf" 2>/dev/null || true
+            fi
+
+            local def_iface="${SAVED_PHYS_IFACE:-eth0}"
+            cat <<EOF_NFT_GW > /etc/nftables.d/homelab.nft
+table inet homelab {
+    chain forward {
+        type filter hook forward priority -10; policy accept;
+        tcp flags syn tcp option maxseg size set rt mtu
+        accept
+    }
+
+    chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+        iifname "${def_iface}" tcp dport 53 redirect to :53
+        iifname "${def_iface}" udp dport 53 redirect to :53
+        iifname "${def_iface}" tcp dport 853 reject with tcp reset
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname "${def_iface}" masquerade
+        oifname "tun0" masquerade
+    }
+
+    chain input {
+        type filter hook input priority filter; policy accept;
+        ip saddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8 } tcp dport { 8083, 9090 } drop
+    }
+}
+EOF_NFT_GW
+            nft -f /etc/nftables.d/homelab.nft 2>/dev/null || true
+
+            if [ -f /opt/homelab/.env ]; then
+                sed -i 's/^ROUTER_MODE=.*/ROUTER_MODE=1/' /opt/homelab/.env 2>/dev/null || true
+                sed -i 's/^SAVED_ROUTER_MODE=.*/SAVED_ROUTER_MODE=1/' /opt/homelab/.env 2>/dev/null || true
+                grep -q '^ROUTER_MODE=' /opt/homelab/.env || echo 'ROUTER_MODE=1' >> /opt/homelab/.env
+                grep -q '^SAVED_ROUTER_MODE=' /opt/homelab/.env || echo 'SAVED_ROUTER_MODE=1' >> /opt/homelab/.env
+            fi
+
+            if [ -f /etc/init.d/adguardhome ]; then
+                rc-service adguardhome restart >/dev/null 2>&1 || true
+            elif command -v docker >/dev/null 2>&1 && docker inspect adguardhome >/dev/null 2>&1; then
+                docker restart adguardhome >/dev/null 2>&1 || true
+            fi
+
+            echo -e "  ${TAG_OK} Режим успешно переключен: ${CLR_GREEN}Прозрачный сетевой шлюз${CLR_RESET}"
+            echo -e "      ${CLR_WHITE}• DHCP AdGuard Home:${CLR_RESET} ${CLR_CYAN}ОТКЛЮЧЕН${CLR_RESET} (коллизии с Keenetic исключены)"
+            echo -e "      ${CLR_WHITE}• Сетевой адаптер:${CLR_RESET}   ${CLR_WHITE}${def_iface}${CLR_RESET}"
+            echo -e "      ${CLR_WHITE}• Настройка роутера:${CLR_RESET} В DHCP Keenetic укажите DNS и Gateway: ${SAVED_LOCAL_IP:-192.168.1.147}"
+            ;;
+
+        2|router|rt)
+            echo -e "  ${TAG_INFO} Переключение в режим: ${CLR_YELLOW}Домашний роутер (WAN + LAN)${CLR_RESET}..."
+
+            local ifaces=()
+            while read -r ifn; do
+                [ -n "$ifn" ] && ifaces+=("$ifn")
+            done < <(ls -1 /sys/class/net 2>/dev/null | grep -E '^(eth|en|wl|enp|eno)' | sort -u || true)
+
+            local wan_if="${SAVED_WAN_IFACE:-${ifaces[0]:-eth0}}"
+            local lan_if="${SAVED_LAN_IFACE:-${ifaces[1]:-wlan0}}"
+
+            if [ -t 0 ] && [ "$target" != "2" ]; then
+                echo -e "  Доступные сетевые интерфейсы: ${CLR_CYAN}${ifaces[*]}${CLR_RESET}"
+                read -r -p "  [?] WAN интерфейс (кабель провайдера) [${wan_if}]: " input_wan
+                wan_if="${input_wan:-$wan_if}"
+                read -r -p "  [?] LAN интерфейс (домашняя сеть / Wi-Fi) [${lan_if}]: " input_lan
+                lan_if="${input_lan:-$lan_if}"
+            fi
+
+            ip link set dev "${lan_if}" up 2>/dev/null || true
+            local local_ip="${SAVED_LOCAL_IP:-192.168.1.147}"
+            ip addr add "${local_ip}/24" dev "${lan_if}" 2>/dev/null || true
+
+            local agh_conf="/var/lib/adguardhome/AdGuardHome.yaml"
+            [ ! -f "$agh_conf" ] && agh_conf="/opt/homelab/adguardhome/AdGuardHome.yaml"
+            if [ -f "$agh_conf" ]; then
+                python3 -c "
+import sys, re
+fpath = '$agh_conf'
+with open(fpath, 'r', encoding='utf-8') as f:
+    text = f.read()
+text = re.sub(r'(dhcp:\s*\n\s*enabled:\s*)\w+', r'\g<1>true', text)
+text = re.sub(r'(interface_name:\s*)\"[^\"]*\"', r'\g<1>\"$lan_if\"', text)
+with open(fpath, 'w', encoding='utf-8') as f:
+    f.write(text)
+" 2>/dev/null || true
+            fi
+
+            cat <<EOF_NFT_RT > /etc/nftables.d/homelab.nft
+table inet homelab {
+    chain forward {
+        type filter hook forward priority -10; policy accept;
+        tcp flags syn tcp option maxseg size set rt mtu
+        iifname "${lan_if}" oifname "${wan_if}" accept
+        iifname "${lan_if}" oifname "tun0" accept
+        ct state { established, related } accept
+    }
+
+    chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+        iifname "${lan_if}" tcp dport 53 redirect to :53
+        iifname "${lan_if}" udp dport 53 redirect to :53
+        iifname "${lan_if}" tcp dport 853 reject with tcp reset
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname "${wan_if}" masquerade
+        oifname "tun0" masquerade
+    }
+
+    chain input {
+        type filter hook input priority filter; policy accept;
+        iifname "lo" accept
+        ct state { established, related } accept
+        iifname "${lan_if}" accept
+        iifname "${wan_if}" tcp dport { 22, 80, 443 } accept
+        iifname "${wan_if}" drop
+    }
+}
+EOF_NFT_RT
+            nft -f /etc/nftables.d/homelab.nft 2>/dev/null || true
+
+            if [ -f /opt/homelab/.env ]; then
+                sed -i 's/^ROUTER_MODE=.*/ROUTER_MODE=2/' /opt/homelab/.env 2>/dev/null || true
+                sed -i 's/^SAVED_ROUTER_MODE=.*/SAVED_ROUTER_MODE=2/' /opt/homelab/.env 2>/dev/null || true
+                grep -q '^ROUTER_MODE=' /opt/homelab/.env || echo 'ROUTER_MODE=2' >> /opt/homelab/.env
+                grep -q '^SAVED_ROUTER_MODE=' /opt/homelab/.env || echo 'SAVED_ROUTER_MODE=2' >> /opt/homelab/.env
+                sed -i "s/^SAVED_WAN_IFACE=.*/SAVED_WAN_IFACE=${wan_if}/" /opt/homelab/.env 2>/dev/null || true
+                sed -i "s/^SAVED_LAN_IFACE=.*/SAVED_LAN_IFACE=${lan_if}/" /opt/homelab/.env 2>/dev/null || true
+            fi
+
+            if [ -f /etc/init.d/adguardhome ]; then
+                rc-service adguardhome restart >/dev/null 2>&1 || true
+            elif command -v docker >/dev/null 2>&1 && docker inspect adguardhome >/dev/null 2>&1; then
+                docker restart adguardhome >/dev/null 2>&1 || true
+            fi
+
+            echo -e "  ${TAG_OK} Режим успешно переключен: ${CLR_YELLOW}Домашний роутер (WAN + LAN)${CLR_RESET}"
+            echo -e "      ${CLR_WHITE}• WAN (Интернет):${CLR_RESET}     ${CLR_CYAN}${wan_if}${CLR_RESET}"
+            echo -e "      ${CLR_WHITE}• LAN (Домашняя сеть):${CLR_RESET}${CLR_CYAN}${lan_if}${CLR_RESET}"
+            echo -e "      ${CLR_WHITE}• DHCP AdGuard Home:${CLR_RESET}   ${CLR_GREEN}АКТИВЕН (пул 192.168.1.50 - 192.168.1.250)${CLR_RESET}"
+            echo -e "      ${CLR_WHITE}• Защита роутеров:${CLR_RESET}     ${CLR_GREEN}Keenetic (192.168.1.5) и OpenWrt (192.168.1.1) исключены${CLR_RESET}"
+            ;;
+
+        *)
+            echo -e "  ${TAG_ERR} Неизвестный режим: ${target}. Используйте 1 (gateway) или 2 (router)."
+            ;;
+    esac
+}
+
 cmd_help() {
     echo -e "${CLR_CYAN}${CLR_BOLD}Утилита управления комплексом Homelab & Transparent Gateway${CLR_RESET}"
     echo ""
@@ -6703,6 +6930,7 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}upgrade [--force]${CLR_RESET}   Бесшовный апгрейд ядра комплекса из GitHub (OTA)"
     echo -e "  ${CLR_WHITE}rollback${CLR_RESET}            Откат к предыдущей версии из снимка восстановления"
     echo -e "  ${CLR_WHITE}mac [новый_mac]${CLR_RESET}     Просмотр или клонирование MAC-адреса WAN"
+    echo -e "  ${CLR_WHITE}mode [1|2]${CLR_RESET}          Переключение режима (1: Прозрачный шлюз, 2: Домашний роутер)"
     echo -e "  ${CLR_WHITE}version${CLR_RESET}             Проверить установленную версию и обновления на GitHub"
     echo -e "  ${CLR_WHITE}unlock${CLR_RESET}              Ручная разблокировка шифрованного диска LUKS"
     echo -e "  ${CLR_WHITE}help${CLR_RESET}                Показать эту справку"
@@ -6716,6 +6944,7 @@ case "${1:-status}" in
     start) shift; cmd_start "$@" ;;
     logs) shift; cmd_logs "$@" ;;
     mac|spoof-mac|clone-mac) shift; cmd_mac "$@" ;;
+    mode|switch-mode|set-mode) shift; cmd_mode "$@" ;;
     dump|dump-logs|export-logs|collect|report) shift; cmd_dump_logs "$@" ;;
     install-log|deploy-log|inst-log) shift; cmd_install_log "$@" ;;
     backup) cmd_backup ;;
@@ -7046,6 +7275,7 @@ show_summary_dashboard() {
             echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Защита роутеров:${CLR_RESET}             ${CLR_NEON_GREEN}192.168.1.1 (OpenWrt) и 192.168.1.5 (Keenetic) ИСКЛЮЧЕНЫ${CLR_RESET}"
         else
             echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Архитектура сети:${CLR_RESET}            ${CLR_NEON_GREEN}ПРОЗРАЧНЫЙ ШЛЮЗ (1 сетевой интерфейс: ${DEFAULT_IFACE})${CLR_RESET}"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ DHCP сервер сети:${CLR_RESET}            ${CLR_NEON_CYAN}ВЫКЛЮЧЕН (работает DHCP вашего роутера Keenetic)${CLR_RESET}"
         fi
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Портал навигации по IP:${CLR_RESET}      ${CLR_NEON_GREEN}http://${LOCAL_IP}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ AdGuard Home (DNS & AdBlock):${CLR_RESET}    ${CLR_NEON_CYAN}https://${ADGUARD_DOMAIN}${CLR_RESET}"

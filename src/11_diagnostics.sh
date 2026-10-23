@@ -268,6 +268,7 @@ show_summary_dashboard() {
             echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Защита роутеров:${CLR_RESET}             ${CLR_NEON_GREEN}192.168.1.1 (OpenWrt) и 192.168.1.5 (Keenetic) ИСКЛЮЧЕНЫ${CLR_RESET}"
         else
             echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Архитектура сети:${CLR_RESET}            ${CLR_NEON_GREEN}ПРОЗРАЧНЫЙ ШЛЮЗ (1 сетевой интерфейс: ${DEFAULT_IFACE})${CLR_RESET}"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ DHCP сервер сети:${CLR_RESET}            ${CLR_NEON_CYAN}ВЫКЛЮЧЕН (работает DHCP вашего роутера Keenetic)${CLR_RESET}"
         fi
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Портал навигации по IP:${CLR_RESET}      ${CLR_NEON_GREEN}http://${LOCAL_IP}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ AdGuard Home (DNS & AdBlock):${CLR_RESET}    ${CLR_NEON_CYAN}https://${ADGUARD_DOMAIN}${CLR_RESET}"
