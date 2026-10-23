@@ -19,7 +19,7 @@ configure_caddy_and_compose() {
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>🛡️ AdGuard Home</span><a href=\"https://${ADGUARD_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${ADGUARD_DOMAIN}</a></li>
-    <li><span>🚀 Mihomo Gateway UI</span><a href=\"https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET_VAL}\" target=\"_blank\" rel=\"noopener\">https://${PROXY_DOMAIN} [Вход]</a></li>"
+    <li><span>🚀 sing-box Gateway UI</span><a href=\"https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET_VAL}\" target=\"_blank\" rel=\"noopener\">https://${PROXY_DOMAIN} [Вход]</a></li>"
     fi
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
@@ -91,6 +91,7 @@ http://${LOCAL_IP} {
     }
 
     handle {
+        header Content-Type "text/html; charset=utf-8"
         respond <<EOF_HTML
 <!DOCTYPE html>
 <html lang="ru">
@@ -203,6 +204,11 @@ EOF_CADDY
             reverse_proxy ${PROXY_API_UPSTREAM}
         }
 
+        @clash_api path /version* /proxies* /rules* /connections* /configs* /logs* /traffic* /memory* /providers* /dns* /group*
+        handle @clash_api {
+            reverse_proxy ${PROXY_API_UPSTREAM}
+        }
+
         handle {
             root * ${CADDY_UI_ROOT}
             file_server
@@ -296,6 +302,11 @@ ${PROXY_DOMAIN} {
     @api path /api*
     handle @api {
         uri strip_prefix /api
+        reverse_proxy ${PROXY_API_UPSTREAM}
+    }
+
+    @clash_api path /version* /proxies* /rules* /connections* /configs* /logs* /traffic* /memory* /providers* /dns* /group*
+    handle @clash_api {
         reverse_proxy ${PROXY_API_UPSTREAM}
     }
 

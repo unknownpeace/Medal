@@ -274,14 +274,6 @@ EOF_AGH
   ],
   "outbounds": [
     {
-      "type": "direct",
-      "tag": "direct"
-    },
-    {
-      "type": "block",
-      "tag": "block"
-    },
-    {
       "type": "selector",
       "tag": "PROXY",
       "outbounds": [
@@ -295,9 +287,18 @@ EOF_AGH
         "PROXY",
         "direct"
       ]
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
     }
   ],
   "route": {
+    "final": "PROXY",
     "default_domain_resolver": "dns-direct",
     "rules": [
       {
@@ -464,7 +465,7 @@ EOF_SINGBOX
 #!/usr/bin/env python3
 import sys, os, json, re, urllib.request, urllib.parse, ssl, base64, subprocess
 
-sub_url = sys.argv[1] if len(sys.argv) > 1 else ""
+sub_url = sys.argv[1].strip() if len(sys.argv) > 1 else ""
 config_path = "/etc/sing-box/config.json"
 
 if not sub_url or sub_url in ("none", "direct", "-"):
@@ -657,7 +658,9 @@ if new_outbounds and os.path.exists(config_path):
         direct_outbound = {"type": "direct", "tag": "direct"}
         block_outbound = {"type": "block", "tag": "block"}
 
-        cfg["outbounds"] = [direct_outbound, block_outbound, auto_outbound, proxy_selector, ai_selector] + deduped
+        cfg["outbounds"] = [proxy_selector, auto_outbound, ai_selector, direct_outbound, block_outbound] + deduped
+        cfg.setdefault("route", {})
+        cfg["route"]["final"] = "PROXY"
 
         # Гарантируем наличие dns-in inbound и hijack-dns для AdGuard Home
         inbounds = cfg.get("inbounds", [])
