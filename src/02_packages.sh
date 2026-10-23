@@ -39,7 +39,7 @@ install_pkgs() {
             samba samba-server-openrc wsdd wsdd-openrc \
             qbittorrent-nox qbittorrent-nox-openrc \
             navidrome navidrome-openrc \
-            yt-dlp linux-firmware-rtw88 wireless-regdb
+            yt-dlp linux-firmware-rtw88 wireless-regdb hostapd hostapd-openrc iw
         )
         run_spin "Установка нативных пакетов Alpine Linux (Zero-Docker OpenRC)" \
             apk add --no-cache "${ALP_PKGS[@]}"

@@ -15,6 +15,9 @@ save_configuration() {
         printf "SAVED_LAN_IFACE=%q\n" "${LAN_IFACE:-}"
         printf "SAVED_WAN_MAC=%q\n" "${WAN_MAC:-}"
         printf "SAVED_LAN_IP=%q\n" "${LAN_IP:-}"
+        printf "SAVED_WIFI_SSID=%q\n" "${WIFI_SSID:-Homelab_WiFi}"
+        printf "SAVED_WIFI_PASS=%q\n" "${WIFI_PASS:-${MASTER_PASS}}"
+        printf "SAVED_WIFI_CHANNEL=%q\n" "${WIFI_CHANNEL:-7}"
         printf "SAVED_ENABLE_GATEWAY=%q\n" "${ENABLE_GATEWAY}"
         printf "SAVED_ENABLE_VAULT=%q\n" "${ENABLE_VAULT}"
         printf "SAVED_ENABLE_GITEA=%q\n" "${ENABLE_GITEA}"
@@ -327,6 +330,17 @@ prompt_configuration() {
             LAN_IP=${INPUT_LAN_IP:-${DEF_LAN_IP}}
             LAN_SUBNET="$(echo "${LAN_IP}" | sed -E 's/\.[0-9]+$/\.0\/24/')"
             LOCAL_IP="${LAN_IP}"
+
+            if [[ "$LAN_IFACE" =~ ^wl ]] || [ -d "/sys/class/net/${LAN_IFACE}/wireless" ] || [ -d "/sys/class/net/${LAN_IFACE}/phy80211" ]; then
+                echo -e "  ${CLR_CYAN}Обнаружен беспроводной LAN-адаптер (${LAN_IFACE}). Настройка Wi-Fi точки доступа (AP):${CLR_RESET}"
+                DEF_SSID="${SAVED_WIFI_SSID:-Homelab_WiFi}"
+                prompt_read "  [?] Имя Wi-Fi сети (SSID) [${DEF_SSID}]: " INPUT_SSID
+                WIFI_SSID=${INPUT_SSID:-${DEF_SSID}}
+                DEF_WIFI_PASS="${SAVED_WIFI_PASS:-${MASTER_PASS}}"
+                prompt_read "  [?] Пароль от Wi-Fi сети [Enter - мастер-пароль]: " INPUT_WIFI_PASS
+                WIFI_PASS=${INPUT_WIFI_PASS:-${DEF_WIFI_PASS}}
+                WIFI_CHANNEL="${SAVED_WIFI_CHANNEL:-7}"
+            fi
         else
             ROUTER_MODE="1"
             WAN_IFACE=""
@@ -729,6 +743,17 @@ EOF_UNLOCK
                 LAN_IP=${INPUT_LAN_IP:-${DEF_LAN_IP}}
                 LAN_SUBNET="$(echo "${LAN_IP}" | sed -E 's/\.[0-9]+$/\.0\/24/')"
                 LOCAL_IP="${LAN_IP}"
+
+                if [[ "$LAN_IFACE" =~ ^wl ]] || [ -d "/sys/class/net/${LAN_IFACE}/wireless" ] || [ -d "/sys/class/net/${LAN_IFACE}/phy80211" ]; then
+                    echo -e "  ${CLR_CYAN}Обнаружен беспроводной LAN-адаптер (${LAN_IFACE}). Настройка Wi-Fi точки доступа (AP):${CLR_RESET}"
+                    DEF_SSID="${SAVED_WIFI_SSID:-Homelab_WiFi}"
+                    prompt_read "  [?] Имя Wi-Fi сети (SSID) [${DEF_SSID}]: " INPUT_SSID
+                    WIFI_SSID=${INPUT_SSID:-${DEF_SSID}}
+                    DEF_WIFI_PASS="${SAVED_WIFI_PASS:-${MASTER_PASS}}"
+                    prompt_read "  [?] Пароль от Wi-Fi сети [Enter - мастер-пароль]: " INPUT_WIFI_PASS
+                    WIFI_PASS=${INPUT_WIFI_PASS:-${DEF_WIFI_PASS}}
+                    WIFI_CHANNEL="${SAVED_WIFI_CHANNEL:-7}"
+                fi
             else
                 ROUTER_MODE="1"
                 WAN_IFACE=""

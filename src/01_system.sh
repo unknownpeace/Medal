@@ -195,6 +195,9 @@ load_previous_config() {
         WAN_MAC="${SAVED_WAN_MAC:-${WAN_MAC:-}}"
         LAN_SUBNET="${SAVED_LAN_SUBNET:-${LAN_SUBNET:-}}"
         LAN_IP="${SAVED_LAN_IP:-${LAN_IP:-}}"
+        WIFI_SSID="${SAVED_WIFI_SSID:-${WIFI_SSID:-Homelab_WiFi}}"
+        WIFI_PASS="${SAVED_WIFI_PASS:-${WIFI_PASS:-}}"
+        WIFI_CHANNEL="${SAVED_WIFI_CHANNEL:-${WIFI_CHANNEL:-7}}"
     fi
     return 0
 }

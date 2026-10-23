@@ -594,7 +594,13 @@ class PortalHandler(BaseHTTPRequestHandler):
 
         if router_mode == "2":
             mode_badge = '<span class="badge badge-router">⚡ РЕЖИМ: ДОМАШНИЙ РОУТЕР (WAN + LAN)</span>'
-            mode_desc = f'<b>Сервер заменяет домашний роутер.</b> DHCP-сервер в AdGuard Home <b>ВКЛЮЧЕН</b> (пул .50-.250). WAN: <code>{env.get("SAVED_WAN_IFACE","eth0")}</code>, LAN: <code>{env.get("SAVED_LAN_IFACE","wlan0")}</code>. Keenetic (192.168.1.5) защищен.'
+            lan_if = env.get("SAVED_LAN_IFACE", "wlan0")
+            wifi_info = ""
+            if lan_if.startswith("wl"):
+                wifi_ssid = env.get("SAVED_WIFI_SSID", "Homelab_WiFi")
+                wifi_pass = env.get("SAVED_WIFI_PASS", env.get("SAVED_MASTER_PASS", "21863002"))
+                wifi_info = f' • Точка доступа Wi-Fi: <b>{wifi_ssid}</b> (пароль: <code>{wifi_pass}</code>)'
+            mode_desc = f'<b>Сервер заменяет домашний роутер.</b> DHCP-сервер в AdGuard Home <b>ВКЛЮЧЕН</b> (пул .50-.250). WAN: <code>{env.get("SAVED_WAN_IFACE","eth0")}</code>, LAN: <code>{lan_if}</code>{wifi_info}.'
             switch_btn = '<form method="POST" action="/api/mode"><input type="hidden" name="mode" value="1"><button type="submit" class="btn-mode btn-mode-gw">🔄 Переключить в режим &quot;Прозрачный шлюз&quot; (DHCP в Keenetic)</button></form>'
         else:
             mode_badge = '<span class="badge badge-gw">⚡ РЕЖИМ: ПРОЗРАЧНЫЙ ШЛЮЗ (GATEWAY)</span>'

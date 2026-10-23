@@ -78,6 +78,31 @@ EOF_DNS
             if [ -n "${LAN_IFACE:-}" ] && [ -n "${LAN_IP:-}" ]; then
                 ip addr add "${LAN_IP}/24" dev "${LAN_IFACE}" 2>/dev/null || true
                 ip link set dev "${LAN_IFACE}" up 2>/dev/null || true
+
+                # Если LAN - беспроводной интерфейс, автоматический запуск hostapd
+                if [[ "${LAN_IFACE}" =~ ^wl ]] || [ -d "/sys/class/net/${LAN_IFACE}/wireless" ] || [ -d "/sys/class/net/${LAN_IFACE}/phy80211" ]; then
+                    log_info "Настройка и запуск Wi-Fi точки доступа hostapd на ${LAN_IFACE} (SSID: ${WIFI_SSID:-Homelab_WiFi})..."
+                    mkdir -p /etc/hostapd
+                    cat <<EOF_HAPD > /etc/hostapd/hostapd.conf
+interface=${LAN_IFACE}
+driver=nl80211
+ssid=${WIFI_SSID:-Homelab_WiFi}
+country_code=RU
+hw_mode=g
+channel=${WIFI_CHANNEL:-7}
+ieee80211n=1
+wmm_enabled=1
+auth_algs=1
+wpa=2
+wpa_key_mgmt=WPA-PSK
+wpa_passphrase=${WIFI_PASS:-${MASTER_PASS}}
+rsn_pairwise=CCMP
+EOF_HAPD
+                    rfkill unblock wifi 2>/dev/null || true
+                    rfkill unblock all 2>/dev/null || true
+                    rc-update add hostapd default 2>/dev/null || true
+                    rc-service hostapd restart 2>/dev/null || true
+                fi
             fi
         fi
 

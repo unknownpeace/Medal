@@ -401,6 +401,9 @@ WAN_IFACE=""
 LAN_IFACE=""
 WAN_MAC=""
 LAN_IP=""
+WIFI_SSID="Homelab_WiFi"
+WIFI_PASS=""
+WIFI_CHANNEL="7"
 SINGBOX_SECRET=""
 
 ENABLE_GATEWAY="Y"
@@ -665,6 +668,9 @@ load_previous_config() {
         WAN_MAC="${SAVED_WAN_MAC:-${WAN_MAC:-}}"
         LAN_SUBNET="${SAVED_LAN_SUBNET:-${LAN_SUBNET:-}}"
         LAN_IP="${SAVED_LAN_IP:-${LAN_IP:-}}"
+        WIFI_SSID="${SAVED_WIFI_SSID:-${WIFI_SSID:-Homelab_WiFi}}"
+        WIFI_PASS="${SAVED_WIFI_PASS:-${WIFI_PASS:-}}"
+        WIFI_CHANNEL="${SAVED_WIFI_CHANNEL:-${WIFI_CHANNEL:-7}}"
     fi
     return 0
 }
@@ -772,7 +778,7 @@ install_pkgs() {
             samba samba-server-openrc wsdd wsdd-openrc \
             qbittorrent-nox qbittorrent-nox-openrc \
             navidrome navidrome-openrc \
-            yt-dlp linux-firmware-rtw88 wireless-regdb
+            yt-dlp linux-firmware-rtw88 wireless-regdb hostapd hostapd-openrc iw
         )
         run_spin "Установка нативных пакетов Alpine Linux (Zero-Docker OpenRC)" \
             apk add --no-cache "${ALP_PKGS[@]}"
@@ -1387,6 +1393,9 @@ save_configuration() {
         printf "SAVED_LAN_IFACE=%q\n" "${LAN_IFACE:-}"
         printf "SAVED_WAN_MAC=%q\n" "${WAN_MAC:-}"
         printf "SAVED_LAN_IP=%q\n" "${LAN_IP:-}"
+        printf "SAVED_WIFI_SSID=%q\n" "${WIFI_SSID:-Homelab_WiFi}"
+        printf "SAVED_WIFI_PASS=%q\n" "${WIFI_PASS:-${MASTER_PASS}}"
+        printf "SAVED_WIFI_CHANNEL=%q\n" "${WIFI_CHANNEL:-7}"
         printf "SAVED_ENABLE_GATEWAY=%q\n" "${ENABLE_GATEWAY}"
         printf "SAVED_ENABLE_VAULT=%q\n" "${ENABLE_VAULT}"
         printf "SAVED_ENABLE_GITEA=%q\n" "${ENABLE_GITEA}"
@@ -1699,6 +1708,17 @@ prompt_configuration() {
             LAN_IP=${INPUT_LAN_IP:-${DEF_LAN_IP}}
             LAN_SUBNET="$(echo "${LAN_IP}" | sed -E 's/\.[0-9]+$/\.0\/24/')"
             LOCAL_IP="${LAN_IP}"
+
+            if [[ "$LAN_IFACE" =~ ^wl ]] || [ -d "/sys/class/net/${LAN_IFACE}/wireless" ] || [ -d "/sys/class/net/${LAN_IFACE}/phy80211" ]; then
+                echo -e "  ${CLR_CYAN}Обнаружен беспроводной LAN-адаптер (${LAN_IFACE}). Настройка Wi-Fi точки доступа (AP):${CLR_RESET}"
+                DEF_SSID="${SAVED_WIFI_SSID:-Homelab_WiFi}"
+                prompt_read "  [?] Имя Wi-Fi сети (SSID) [${DEF_SSID}]: " INPUT_SSID
+                WIFI_SSID=${INPUT_SSID:-${DEF_SSID}}
+                DEF_WIFI_PASS="${SAVED_WIFI_PASS:-${MASTER_PASS}}"
+                prompt_read "  [?] Пароль от Wi-Fi сети [Enter - мастер-пароль]: " INPUT_WIFI_PASS
+                WIFI_PASS=${INPUT_WIFI_PASS:-${DEF_WIFI_PASS}}
+                WIFI_CHANNEL="${SAVED_WIFI_CHANNEL:-7}"
+            fi
         else
             ROUTER_MODE="1"
             WAN_IFACE=""
@@ -2101,6 +2121,17 @@ EOF_UNLOCK
                 LAN_IP=${INPUT_LAN_IP:-${DEF_LAN_IP}}
                 LAN_SUBNET="$(echo "${LAN_IP}" | sed -E 's/\.[0-9]+$/\.0\/24/')"
                 LOCAL_IP="${LAN_IP}"
+
+                if [[ "$LAN_IFACE" =~ ^wl ]] || [ -d "/sys/class/net/${LAN_IFACE}/wireless" ] || [ -d "/sys/class/net/${LAN_IFACE}/phy80211" ]; then
+                    echo -e "  ${CLR_CYAN}Обнаружен беспроводной LAN-адаптер (${LAN_IFACE}). Настройка Wi-Fi точки доступа (AP):${CLR_RESET}"
+                    DEF_SSID="${SAVED_WIFI_SSID:-Homelab_WiFi}"
+                    prompt_read "  [?] Имя Wi-Fi сети (SSID) [${DEF_SSID}]: " INPUT_SSID
+                    WIFI_SSID=${INPUT_SSID:-${DEF_SSID}}
+                    DEF_WIFI_PASS="${SAVED_WIFI_PASS:-${MASTER_PASS}}"
+                    prompt_read "  [?] Пароль от Wi-Fi сети [Enter - мастер-пароль]: " INPUT_WIFI_PASS
+                    WIFI_PASS=${INPUT_WIFI_PASS:-${DEF_WIFI_PASS}}
+                    WIFI_CHANNEL="${SAVED_WIFI_CHANNEL:-7}"
+                fi
             else
                 ROUTER_MODE="1"
                 WAN_IFACE=""
@@ -2338,6 +2369,31 @@ EOF_DNS
             if [ -n "${LAN_IFACE:-}" ] && [ -n "${LAN_IP:-}" ]; then
                 ip addr add "${LAN_IP}/24" dev "${LAN_IFACE}" 2>/dev/null || true
                 ip link set dev "${LAN_IFACE}" up 2>/dev/null || true
+
+                # Если LAN - беспроводной интерфейс, автоматический запуск hostapd
+                if [[ "${LAN_IFACE}" =~ ^wl ]] || [ -d "/sys/class/net/${LAN_IFACE}/wireless" ] || [ -d "/sys/class/net/${LAN_IFACE}/phy80211" ]; then
+                    log_info "Настройка и запуск Wi-Fi точки доступа hostapd на ${LAN_IFACE} (SSID: ${WIFI_SSID:-Homelab_WiFi})..."
+                    mkdir -p /etc/hostapd
+                    cat <<EOF_HAPD > /etc/hostapd/hostapd.conf
+interface=${LAN_IFACE}
+driver=nl80211
+ssid=${WIFI_SSID:-Homelab_WiFi}
+country_code=RU
+hw_mode=g
+channel=${WIFI_CHANNEL:-7}
+ieee80211n=1
+wmm_enabled=1
+auth_algs=1
+wpa=2
+wpa_key_mgmt=WPA-PSK
+wpa_passphrase=${WIFI_PASS:-${MASTER_PASS}}
+rsn_pairwise=CCMP
+EOF_HAPD
+                    rfkill unblock wifi 2>/dev/null || true
+                    rfkill unblock all 2>/dev/null || true
+                    rc-update add hostapd default 2>/dev/null || true
+                    rc-service hostapd restart 2>/dev/null || true
+                fi
             fi
         fi
 
@@ -4946,7 +5002,13 @@ class PortalHandler(BaseHTTPRequestHandler):
 
         if router_mode == "2":
             mode_badge = '<span class="badge badge-router">⚡ РЕЖИМ: ДОМАШНИЙ РОУТЕР (WAN + LAN)</span>'
-            mode_desc = f'<b>Сервер заменяет домашний роутер.</b> DHCP-сервер в AdGuard Home <b>ВКЛЮЧЕН</b> (пул .50-.250). WAN: <code>{env.get("SAVED_WAN_IFACE","eth0")}</code>, LAN: <code>{env.get("SAVED_LAN_IFACE","wlan0")}</code>. Keenetic (192.168.1.5) защищен.'
+            lan_if = env.get("SAVED_LAN_IFACE", "wlan0")
+            wifi_info = ""
+            if lan_if.startswith("wl"):
+                wifi_ssid = env.get("SAVED_WIFI_SSID", "Homelab_WiFi")
+                wifi_pass = env.get("SAVED_WIFI_PASS", env.get("SAVED_MASTER_PASS", "21863002"))
+                wifi_info = f' • Точка доступа Wi-Fi: <b>{wifi_ssid}</b> (пароль: <code>{wifi_pass}</code>)'
+            mode_desc = f'<b>Сервер заменяет домашний роутер.</b> DHCP-сервер в AdGuard Home <b>ВКЛЮЧЕН</b> (пул .50-.250). WAN: <code>{env.get("SAVED_WAN_IFACE","eth0")}</code>, LAN: <code>{lan_if}</code>{wifi_info}.'
             switch_btn = '<form method="POST" action="/api/mode"><input type="hidden" name="mode" value="1"><button type="submit" class="btn-mode btn-mode-gw">🔄 Переключить в режим &quot;Прозрачный шлюз&quot; (DHCP в Keenetic)</button></form>'
         else:
             mode_badge = '<span class="badge badge-gw">⚡ РЕЖИМ: ПРОЗРАЧНЫЙ ШЛЮЗ (GATEWAY)</span>'
@@ -6523,6 +6585,18 @@ cmd_doctor() {
         echo -e "  ${TAG_ERR} Виртуальное устройство TUN (/dev/net/tun): ${CLR_RED}[ОТСУТСТВУЕТ]${CLR_RESET}"
     fi
 
+    if [ "${SAVED_ROUTER_MODE:-1}" = "2" ]; then
+        local rlan="${SAVED_LAN_IFACE:-wlan0}"
+        if [[ "$rlan" =~ ^wl ]] || [ -d "/sys/class/net/${rlan}/wireless" ] || [ -d "/sys/class/net/${rlan}/phy80211" ]; then
+            if command -v hostapd >/dev/null 2>&1 && rc-service hostapd status >/dev/null 2>&1; then
+                local ssid_name="${SAVED_WIFI_SSID:-Homelab_WiFi}"
+                echo -e "  ${TAG_OK} Точка доступа Wi-Fi hostapd (${rlan}):     ${CLR_GREEN}[АКТИВНА (SSID: ${ssid_name})]${CLR_RESET}"
+            else
+                echo -e "  ${TAG_ERR} Точка доступа Wi-Fi hostapd (${rlan}):     ${CLR_RED}[НЕ ЗАПУЩЕНА/ОШИБКА]${CLR_RESET}"
+            fi
+        fi
+    fi
+
     if [ -w "${SAVED_SAVE_DIR:-/opt/homelab/save}" ]; then
         echo -e "  ${TAG_OK} Каталог данных хранилища:               ${CLR_GREEN}[ДОСТУПЕН ДЛЯ ЗАПИСИ]${CLR_RESET}"
     else
@@ -7179,6 +7253,11 @@ EOF_NFT_GW
                 grep -q '^SAVED_ROUTER_MODE=' /opt/homelab/.env || echo 'SAVED_ROUTER_MODE=1' >> /opt/homelab/.env
             fi
 
+            if [ -f /etc/init.d/hostapd ]; then
+                rc-service hostapd stop 2>/dev/null || true
+                rc-update del hostapd default 2>/dev/null || true
+            fi
+
             if [ -f /etc/init.d/adguardhome ]; then
                 rc-service adguardhome restart >/dev/null 2>&1 || true
             elif command -v docker >/dev/null 2>&1 && docker inspect adguardhome >/dev/null 2>&1; then
@@ -7210,9 +7289,38 @@ EOF_NFT_GW
                 lan_if="${input_lan:-$lan_if}"
             fi
 
+            local lan_ip="${SAVED_LAN_IP:-192.168.10.1}"
+            ip addr add "${lan_ip}/24" dev "${lan_if}" 2>/dev/null || true
             ip link set dev "${lan_if}" up 2>/dev/null || true
-            local local_ip="${SAVED_LOCAL_IP:-192.168.1.147}"
-            ip addr add "${local_ip}/24" dev "${lan_if}" 2>/dev/null || true
+
+            local wifi_ssid="${SAVED_WIFI_SSID:-Homelab_WiFi}"
+            local wifi_pass="${SAVED_WIFI_PASS:-${SAVED_MASTER_PASS:-21863002}}"
+            local wifi_chan="${SAVED_WIFI_CHANNEL:-7}"
+
+            if [[ "${lan_if}" =~ ^wl ]] || [ -d "/sys/class/net/${lan_if}/wireless" ] || [ -d "/sys/class/net/${lan_if}/phy80211" ]; then
+                mkdir -p /etc/hostapd
+                cat <<EOF_HAPD > /etc/hostapd/hostapd.conf
+interface=${lan_if}
+driver=nl80211
+ssid=${wifi_ssid}
+country_code=RU
+hw_mode=g
+channel=${wifi_chan}
+ieee80211n=1
+wmm_enabled=1
+auth_algs=1
+wpa=2
+wpa_key_mgmt=WPA-PSK
+wpa_passphrase=${wifi_pass}
+rsn_pairwise=CCMP
+EOF_HAPD
+                rfkill unblock wifi 2>/dev/null || true
+                rfkill unblock all 2>/dev/null || true
+                if [ -f /etc/init.d/hostapd ]; then
+                    rc-update add hostapd default 2>/dev/null || true
+                    rc-service hostapd restart >/dev/null 2>&1 || true
+                fi
+            fi
 
             local agh_conf="/var/lib/adguardhome/AdGuardHome.yaml"
             [ ! -f "$agh_conf" ] && agh_conf="/opt/homelab/adguardhome/AdGuardHome.yaml"
@@ -7224,6 +7332,10 @@ with open(fpath, 'r', encoding='utf-8') as f:
     text = f.read()
 text = re.sub(r'(dhcp:\s*\n\s*enabled:\s*)\w+', r'\g<1>true', text)
 text = re.sub(r'(interface_name:\s*)(\"[^\"]*\"|\S+)', r'\g<1>\"' + '$lan_if' + '\"', text)
+text = re.sub(r'(gateway_ip:\s*)(\"[^\"]*\"|\S+)', r'\g<1>\"' + '$lan_ip' + '\"', text)
+prefix = '.'.join('$lan_ip'.split('.')[:3])
+text = re.sub(r'(range_start:\s*)(\"[^\"]*\"|\S+)', r'\g<1>\"' + prefix + '.50\"', text)
+text = re.sub(r'(range_end:\s*)(\"[^\"]*\"|\S+)', r'\g<1>\"' + prefix + '.250\"', text)
 with open(fpath, 'w', encoding='utf-8') as f:
     f.write(text)
 " 2>/dev/null || true
@@ -7286,8 +7398,11 @@ EOF_NFT_RT
 
             echo -e "  ${TAG_OK} Режим успешно переключен: ${CLR_YELLOW}Домашний роутер (WAN + LAN)${CLR_RESET}"
             echo -e "      ${CLR_WHITE}• WAN (Интернет):${CLR_RESET}     ${CLR_CYAN}${wan_if}${CLR_RESET}"
-            echo -e "      ${CLR_WHITE}• LAN (Домашняя сеть):${CLR_RESET}${CLR_CYAN}${lan_if}${CLR_RESET}"
-            echo -e "      ${CLR_WHITE}• DHCP AdGuard Home:${CLR_RESET}   ${CLR_GREEN}АКТИВЕН (пул 192.168.1.50 - 192.168.1.250)${CLR_RESET}"
+            echo -e "      ${CLR_WHITE}• LAN (Домашняя сеть):${CLR_RESET}${CLR_CYAN}${lan_if}${CLR_RESET} (${lan_ip})"
+            if [[ "${lan_if}" =~ ^wl ]] || [ -d "/sys/class/net/${lan_if}/wireless" ] || [ -d "/sys/class/net/${lan_if}/phy80211" ]; then
+                echo -e "      ${CLR_WHITE}• Wi-Fi AP (Точка):${CLR_RESET}   ${CLR_GREEN}ВКЛЮЧЕНА (SSID: ${wifi_ssid}, Канал: ${wifi_chan}, WPA2-PSK)${CLR_RESET}"
+            fi
+            echo -e "      ${CLR_WHITE}• DHCP AdGuard Home:${CLR_RESET}   ${CLR_GREEN}АКТИВЕН (пул ${prefix}.50 - ${prefix}.250)${CLR_RESET}"
             echo -e "      ${CLR_WHITE}• Защита роутеров:${CLR_RESET}     ${CLR_GREEN}Keenetic (192.168.1.5) и OpenWrt (192.168.1.1) исключены${CLR_RESET}"
             ;;
 
