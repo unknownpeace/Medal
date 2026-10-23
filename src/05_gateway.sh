@@ -113,7 +113,7 @@ EOF_SYSCTL
         log_info "Настройка декларативного фаервола nftables (таблица inet homelab)..."
         mkdir -p /etc/nftables.d
 
-        if [ "${ROUTER_MODE:-1}" = "2" ] && [ -n "${WAN_IFACE:-}" ] && [ -n "${LAN_IFACE:-}" ]; then
+        if [ "${ROUTER_MODE:-1}" = "2" ] && [ -n "${WAN_IFACE:-}" ] && [ -n "${LAN_IFACE:-}" ] && [ -d "/sys/class/net/${LAN_IFACE}" ]; then
             cat <<EOF_NFT > /etc/nftables.d/homelab.nft
 table inet homelab {
     chain forward {
@@ -142,6 +142,8 @@ table inet homelab {
         iifname "lo" accept
         ct state { established, related } accept
         iifname "${LAN_IFACE}" accept
+        ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } tcp dport { 22, 80, 443, 8080, 8081, 8083, 9090, 4533, 3000 } accept
+        ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } udp dport { 53, 67, 68 } accept
         iifname "${WAN_IFACE}" tcp dport { 22, 80, 443 } accept
         iifname "${WAN_IFACE}" drop
     }

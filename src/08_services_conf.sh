@@ -13,28 +13,37 @@ configure_gateway_services() {
         local REWRITE_ENTRIES=""
         [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${VAULT_DOMAIN}
-      answer: ${LOCAL_IP}"
+      answer: ${LOCAL_IP}
+      enabled: true"
         [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${GITEA_DOMAIN}
-      answer: ${LOCAL_IP}"
+      answer: ${LOCAL_IP}
+      enabled: true"
         REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${ADGUARD_DOMAIN}
       answer: ${LOCAL_IP}
+      enabled: true
     - domain: ${PROXY_DOMAIN}
       answer: ${LOCAL_IP}
+      enabled: true
     - domain: ${LOGS_DOMAIN}
-      answer: ${LOCAL_IP}"
+      answer: ${LOCAL_IP}
+      enabled: true"
         [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${TORRENT_DOMAIN}
-      answer: ${LOCAL_IP}"
+      answer: ${LOCAL_IP}
+      enabled: true"
         [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${METUBE_DOMAIN}
       answer: ${LOCAL_IP}
+      enabled: true
     - domain: tube.lan
-      answer: ${LOCAL_IP}"
+      answer: ${LOCAL_IP}
+      enabled: true"
         [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && REWRITE_ENTRIES="${REWRITE_ENTRIES}
     - domain: ${MUSIC_DOMAIN}
-      answer: ${LOCAL_IP}"
+      answer: ${LOCAL_IP}
+      enabled: true"
 
         local PTR_UPSTREAMS_YAML="    - 127.0.0.1:1053"
         if [ -n "${ROUTER_GATEWAY:-}" ] && [ "${ROUTER_GATEWAY}" != "127.0.0.1" ]; then
@@ -154,9 +163,13 @@ filters:
     name: "AdGuard Tracking Protection filter"
     id: 2
   - enabled: true
-    url: https://raw.githubusercontent.com/dimisa-ru/anti-ad-filters/master/anti-ad.txt
-    name: "Anti-AD (RU / CIS)"
+    url: https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/master/filters/filter_1_Russian/filter.txt
+    name: "AdGuard Russian filter"
     id: 3
+  - enabled: true
+    url: https://easylist-downloads.adblockplus.org/ruadlist.txt
+    name: "RU AdList"
+    id: 4
 whitelist_filters: []
 user_rules:
   # Блокировка канареечных доменов DoH и Apple Private Relay (предотвращение скрытого обхода шлюза)
@@ -194,9 +207,6 @@ user_rules:
   - '@@||nalog.gov.ru^\$important'
   - '@@||mos.ru^\$important'
   - '@@||emias.info^\$important'
-  - '@@||yandex.ru^\$important'
-  - '@@||yandex.net^\$important'
-  - '@@||vk.com^\$important'
   - '@@||2ip.ru^\$important'
   - '@@||speedtest.net^\$important'
   - '@@||whoer.net^\$important'
@@ -252,13 +262,14 @@ EOF_AGH
   "dns": {
     "servers": [
       {
-        "type": "local",
-        "tag": "dns-direct"
+        "type": "udp",
+        "tag": "dns-direct",
+        "server": "${SELECTED_BOOTSTRAP_IP_1:-77.88.8.8}"
       },
       {
         "type": "udp",
         "tag": "dns-remote",
-        "server": "77.88.8.8"
+        "server": "${SELECTED_BOOTSTRAP_IP_1:-77.88.8.8}"
       }
     ]
   },
@@ -698,6 +709,14 @@ if new_outbounds and os.path.exists(config_path):
         cfg["log"]["output"] = "/var/log/sing-box.log"
         cfg["log"]["level"] = "info"
         cfg["log"]["timestamp"] = True
+
+        # Предотвращаем зацикливание DNS и флуд в логах AdGuard Home
+        cfg["dns"] = {
+            "servers": [
+                {"type": "udp", "tag": "dns-direct", "server": "77.88.8.8"},
+                {"type": "udp", "tag": "dns-remote", "server": "77.88.8.8"}
+            ]
+        }
 
         # Проверка валидности конфигурации утилитой sing-box check
         test_path = config_path + ".test"

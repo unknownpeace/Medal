@@ -1716,6 +1716,8 @@ table inet homelab {
         iifname "lo" accept
         ct state { established, related } accept
         iifname "${lan_if}" accept
+        ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } tcp dport { 22, 80, 443, 8080, 8081, 8083, 9090, 4533, 3000 } accept
+        ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } udp dport { 53, 67, 68 } accept
         iifname "${wan_if}" tcp dport { 22, 80, 443 } accept
         iifname "${wan_if}" drop
     }
