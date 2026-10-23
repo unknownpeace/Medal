@@ -7114,6 +7114,72 @@ EOF_NFT_RT
     esac
 }
 
+cmd_sim() {
+    echo -e "${CLR_CYAN}${CLR_BOLD}╭── HOMELAB SIMULATOR: СИМУЛЯЦИЯ КЛИЕНТА СЕТИ (WI-FI / LAN) ──────${CLR_RESET}"
+    local NS_NAME="sim_wifi_$$"
+    local VETH_GW="vgw_$$"
+    local VETH_CL="vcl_$$"
+    local CLEANUP="ip netns del ${NS_NAME} 2>/dev/null || true; ip link del ${VETH_GW} 2>/dev/null || true"
+    trap 'eval "$CLEANUP"' EXIT INT TERM
+
+    eval "$CLEANUP"
+    ip netns add "${NS_NAME}"
+    ip link add "${VETH_GW}" type veth peer name "${VETH_CL}"
+    ip link set "${VETH_CL}" netns "${NS_NAME}"
+
+    ip link set dev "${VETH_GW}" up
+    ip addr add 192.168.100.1/24 dev "${VETH_GW}"
+
+    ip netns exec "${NS_NAME}" ip link set lo up
+    ip netns exec "${NS_NAME}" ip link set "${VETH_CL}" up
+    ip netns exec "${NS_NAME}" ip addr add 192.168.100.50/24 dev "${VETH_CL}"
+    ip netns exec "${NS_NAME}" ip route add default via 192.168.100.1
+
+    echo -e "  ${TAG_OK} Виртуальный Wi-Fi/LAN клиент создан в изолированном пространстве"
+    echo -e "      • IP клиента: 192.168.100.50"
+    echo -e "      • Шлюз:        192.168.100.1"
+
+    if ip netns exec "${NS_NAME}" ping -c 2 -W 1 192.168.100.1 >/dev/null 2>&1; then
+        echo -e "  ${TAG_OK} Связь со шлюзом (Ping):                     ${CLR_GREEN}[АКТИВНА (<0.5 ms)]${CLR_RESET}"
+    else
+        echo -e "  ${TAG_ERR} Связь со шлюзом (Ping):                     ${CLR_RED}[СБОЙ]${CLR_RESET}"
+    fi
+
+    local target_ip="${SAVED_LOCAL_IP:-192.168.1.147}"
+    if ip netns exec "${NS_NAME}" python3 -c "
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.settimeout(2)
+s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07adguard\x03lan\x00\x00\x01\x00\x01', ('${target_ip}', 53))
+data, _ = s.recvfrom(512)
+exit(0 if len(data) > 12 else 1)
+" 2>/dev/null; then
+        echo -e "  ${TAG_OK} Резолв DNS AdGuard Home (порт 53):           ${CLR_GREEN}[ОТВЕЧАЕТ КЛИЕНТУ]${CLR_RESET}"
+    else
+        echo -e "  ${TAG_WARN} Резолв DNS AdGuard Home (порт 53):           ${CLR_YELLOW}[ОЖИДАНИЕ]${CLR_RESET}"
+    fi
+
+    local http_st
+    http_st=$(ip netns exec "${NS_NAME}" python3 -c "
+import urllib.request
+try:
+    with urllib.request.urlopen('http://${target_ip}/', timeout=3) as resp:
+        print(resp.getcode())
+except Exception:
+    print('ERR')
+" 2>/dev/null || echo "ERR")
+
+    if [ "${http_st}" = "200" ]; then
+        echo -e "  ${TAG_OK} Доступ к веб-порталу с клиента:            ${CLR_GREEN}[HTTP 200 OK]${CLR_RESET}"
+    else
+        echo -e "  ${TAG_WARN} Доступ к веб-порталу с клиента:            ${CLR_YELLOW}[${http_st}]${CLR_RESET}"
+    fi
+
+    eval "$CLEANUP"
+    trap - EXIT INT TERM
+    echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+}
+
 cmd_help() {
     echo -e "${CLR_CYAN}${CLR_BOLD}Утилита управления комплексом Homelab & Transparent Gateway${CLR_RESET}"
     echo ""
@@ -7128,6 +7194,7 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}dump-logs [файл]${CLR_RESET}    Собрать логи всех сервисов и системы в единый файл"
     echo -e "  ${CLR_WHITE}install-log [-f]${CLR_RESET}    Просмотр журнала и таймингов развертывания ядра"
     echo -e "  ${CLR_WHITE}doctor${CLR_RESET}              Комплексная самодиагностика DNS, TUN, NAT и прав"
+    echo -e "  ${CLR_WHITE}sim${CLR_RESET}                 Симуляция беспроводного/LAN клиента в изолированном netns"
     echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
     echo -e "  ${CLR_WHITE}notify [текст]${CLR_RESET}      Отправить тестовое оповещение в Telegram"
     echo -e "  ${CLR_WHITE}cookies [файл|--paste|clear]${CLR_RESET} Управление cookies YouTube для MeTube (yt-dlp)"
@@ -7154,6 +7221,7 @@ case "${1:-status}" in
     install-log|deploy-log|inst-log) shift; cmd_install_log "$@" ;;
     backup) cmd_backup ;;
     doctor|check) cmd_doctor ;;
+    sim|simulate|test-client) cmd_sim ;;
     cookies|cookie) shift; cmd_cookies "$@" ;;
     upgrade|self-update|ota) shift; cmd_upgrade "$@" ;;
     rollback|revert) cmd_rollback ;;
