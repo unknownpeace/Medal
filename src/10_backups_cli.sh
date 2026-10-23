@@ -1499,6 +1499,7 @@ table inet homelab {
     }
 }
 EOF_NFT_GW
+            nft delete table inet homelab 2>/dev/null || true
             nft -f /etc/nftables.d/homelab.nft 2>/dev/null || true
 
             if [ -f /opt/homelab/.env ]; then
@@ -1591,6 +1592,7 @@ table inet homelab {
     }
 }
 EOF_NFT_RT
+            nft delete table inet homelab 2>/dev/null || true
             nft -f /etc/nftables.d/homelab.nft 2>/dev/null || true
 
             if [ -f /opt/homelab/.env ]; then
