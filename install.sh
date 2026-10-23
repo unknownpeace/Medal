@@ -768,7 +768,7 @@ install_pkgs() {
             samba samba-server-openrc wsdd wsdd-openrc \
             qbittorrent-nox qbittorrent-nox-openrc \
             navidrome navidrome-openrc \
-            yt-dlp
+            yt-dlp linux-firmware-rtw88 wireless-regdb
         )
         run_spin "Установка нативных пакетов Alpine Linux (Zero-Docker OpenRC)" \
             apk add --no-cache "${ALP_PKGS[@]}"
@@ -3634,7 +3634,7 @@ dns:
   bind_hosts:
     - 0.0.0.0
   port: 53
-  block_ipv6: true
+  aaaa_disabled: true
   block_ech: true
   anonymize_client_ip: false
   ratelimit: 0
@@ -6848,7 +6848,7 @@ fpath = '$agh_conf'
 with open(fpath, 'r', encoding='utf-8') as f:
     text = f.read()
 text = re.sub(r'(dhcp:\s*\n\s*enabled:\s*)\w+', r'\g<1>true', text)
-text = re.sub(r'(interface_name:\s*)\"[^\"]*\"', r'\g<1>\"$lan_if\"', text)
+text = re.sub(r'(interface_name:\s*)(\"[^\"]*\"|\S+)', r'\g<1>\"' + '$lan_if' + '\"', text)
 with open(fpath, 'w', encoding='utf-8') as f:
     f.write(text)
 " 2>/dev/null || true

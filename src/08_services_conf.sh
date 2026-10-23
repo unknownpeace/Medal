@@ -95,7 +95,7 @@ dns:
   bind_hosts:
     - 0.0.0.0
   port: 53
-  block_ipv6: true
+  aaaa_disabled: true
   block_ech: true
   anonymize_client_ip: false
   ratelimit: 0

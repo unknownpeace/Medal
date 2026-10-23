@@ -1552,7 +1552,7 @@ fpath = '$agh_conf'
 with open(fpath, 'r', encoding='utf-8') as f:
     text = f.read()
 text = re.sub(r'(dhcp:\s*\n\s*enabled:\s*)\w+', r'\g<1>true', text)
-text = re.sub(r'(interface_name:\s*)\"[^\"]*\"', r'\g<1>\"$lan_if\"', text)
+text = re.sub(r'(interface_name:\s*)(\"[^\"]*\"|\S+)', r'\g<1>\"' + '$lan_if' + '\"', text)
 with open(fpath, 'w', encoding='utf-8') as f:
     f.write(text)
 " 2>/dev/null || true
