@@ -18,31 +18,31 @@ configure_caddy_and_compose() {
     local IP_PORTAL_ITEMS=""
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🛡️ AdGuard Home</span><a href=\"https://${ADGUARD_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${ADGUARD_DOMAIN}</a></li>
-    <li><span>🚀 sing-box Gateway UI</span><a href=\"https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET_VAL}\" target=\"_blank\" rel=\"noopener\">https://${PROXY_DOMAIN} [Вход]</a></li>"
+    <li><span>🛡️ AdGuard Home</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:8083\" target=\"_blank\" rel=\"noopener\">IP :8083</a><a class=\"alt\" href=\"https://${ADGUARD_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${ADGUARD_DOMAIN}</a></div></li>
+    <li><span>🚀 sing-box Gateway UI</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:9090/ui/#/?hostname=${LOCAL_IP}&port=9090&protocol=http&secret=${MIHOMO_SECRET_VAL}\" target=\"_blank\" rel=\"noopener\">IP :9090 [Вход]</a><a class=\"alt\" href=\"https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET_VAL}\" target=\"_blank\" rel=\"noopener\">${PROXY_DOMAIN}</a></div></li>"
     fi
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🔑 Vaultwarden</span><a href=\"https://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${VAULT_DOMAIN}</a></li>"
+    <li><span>🔑 Vaultwarden</span><div class=\"links\"><a href=\"https://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${VAULT_DOMAIN}</a><a class=\"alt\" href=\"http://${LOCAL_IP}:8000\" target=\"_blank\" rel=\"noopener\">IP :8000</a></div></li>"
     fi
     if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🐙 Gitea Git Server</span><a href=\"https://${GITEA_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${GITEA_DOMAIN}</a></li>"
+    <li><span>🐙 Forgejo Git Server</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:3000\" target=\"_blank\" rel=\"noopener\">IP :3000</a><a class=\"alt\" href=\"https://${GITEA_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${GITEA_DOMAIN}</a></div></li>"
     fi
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>📥 qBittorrent (VueTorrent)</span><a href=\"https://${TORRENT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${TORRENT_DOMAIN}</a></li>"
+    <li><span>📥 qBittorrent</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:8080\" target=\"_blank\" rel=\"noopener\">IP :8080</a><a class=\"alt\" href=\"https://${TORRENT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${TORRENT_DOMAIN}</a></div></li>"
     fi
     if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>📥 MeTube (Загрузка видео)</span><a href=\"https://${METUBE_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${METUBE_DOMAIN}</a></li>"
+    <li><span>📥 MeTube (Загрузка видео)</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:8081\" target=\"_blank\" rel=\"noopener\">IP :8081</a><a class=\"alt\" href=\"https://${METUBE_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${METUBE_DOMAIN}</a></div></li>"
     fi
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🎵 Navidrome Music (Spotify)</span><a href=\"https://${MUSIC_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${MUSIC_DOMAIN}</a></li>"
+    <li><span>🎵 Navidrome Music</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:4533\" target=\"_blank\" rel=\"noopener\">IP :4533</a><a class=\"alt\" href=\"https://${MUSIC_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${MUSIC_DOMAIN}</a></div></li>"
     fi
     IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>📋 Dozzle Web Logs</span><a href=\"https://${LOGS_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${LOGS_DOMAIN}</a></li>"
+    <li><span>📋 Dozzle Web Logs</span><div class=\"links\"><a href=\"https://${LOGS_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${LOGS_DOMAIN}</a></div></li>"
 
     local VAULT_UPSTREAM="127.0.0.1:8000"
     local GITEA_UPSTREAM="127.0.0.1:3000"
@@ -73,12 +73,17 @@ configure_caddy_and_compose() {
 
 (security_headers) {
     header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "SAMEORIGIN"
         X-XSS-Protection "0"
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+    }
+}
+
+(hsts_headers) {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     }
 }
 
@@ -106,9 +111,12 @@ h1 { color: #38bdf8; font-size: 24px; margin: 0 0 8px; display: flex; align-item
 .badge { background: #065f46; color: #6ee7b7; font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: bold; }
 p { color: #94a3b8; font-size: 14px; line-height: 1.6; margin: 8px 0 16px; }
 .list { list-style: none; padding: 0; margin: 16px 0; }
-.list li { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #131e36; border-radius: 8px; border: 1px solid #1e293b; font-size: 14px; }
-.list a { color: #38bdf8; text-decoration: none; font-weight: 600; font-family: monospace; font-size: 13px; background: rgba(56, 189, 248, 0.1); padding: 4px 8px; border-radius: 4px; }
+.list li { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #131e36; border-radius: 8px; border: 1px solid #1e293b; font-size: 14px; gap: 8px; }
+.links { display: flex; gap: 6px; flex-wrap: wrap; }
+.list a { color: #38bdf8; text-decoration: none; font-weight: 600; font-family: monospace; font-size: 13px; background: rgba(56, 189, 248, 0.1); padding: 4px 8px; border-radius: 4px; transition: all 0.2s; white-space: nowrap; }
 .list a:hover { background: rgba(56, 189, 248, 0.25); text-decoration: underline; }
+.list a.alt { background: rgba(148, 163, 184, 0.12); color: #94a3b8; }
+.list a.alt:hover { background: rgba(148, 163, 184, 0.25); color: #f8fafc; text-decoration: underline; }
 .btn-cert { display: block; text-align: center; background: #0284c7; color: #fff; text-decoration: none; font-weight: 600; font-size: 13px; padding: 10px 16px; border-radius: 8px; margin: 18px 0 10px; transition: background 0.2s; }
 .btn-cert:hover { background: #0369a1; }
 .tip { background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; padding: 12px; font-size: 13px; color: #cbd5e1; border-radius: 4px; margin-top: 14px; line-height: 1.5; }
@@ -141,6 +149,7 @@ EOF_CADDY
         dns duckdns {env.DUCKDNS_API_TOKEN}
     }
     import security_headers
+    import hsts_headers
     encode zstd gzip
 EOF_CADDY
 
@@ -386,7 +395,7 @@ EOF_SMB
         if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
             mkdir -p /var/lib/vaultwarden
             cat << EOF_VW > /etc/conf.d/vaultwarden
-export ROCKET_ADDRESS=127.0.0.1
+export ROCKET_ADDRESS=0.0.0.0
 export ROCKET_PORT=8000
 export DATA_FOLDER=/var/lib/vaultwarden
 export WEB_VAULT_FOLDER=/usr/share/webapps/vaultwarden-web
@@ -411,7 +420,7 @@ RUN_MODE = prod
 PROTOCOL = http
 DOMAIN = ${GITEA_DOMAIN}
 ROOT_URL = https://${GITEA_DOMAIN}/
-HTTP_ADDR = 127.0.0.1
+HTTP_ADDR = 0.0.0.0
 HTTP_PORT = 3000
 DISABLE_SSH = false
 SSH_PORT = 22
@@ -541,7 +550,7 @@ class DownloaderHandler(BaseHTTPRequestHandler):
         self.wfile.write(resp.encode("utf-8"))
 
 if __name__ == "__main__":
-    server = HTTPServer(("127.0.0.1", 8081), DownloaderHandler)
+    server = HTTPServer(("0.0.0.0", 8081), DownloaderHandler)
     server.serve_forever()
 EOF_YTDL_PY
             chmod 755 "${APP_DIR}/scripts/ytdlp_web.py"
