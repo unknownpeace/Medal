@@ -26,6 +26,16 @@ EOF_NM
             systemctl reload NetworkManager 2>/dev/null || true
         fi
 
+        # Защита /etc/resolv.conf от перезаписи DHCP-клиентом udhcpc в Alpine Linux
+        if [ -d /etc/udhcpc ] || command -v udhcpc >/dev/null 2>&1; then
+            mkdir -p /etc/udhcpc
+            if [ -f /etc/udhcpc/udhcpc.conf ]; then
+                sed -i 's/^#\(RESOLV_CONF="no"\)/\1/' /etc/udhcpc/udhcpc.conf 2>/dev/null || true
+                grep -q '^RESOLV_CONF="no"' /etc/udhcpc/udhcpc.conf 2>/dev/null || echo 'RESOLV_CONF="no"' >> /etc/udhcpc/udhcpc.conf
+            else
+                echo 'RESOLV_CONF="no"' > /etc/udhcpc/udhcpc.conf
+            fi
+        fi
 
         chattr -i /etc/resolv.conf 2>/dev/null || true
         rm -f /etc/resolv.conf
@@ -46,6 +56,29 @@ EOF_DNS
         if [ ! -c /dev/net/tun ]; then
             mknod /dev/net/tun c 10 200 2>/dev/null || true
             chmod 666 /dev/net/tun 2>/dev/null || true
+        fi
+
+        # Настройка MAC-адреса и топологии роутера при необходимости
+        if [ "${ROUTER_MODE:-1}" = "2" ] && [ -n "${WAN_IFACE:-}" ]; then
+            log_info "Настройка сетевых интерфейсов домашнего маршрутизатора (WAN: ${WAN_IFACE}, LAN: ${LAN_IFACE})..."
+            if [ -n "${WAN_MAC:-}" ]; then
+                log_info "Применение клонированного MAC-адреса провайдера на ${WAN_IFACE}: ${WAN_MAC}..."
+                ip link set dev "${WAN_IFACE}" down 2>/dev/null || true
+                ip link set dev "${WAN_IFACE}" address "${WAN_MAC}" 2>/dev/null || true
+                ip link set dev "${WAN_IFACE}" up 2>/dev/null || true
+
+                # Персистентное сохранение в /etc/network/interfaces для Alpine Linux
+                if [ -f /etc/network/interfaces ]; then
+                    if ! grep -q "hwaddress ether ${WAN_MAC}" /etc/network/interfaces; then
+                        sed -i "/iface ${WAN_IFACE} inet/a \    hwaddress ether ${WAN_MAC}" /etc/network/interfaces 2>/dev/null || true
+                    fi
+                fi
+            fi
+
+            if [ -n "${LAN_IFACE:-}" ] && [ -n "${LAN_IP:-}" ]; then
+                ip addr add "${LAN_IP}/24" dev "${LAN_IFACE}" 2>/dev/null || true
+                ip link set dev "${LAN_IFACE}" up 2>/dev/null || true
+            fi
         fi
 
         log_info "Настройка sysctl: IP-форвардинг, BBR и loose rp_filter для TUN-маршрутизации..."
@@ -78,7 +111,43 @@ EOF_SYSCTL
         fi
         log_info "Настройка декларативного фаервола nftables (таблица inet homelab)..."
         mkdir -p /etc/nftables.d
-        cat <<EOF_NFT > /etc/nftables.d/homelab.nft
+
+        if [ "${ROUTER_MODE:-1}" = "2" ] && [ -n "${WAN_IFACE:-}" ] && [ -n "${LAN_IFACE:-}" ]; then
+            cat <<EOF_NFT > /etc/nftables.d/homelab.nft
+table inet homelab {
+    chain forward {
+        type filter hook forward priority -10; policy accept;
+        tcp flags syn tcp option maxseg size set rt mtu
+        iifname "${LAN_IFACE}" oifname "${WAN_IFACE}" accept
+        iifname "${LAN_IFACE}" oifname "tun0" accept
+        ct state { established, related } accept
+    }
+
+    chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+        iifname "${LAN_IFACE}" tcp dport 53 redirect to :53
+        iifname "${LAN_IFACE}" udp dport 53 redirect to :53
+        iifname "${LAN_IFACE}" tcp dport 853 reject with tcp reset
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname "${WAN_IFACE}" masquerade
+        oifname "tun0" masquerade
+    }
+
+    chain input {
+        type filter hook input priority filter; policy accept;
+        iifname "lo" accept
+        ct state { established, related } accept
+        iifname "${LAN_IFACE}" accept
+        iifname "${WAN_IFACE}" tcp dport { 22, 80, 443 } accept
+        iifname "${WAN_IFACE}" drop
+    }
+}
+EOF_NFT
+        else
+            cat <<EOF_NFT > /etc/nftables.d/homelab.nft
 table inet homelab {
     chain forward {
         type filter hook forward priority -10; policy accept;
@@ -96,7 +165,7 @@ table inet homelab {
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         oifname "${DEFAULT_IFACE}" masquerade
-        oifname "Meta" masquerade
+        oifname "tun0" masquerade
     }
 
     chain input {
@@ -105,6 +174,7 @@ table inet homelab {
     }
 }
 EOF_NFT
+        fi
 
         local NFT_APPLIED=0
         if command -v nft >/dev/null 2>&1; then
@@ -116,8 +186,17 @@ EOF_NFT
         fi
 
         for nft_conf in /etc/nftables.conf /etc/nftables.nft; do
-            if [ -f "$nft_conf" ] && ! grep -q 'homelab.nft' "$nft_conf" 2>/dev/null; then
-                echo 'include "/etc/nftables.d/homelab.nft"' >> "$nft_conf" 2>/dev/null || true
+            if [ -f "$nft_conf" ]; then
+                # Очистка стандартной блокирующей таблицы inet filter в Alpine Linux
+                if grep -q 'table inet filter' "$nft_conf" 2>/dev/null && grep -q 'policy drop' "$nft_conf" 2>/dev/null; then
+                    cat << 'EOF_NFT_ROOT' > "$nft_conf"
+#!/usr/sbin/nft -f
+flush ruleset
+include "/etc/nftables.d/*.nft"
+EOF_NFT_ROOT
+                elif ! grep -q 'homelab.nft' "$nft_conf" 2>/dev/null && ! grep -q 'include "/etc/nftables.d/\*.nft"' "$nft_conf" 2>/dev/null; then
+                    echo 'include "/etc/nftables.d/homelab.nft"' >> "$nft_conf" 2>/dev/null || true
+                fi
             fi
         done
 
@@ -259,7 +338,20 @@ if [ "$APPLIED_NFT" -eq 1 ] || ! nft list chain ip filter DOCKER-USER 2>/dev/nul
     fi
 fi
 
-if command -v docker >/dev/null 2>&1 && docker inspect adguardhome >/dev/null 2>&1; then
+if command -v rc-service >/dev/null 2>&1 && rc-service adguardhome status >/dev/null 2>&1; then
+    DNS_CHECK_OK=0
+    if timeout 2 nc -z 127.0.0.1 53 2>/dev/null || python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 53)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
+        DNS_CHECK_OK=1
+    fi
+    if [ "$DNS_CHECK_OK" -eq 0 ]; then
+        sleep 2
+        if ! (timeout 2 nc -z 127.0.0.1 53 2>/dev/null); then
+            logger -t gateway-watchdog "DNS-резолвер AdGuard Home не отвечает, перезапуск службы OpenRC..." 2>/dev/null || true
+            rc-service adguardhome restart >/dev/null 2>&1 || true
+            /usr/local/bin/homelab-notify "Самовосстановление DNS" "Порт 53 не отвечал на запросы. Служба AdGuard Home автоматически перезапущена сторожем." "WARN" 2>/dev/null || true
+        fi
+    fi
+elif command -v docker >/dev/null 2>&1 && docker inspect adguardhome >/dev/null 2>&1; then
     AG_STATUS=$(docker inspect -f '{{.State.Status}}' adguardhome 2>/dev/null || echo "none")
     AG_HEALTH=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' adguardhome 2>/dev/null || echo "none")
     if [ "$AG_STATUS" = "running" ] && [ "$AG_HEALTH" != "starting" ]; then
@@ -278,7 +370,21 @@ if command -v docker >/dev/null 2>&1 && docker inspect adguardhome >/dev/null 2>
     fi
 fi
 
-if command -v docker >/dev/null 2>&1 && docker inspect mihomo >/dev/null 2>&1; then
+if command -v rc-service >/dev/null 2>&1 && rc-service sing-box status >/dev/null 2>&1; then
+    SINGBOX_CHECK_OK=0
+    if python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null || \
+       timeout 2 nc -z 127.0.0.1 9090 2>/dev/null; then
+        SINGBOX_CHECK_OK=1
+    fi
+    if [ "$SINGBOX_CHECK_OK" -eq 0 ]; then
+        sleep 2
+        if ! (python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null || timeout 2 nc -z 127.0.0.1 9090 2>/dev/null); then
+            logger -t gateway-watchdog "Ядро маршрутизации sing-box (порт 9090) не отвечает, выполняется автоматический перезапуск..." 2>/dev/null || true
+            rc-service sing-box restart >/dev/null 2>&1 || true
+            /usr/local/bin/homelab-notify "Самовосстановление sing-box" "Ядро маршрутизации не отвечало на порту 9090. Служба sing-box автоматически перезапущена сторожем." "WARN" 2>/dev/null || true
+        fi
+    fi
+elif command -v docker >/dev/null 2>&1 && docker inspect mihomo >/dev/null 2>&1; then
     MH_STATUS=$(docker inspect -f '{{.State.Status}}' mihomo 2>/dev/null || echo "none")
     MH_HEALTH=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' mihomo 2>/dev/null || echo "none")
     if [ "$MH_STATUS" = "running" ] && [ "$MH_HEALTH" != "starting" ]; then

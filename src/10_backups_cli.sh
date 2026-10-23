@@ -225,8 +225,49 @@ EOF_NAVI_BKP_TMR
 
     cd "${APP_DIR}"
 
-    if [ "${IS_UPGRADE_MODE:-0}" -ne 1 ]; then
-        log_info "Загрузка Docker-образов стека с поддержкой зеркал и докачки..."
+    if [ "${DISTRO_FAMILY}" = "alpine" ] || is_native; then
+        log_info "Активация и запуск нативных служб комплекса под управлением OpenRC..."
+        local NATIVE_SVCS=(sing-box adguardhome caddy)
+        [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(vaultwarden)
+        [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(forgejo)
+        [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(samba wsdd)
+        [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(qbittorrent-nox)
+        [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(navidrome)
+        [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(ytdlp-web)
+
+        for svc in "${NATIVE_SVCS[@]}"; do
+            if [ -f "/etc/init.d/${svc}" ]; then
+                rc-update add "${svc}" default >/dev/null 2>&1 || true
+                run_spin "Запуск службы ${svc} (OpenRC)" bash -c "rc-service '${svc}' restart 2>/dev/null || (sleep 1 && rc-service '${svc}' restart) || rc-service '${svc}' start"
+            fi
+        done
+
+        if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]] && command -v forgejo >/dev/null 2>&1; then
+            log_info "Инициализация учетной записи администратора Forgejo (${ADMIN_USER})..."
+            su forgejo -s /bin/sh -c "FORGEJO_WORK_DIR=/var/lib/forgejo forgejo admin user create --config /etc/forgejo/app.ini --admin --username '${ADMIN_USER}' --password '${MASTER_PASS}' --email '${ADMIN_USER}@example.lan' --must-change-password=false" 2>/dev/null || \
+            su forgejo -s /bin/sh -c "FORGEJO_WORK_DIR=/var/lib/forgejo forgejo admin user change-password --config /etc/forgejo/app.ini --username '${ADMIN_USER}' --password '${MASTER_PASS}'" 2>/dev/null || true
+            log_ok "Администратор Forgejo (${ADMIN_USER}) готов к работе"
+        fi
+
+        if [ "$SSL_MODE" = "1" ]; then
+            log_info "Экспорт локального корневого сертификата CA Caddy..."
+            local CADDY_ROOT_CERT="/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt"
+            for _ in {1..15}; do
+                if [ -f "${CADDY_ROOT_CERT}" ]; then
+                    mkdir -p "${SAVE_DIR}/certificates"
+                    cp -f "${CADDY_ROOT_CERT}" "${SAVE_DIR}/certificates/caddy-root.crt"
+                    chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/certificates" 2>/dev/null || true
+                    chmod 644 "${SAVE_DIR}/certificates/caddy-root.crt" 2>/dev/null || true
+                    log_ok "Сертификат CA сохранен: ${SAVE_DIR}/certificates/caddy-root.crt"
+                    break
+                fi
+                sleep 1
+            done
+        fi
+        log_ok "Все нативные службы комплекса успешно инициализированы"
+
+    else
+        log_info "Проверка наличия и загрузка Docker-образов стека..."
         local IMAGES=()
         if dc config --images >/dev/null 2>&1; then
             while IFS= read -r line; do
@@ -254,7 +295,6 @@ EOF_NAVI_BKP_TMR
                 fi
             done
 
-            # 2. Прямой pull через префиксы проверенных российских зеркал Docker Hub
             if [ $PULL_DONE -eq 0 ]; then
                 local PREFIX_IMG="${img}"
                 [[ ! "${PREFIX_IMG}" =~ / ]] && PREFIX_IMG="library/${PREFIX_IMG}"
@@ -270,7 +310,6 @@ EOF_NAVI_BKP_TMR
                 done
             fi
 
-            # 3. Прямой fallback на независимые реестры (ghcr.io / lscr.io)
             if [ $PULL_DONE -eq 0 ]; then
                 local FALLBACK_IMG=""
                 case "${img}" in
@@ -296,50 +335,47 @@ EOF_NAVI_BKP_TMR
                 fi
             fi
         done
-    else
-        log_info "Режим обновления ядра: повторная загрузка образов пропущена (образы сохранены)"
-    fi
 
-    log_info "Запуск контейнеров стека (Docker Compose)..."
-    local UP_OK=0
-    for up_att in 1 2 3 4; do
-        if dc up -d; then
-            UP_OK=1
-            log_ok "Все контейнеры стека успешно запущены"
-            break
-        else
-            log_warn "Попытка запуска ${up_att}/4 завершилась с ошибкой, повторная попытка через 5 сек..."
-            sleep 5
+        log_info "Запуск контейнеров стека (Docker Compose)..."
+        local UP_OK=0
+        for up_att in 1 2 3 4; do
+            if dc up -d; then
+                UP_OK=1
+                log_ok "Все контейнеры стека успешно запущены"
+                break
+            else
+                log_warn "Попытка запуска ${up_att}/4 завершилась с ошибкой, повторная попытка через 5 сек..."
+                sleep 5
+            fi
+        done
+        if [ $UP_OK -eq 0 ]; then
+            log_err "Критическая ошибка запуска контейнеров через Docker Compose!"
+            return 1
         fi
-    done
-    if [ $UP_OK -eq 0 ]; then
-        log_err "Критическая ошибка запуска контейнеров через Docker Compose!"
-        return 1
-    fi
 
-    if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
-        if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
-            log_ok "Режим обновления: существующий администратор Gitea (${ADMIN_USER}) сохранен"
-        else
-            log_info "Автоматическая инициализация администратора Gitea (${ADMIN_USER})..."
-            local GITEA_READY=0
-            for i in {1..40}; do
-                if docker inspect -f '{{.State.Status}}' gitea 2>/dev/null | grep -q "running"; then
-                    if docker exec gitea wget -q -O - http://localhost:3000/api/v1/version >/dev/null 2>&1 || \
-                       docker exec gitea curl -sf http://localhost:3000/api/v1/version >/dev/null 2>&1 || \
-                       [ $i -ge 12 ]; then
-                        
-                        if docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u "${USER_UID}:${USER_GID}" gitea sh -c 'gitea admin user create --config /data/gitea/conf/app.ini --admin --username "$1" --password "$GITEA_ADMIN_PWD" --email "$1@example.lan" --must-change-password=false' _ "${ADMIN_USER}" >/dev/null 2>&1 || \
-                           docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u git gitea sh -c 'gitea admin user create --config /data/gitea/conf/app.ini --admin --username "$1" --password "$GITEA_ADMIN_PWD" --email "$1@example.lan" --must-change-password=false' _ "${ADMIN_USER}" >/dev/null 2>&1; then
-                            log_ok "Администратор Gitea (${ADMIN_USER}) успешно создан с мастер-паролем"
-                            GITEA_READY=1
-                        elif docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u git gitea sh -c 'gitea admin user change-password --config /data/gitea/conf/app.ini --username "$1" --password "$GITEA_ADMIN_PWD"' _ "${ADMIN_USER}" >/dev/null 2>&1; then
-                            log_ok "Пароль администратора Gitea (${ADMIN_USER}) успешно обновлен на мастер-пароль"
-                            GITEA_READY=1
-                        fi
+        if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
+            if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
+                log_ok "Режим обновления: существующий администратор Gitea (${ADMIN_USER}) сохранен"
+            else
+                log_info "Автоматическая инициализация администратора Gitea (${ADMIN_USER})..."
+                local GITEA_READY=0
+                for i in {1..40}; do
+                    if docker inspect -f '{{.State.Status}}' gitea 2>/dev/null | grep -q "running"; then
+                        if docker exec gitea wget -q -O - http://localhost:3000/api/v1/version >/dev/null 2>&1 || \
+                           docker exec gitea curl -sf http://localhost:3000/api/v1/version >/dev/null 2>&1 || \
+                           [ $i -ge 12 ]; then
+                            
+                            if docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u "${USER_UID}:${USER_GID}" gitea sh -c 'gitea admin user create --config /data/gitea/conf/app.ini --admin --username "$1" --password "$GITEA_ADMIN_PWD" --email "$1@example.lan" --must-change-password=false' _ "${ADMIN_USER}" >/dev/null 2>&1 || \
+                               docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u git gitea sh -c 'gitea admin user create --config /data/gitea/conf/app.ini --admin --username "$1" --password "$GITEA_ADMIN_PWD" --email "$1@example.lan" --must-change-password=false' _ "${ADMIN_USER}" >/dev/null 2>&1; then
+                                log_ok "Администратор Gitea (${ADMIN_USER}) успешно создан с мастер-паролем"
+                                GITEA_READY=1
+                            elif docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u git gitea sh -c 'gitea admin user change-password --config /data/gitea/conf/app.ini --username "$1" --password "$GITEA_ADMIN_PWD"' _ "${ADMIN_USER}" >/dev/null 2>&1; then
+                                log_ok "Пароль администратора Gitea (${ADMIN_USER}) успешно обновлен на мастер-пароль"
+                                GITEA_READY=1
+                            fi
 
-                        if [ "${GITEA_READY}" -eq 1 ]; then
-                            python3 -c "
+                            if [ "${GITEA_READY}" -eq 1 ]; then
+                                python3 -c "
 import sqlite3, glob, sys
 db_paths = glob.glob('${GITEA_DATA_DIR}/**/gitea.db', recursive=True) + glob.glob('${SAVE_DIR}/**/gitea.db', recursive=True)
 for p in set(db_paths):
@@ -351,35 +387,36 @@ for p in set(db_paths):
     except Exception:
         pass
 " 2>/dev/null || true
-                            break
+                                break
+                            fi
                         fi
                     fi
-                fi
-                sleep 2
-            done
-            [ $GITEA_READY -eq 0 ] && log_warn "Не удалось инициализировать админа Gitea (контейнер запускается в фоновом режиме)"
-        fi
-    fi
-
-    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
-        log_ok "Сервис Navidrome готов к работе (порт 4533 / ${MUSIC_DOMAIN})"
-        log_info "Создание учетной записи администратора Navidrome выполняется в веб-интерфейсе при первом открытии: https://${MUSIC_DOMAIN}"
-    fi
-
-    if [ "$SSL_MODE" = "1" ]; then
-        log_info "Экспорт локального корневого сертификата CA Caddy..."
-        local CADDY_ROOT_CERT="${APP_DIR}/caddy/data/caddy/pki/authorities/local/root.crt"
-        for _ in {1..30}; do
-            if [ -f "${CADDY_ROOT_CERT}" ]; then
-                mkdir -p "${SAVE_DIR}/certificates"
-                cp -f "${CADDY_ROOT_CERT}" "${SAVE_DIR}/certificates/caddy-root.crt"
-                chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/certificates" 2>/dev/null || true
-                chmod 644 "${SAVE_DIR}/certificates/caddy-root.crt" 2>/dev/null || true
-                log_ok "Сертификат CA сохранен: ${SAVE_DIR}/certificates/caddy-root.crt"
-                break
+                    sleep 2
+                done
+                [ $GITEA_READY -eq 0 ] && log_warn "Не удалось инициализировать админа Gitea (контейнер запускается в фоновом режиме)"
             fi
-            sleep 1
-        done
+        fi
+
+        if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+            log_ok "Сервис Navidrome готов к работе (порт 4533 / ${MUSIC_DOMAIN})"
+            log_info "Создание учетной записи администратора Navidrome выполняется в веб-интерфейсе при первом открытии: https://${MUSIC_DOMAIN}"
+        fi
+
+        if [ "$SSL_MODE" = "1" ]; then
+            log_info "Экспорт локального корневого сертификата CA Caddy..."
+            local CADDY_ROOT_CERT="${APP_DIR}/caddy/data/caddy/pki/authorities/local/root.crt"
+            for _ in {1..30}; do
+                if [ -f "${CADDY_ROOT_CERT}" ]; then
+                    mkdir -p "${SAVE_DIR}/certificates"
+                    cp -f "${CADDY_ROOT_CERT}" "${SAVE_DIR}/certificates/caddy-root.crt"
+                    chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/certificates" 2>/dev/null || true
+                    chmod 644 "${SAVE_DIR}/certificates/caddy-root.crt" 2>/dev/null || true
+                    log_ok "Сертификат CA сохранен: ${SAVE_DIR}/certificates/caddy-root.crt"
+                    break
+                fi
+                sleep 1
+            done
+        fi
     fi
 
     log_info "Установка консольной утилиты управления комплексом (/usr/local/bin/homelab)..."
@@ -412,6 +449,10 @@ TAG_ERR="${CLR_RED}✖${CLR_RESET}"
 TAG_WARN="${CLR_YELLOW}▲${CLR_RESET}"
 TAG_INFO="${CLR_CYAN}✦${CLR_RESET}"
 
+is_native() {
+    [ "${SAVED_INIT_SYSTEM:-${INIT_SYSTEM:-}}" = "openrc" ] || [ -f /sbin/openrc-run ] || ! command -v docker >/dev/null 2>&1
+}
+
 dc_cmd() {
     if [ -x /usr/local/bin/dc ]; then
         /usr/local/bin/dc "$@"
@@ -433,16 +474,13 @@ norm_service() {
     case "$s" in
         adguard|adguardhome) echo "adguardhome" ;;
         vault|vaultwarden) echo "vaultwarden" ;;
-        torrent|qbittorrent) echo "qbittorrent" ;;
+        torrent|qbittorrent) echo "qbittorrent-nox" ;;
         music|navidrome) echo "navidrome" ;;
-        tube|video|metube) echo "metube" ;;
-        git|gitea) echo "gitea" ;;
-        proxy|clash|meta|mihomo) echo "mihomo" ;;
+        tube|video|metube) echo "ytdlp-web" ;;
+        git|gitea|forgejo) echo "forgejo" ;;
+        proxy|clash|meta|mihomo|singbox|sing-box) echo "sing-box" ;;
         smb|samba) echo "samba" ;;
         caddy|web|proxy-web) echo "caddy" ;;
-        logs|dozzle) echo "dozzle" ;;
-        autoheal) echo "autoheal" ;;
-        watchtower) echo "watchtower" ;;
         *) echo "$s" ;;
     esac
 }
@@ -490,64 +528,83 @@ cmd_status() {
     fi
     echo -e "  ${CLR_WHITE}• Фаервол / NAT:${CLR_RESET}     ${FW_STATUS}"
 
-    if docker inspect metube >/dev/null 2>&1; then
-        local c_file="${target_save}/downloads/.metube/cookies.txt"
-        if [ -s "${c_file}" ]; then
-            local c_sz
-            c_sz=$(ls -lh "${c_file}" 2>/dev/null | awk '{print $5}' || echo "OK")
-            echo -e "  ${CLR_WHITE}• YouTube Cookies:${CLR_RESET}   ${CLR_GREEN}🟢 Загружен (${c_sz})${CLR_RESET}"
-        else
-            echo -e "  ${CLR_WHITE}• YouTube Cookies:${CLR_RESET}   ${CLR_YELLOW}🟡 Не загружен (команда: homelab cookies)${CLR_RESET}"
-        fi
+    if [ "${SAVED_ROUTER_MODE:-1}" = "2" ]; then
+        echo -e "  ${CLR_WHITE}• Топология сети:${CLR_RESET}    ${CLR_GREEN}Домашний маршрутизатор (WAN: ${SAVED_WAN_IFACE:-eth0}, LAN: ${SAVED_LAN_IFACE:-eth1}, MAC: ${SAVED_WAN_MAC:-})${CLR_RESET}"
+    else
+        echo -e "  ${CLR_WHITE}• Топология сети:${CLR_RESET}    ${CLR_GREEN}Прозрачный шлюз (LAN: ${SAVED_PHYS_IFACE:-eth0})${CLR_RESET}"
     fi
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
     echo ""
 
-    echo -e "${CLR_CYAN}${CLR_BOLD}╭── СТАТУС КОНТЕЙНЕРОВ DOCKER ─────────────────────────────────${CLR_RESET}"
-    printf "  %-18s %-12s %-14s %-10s\n" "СЕРВИС" "СТАТУС" "ЗДОРОВЬЕ" "ПАМЯТЬ"
-    echo -e "  ─────────────────────────────────────────────────────────────"
-    
-    local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "metube" "navidrome" "samba" "dozzle" "watchtower" "autoheal")
-    declare -A DOCKER_MEM
-    if command -v docker >/dev/null 2>&1; then
-        while read -r d_name d_mem; do
-            [ -n "$d_name" ] && DOCKER_MEM["$d_name"]="$d_mem"
-        done < <(docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' 2>/dev/null | awk '{print $1, $2}' || true)
-    fi
+    if is_native; then
+        echo -e "${CLR_CYAN}${CLR_BOLD}╭── СТАТУС СЛУЖБ OPENRC (NATIVE BARE-METAL) ──────────────────${CLR_RESET}"
+        printf "  %-18s %-22s %-10s\n" "СЛУЖБА" "СТАТУС" "ОЗУ (RSS)"
+        echo -e "  ─────────────────────────────────────────────────────────────"
+        local NATIVE_SVCS=("sing-box" "adguardhome" "caddy" "vaultwarden" "forgejo" "samba" "wsdd" "qbittorrent-nox" "navidrome" "ytdlp-web")
+        for svc in "${NATIVE_SVCS[@]}"; do
+            if [ -f "/etc/init.d/$svc" ]; then
+                local st_raw
+                st_raw=$(rc-service "$svc" status 2>&1 || true)
+                local st_str="${CLR_RED}Stopped${CLR_RESET}"
+                if echo "$st_raw" | grep -q "started"; then
+                    st_str="${CLR_GREEN}Started (OpenRC)${CLR_RESET}"
+                fi
+                local pat="$svc"
+                [ "$svc" = "samba" ] && pat="smbd"
+                [ "$svc" = "ytdlp-web" ] && pat="ytdlp_web"
+                local mem_str
+                mem_str=$(ps -eo rss,args 2>/dev/null | awk -v p="$pat" 'tolower($0) ~ tolower(p) && $0 !~ /awk/ {sum+=$1} END {if (sum>0) printf "%.1f MB", sum/1024; else print "—"}')
+                printf "  %-18s %-32b %-10s\n" "$svc" "$st_str" "$mem_str"
+            fi
+        done
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
 
-    for c in "${CONTAINERS[@]}"; do
-        if docker inspect "$c" >/dev/null 2>&1; then
-            local state
-            state=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo "stopped")
-            local health
-            health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null || echo "none")
-            local mem="${DOCKER_MEM[$c]:-—}"
-            
-            local state_str="${CLR_GREEN}Running${CLR_RESET}"
-            [ "$state" != "running" ] && state_str="${CLR_RED}${state}${CLR_RESET}"
-            
-            local health_str="${CLR_DIM}—${CLR_RESET}"
-            [ "$health" = "healthy" ] && health_str="${CLR_GREEN}Healthy${CLR_RESET}"
-            [ "$health" = "starting" ] && health_str="${CLR_YELLOW}Starting${CLR_RESET}"
-            [ "$health" = "unhealthy" ] && health_str="${CLR_RED}UNHEALTHY${CLR_RESET}"
-            
-            printf "  %-18s %-22b %-24b %-10s\n" "$c" "$state_str" "$health_str" "${mem}"
+    else
+        echo -e "${CLR_CYAN}${CLR_BOLD}╭── СТАТУС КОНТЕЙНЕРОВ DOCKER ─────────────────────────────────${CLR_RESET}"
+        printf "  %-18s %-12s %-14s %-10s\n" "СЕРВИС" "СТАТУС" "ЗДОРОВЬЕ" "ПАМЯТЬ"
+        echo -e "  ─────────────────────────────────────────────────────────────"
+        
+        local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "metube" "navidrome" "samba" "dozzle" "watchtower" "autoheal")
+        declare -A DOCKER_MEM
+        if command -v docker >/dev/null 2>&1; then
+            while read -r d_name d_mem; do
+                [ -n "$d_name" ] && DOCKER_MEM["$d_name"]="$d_mem"
+            done < <(docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' 2>/dev/null | awk '{print $1, $2}' || true)
         fi
-    done
-    echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+
+        for c in "${CONTAINERS[@]}"; do
+            if docker inspect "$c" >/dev/null 2>&1; then
+                local state
+                state=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo "stopped")
+                local health
+                health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null || echo "none")
+                local mem="${DOCKER_MEM[$c]:-—}"
+                
+                local state_str="${CLR_GREEN}Running${CLR_RESET}"
+                [ "$state" != "running" ] && state_str="${CLR_RED}${state}${CLR_RESET}"
+                
+                local health_str="${CLR_DIM}—${CLR_RESET}"
+                [ "$health" = "healthy" ] && health_str="${CLR_GREEN}Healthy${CLR_RESET}"
+                [ "$health" = "starting" ] && health_str="${CLR_YELLOW}Starting${CLR_RESET}"
+                [ "$health" = "unhealthy" ] && health_str="${CLR_RED}UNHEALTHY${CLR_RESET}"
+                
+                printf "  %-18s %-22b %-24b %-10s\n" "$c" "$state_str" "$health_str" "${mem}"
+            fi
+        done
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+    fi
 
     echo ""
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── АДРЕСА СЕРВИСОВ И ВЕБ-ПОРТАЛОВ ────────────────────────────${CLR_RESET}"
     local BASE_IP="${SAVED_LOCAL_IP:-${LOCAL_IP:-127.0.0.1}}"
     [ -n "${SAVED_MUSIC_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🎵 Музыка (Navidrome):${CLR_RESET}   https://${SAVED_MUSIC_DOMAIN} (порт 4533)"
-    [ -n "${SAVED_METUBE_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🎬 Загрузчик (MeTube):${CLR_RESET}   https://${SAVED_METUBE_DOMAIN} (порт 8081)"
+    [ -n "${SAVED_METUBE_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🎬 Загрузчик (Медиа):${CLR_RESET}    https://${SAVED_METUBE_DOMAIN} (порт 8081)"
     [ -n "${SAVED_TORRENT_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}📥 Торренты (qBit):${CLR_RESET}      https://${SAVED_TORRENT_DOMAIN} (порт 8080)"
     [ -n "${SAVED_VAULT_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🔑 Пароли (Vaultwarden):${CLR_RESET} https://${SAVED_VAULT_DOMAIN}"
-    [ -n "${SAVED_GITEA_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🐙 Git-сервер (Gitea):${CLR_RESET}   https://${SAVED_GITEA_DOMAIN} (порт 3000)"
+    [ -n "${SAVED_GITEA_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🐙 Git-сервер (Forgejo):${CLR_RESET} https://${SAVED_GITEA_DOMAIN} (порт 3000)"
     [ -n "${SAVED_ADGUARD_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🛡️  DNS (AdGuard Home):${CLR_RESET}   https://${SAVED_ADGUARD_DOMAIN} (порт 8083)"
-    [ -n "${SAVED_PROXY_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🚀 Прокси (Mihomo UI):${CLR_RESET}   https://${SAVED_PROXY_DOMAIN}"
-    [ -n "${SAVED_LOGS_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}📋 Логи (Dozzle):${CLR_RESET}        https://${SAVED_LOGS_DOMAIN}"
-    if docker inspect samba >/dev/null 2>&1; then
+    [ -n "${SAVED_PROXY_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🚀 Прокси (sing-box UI):${CLR_RESET} https://${SAVED_PROXY_DOMAIN}"
+    if [ -f /etc/init.d/samba ] || docker inspect samba >/dev/null 2>&1; then
         echo -e "  ${CLR_WHITE}📂 Samba Хранилище:${CLR_RESET}      \\\\${BASE_IP}\\${SAVED_SHARE_NAME:-storage} и \\\\${BASE_IP}\\music"
     fi
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
@@ -555,6 +612,21 @@ cmd_status() {
 
 cmd_restart() {
     local target="${1:-}"
+    if is_native; then
+        if [ -n "$target" ]; then
+            target=$(norm_service "$target")
+            echo -e "  ${TAG_INFO} Перезапуск нативной службы OpenRC ${CLR_WHITE}${target}${CLR_RESET}..."
+            rc-service "$target" restart 2>/dev/null || rc-service "${target}-nox" restart 2>/dev/null || true
+            echo -e "  ${TAG_OK} Служба ${target} перезапущена"
+        else
+            echo -e "  ${TAG_INFO} Перезапуск всего комплекса Homelab (OpenRC)..."
+            /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
+            rc-service homelab restart 2>/dev/null || true
+            echo -e "  ${TAG_OK} Все службы успешно перезапущены"
+        fi
+        return 0
+    fi
+
     if [ -n "$target" ]; then
         target=$(norm_service "$target")
         shift || true
@@ -571,6 +643,20 @@ cmd_restart() {
 
 cmd_stop() {
     local target="${1:-}"
+    if is_native; then
+        if [ -n "$target" ]; then
+            target=$(norm_service "$target")
+            echo -e "  ${TAG_INFO} Остановка службы OpenRC ${CLR_WHITE}${target}${CLR_RESET}..."
+            rc-service "$target" stop 2>/dev/null || rc-service "${target}-nox" stop 2>/dev/null || true
+            echo -e "  ${TAG_OK} Служба ${target} остановлена"
+        else
+            echo -e "  ${TAG_INFO} Остановка всех служб Homelab (OpenRC)..."
+            rc-service homelab stop 2>/dev/null || true
+            echo -e "  ${TAG_OK} Все службы остановлены"
+        fi
+        return 0
+    fi
+
     if [ -n "$target" ]; then
         target=$(norm_service "$target")
         shift || true
@@ -586,6 +672,20 @@ cmd_stop() {
 
 cmd_start() {
     local target="${1:-}"
+    if is_native; then
+        if [ -n "$target" ]; then
+            target=$(norm_service "$target")
+            echo -e "  ${TAG_INFO} Запуск службы OpenRC ${CLR_WHITE}${target}${CLR_RESET}..."
+            rc-service "$target" start 2>/dev/null || rc-service "${target}-nox" start 2>/dev/null || true
+            echo -e "  ${TAG_OK} Служба ${target} запущена"
+        else
+            echo -e "  ${TAG_INFO} Запуск всех служб Homelab (OpenRC)..."
+            rc-service homelab start 2>/dev/null || true
+            echo -e "  ${TAG_OK} Все службы запущены"
+        fi
+        return 0
+    fi
+
     if [ -n "$target" ]; then
         target=$(norm_service "$target")
         shift || true
@@ -599,12 +699,87 @@ cmd_start() {
     fi
 }
 
+cmd_mac() {
+    local iface="${SAVED_WAN_IFACE:-${DEFAULT_IFACE:-eth0}}"
+    local new_mac="${1:-}"
+    if [ -n "$new_mac" ]; then
+        echo -e "  ${TAG_INFO} Клонирование MAC-адреса на интерфейсе ${iface}: ${new_mac}..."
+        ip link set dev "$iface" down 2>/dev/null || true
+        if ip link set dev "$iface" address "$new_mac" 2>/dev/null; then
+            ip link set dev "$iface" up 2>/dev/null || true
+            if [ -f /etc/network/interfaces ]; then
+                sed -i "/hwaddress ether/d" /etc/network/interfaces 2>/dev/null || true
+                sed -i "/iface ${iface} inet/a \    hwaddress ether ${new_mac}" /etc/network/interfaces 2>/dev/null || true
+            fi
+            echo -e "  ${TAG_OK} MAC-адрес интерфейса ${iface} успешно изменен на ${CLR_GREEN}${new_mac}${CLR_RESET}!"
+        else
+            ip link set dev "$iface" up 2>/dev/null || true
+            echo -e "  ${TAG_ERR} Ошибка смены MAC-адреса на ${new_mac}."
+        fi
+    else
+        local cur_mac
+        cur_mac=$(cat "/sys/class/net/${iface}/address" 2>/dev/null || ip link show "$iface" 2>/dev/null | awk '/ether/{print $2}')
+        echo -e "  ${CLR_WHITE}Интерфейс WAN:${CLR_RESET}     ${CLR_YELLOW}${iface}${CLR_RESET}"
+        echo -e "  ${CLR_WHITE}Текущий MAC-адрес:${CLR_RESET} ${CLR_GREEN}${cur_mac}${CLR_RESET}"
+        echo -e "  ${CLR_DIM}Для смены/симуляции MAC выполните: sudo homelab mac AA:BB:CC:DD:EE:FF${CLR_RESET}"
+    fi
+}
+
 cmd_logs() {
     local target="${1:-}"
     if [ "$target" = "dump" ] || [ "$target" = "--dump" ] || [ "$target" = "export" ]; then
         shift || true
         cmd_dump_logs "$@"
         return
+    fi
+    if is_native; then
+        local follow=""
+        local tail_lines=50
+        for arg in "$@"; do
+            case "$arg" in
+                -f|--follow) follow="-f" ;;
+                -n=*|--tail=*) tail_lines="${arg#*=}" ;;
+                -n|--tail) ;;
+                *) [ -z "$target" ] && target="$arg" ;;
+            esac
+        done
+        target=$(norm_service "${target:-all}")
+        case "$target" in
+            sing-box)
+                [ -f /var/log/sing-box.log ] && tail ${follow} -n ${tail_lines} /var/log/sing-box.log || grep -i sing-box /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            adguardhome)
+                [ -f /var/log/adguardhome.log ] && tail ${follow} -n ${tail_lines} /var/log/adguardhome.log || grep -i adguard /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            caddy)
+                [ -f /var/log/caddy.log ] && tail ${follow} -n ${tail_lines} /var/log/caddy.log || grep -i caddy /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            vaultwarden)
+                [ -f /var/log/vaultwarden.log ] && tail ${follow} -n ${tail_lines} /var/log/vaultwarden.log || grep -i vaultwarden /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            forgejo)
+                [ -f /var/log/forgejo/http.log ] && tail ${follow} -n ${tail_lines} /var/log/forgejo/http.log || [ -f /var/lib/forgejo/log/gitea.log ] && tail ${follow} -n ${tail_lines} /var/lib/forgejo/log/gitea.log
+                ;;
+            samba)
+                [ -f /var/log/samba/smbd.log ] && tail ${follow} -n ${tail_lines} /var/log/samba/smbd.log
+                ;;
+            wsdd)
+                [ -f /var/log/wsdd.log ] && tail ${follow} -n ${tail_lines} /var/log/wsdd.log
+                ;;
+            qbittorrent-nox)
+                tail ${follow} -n ${tail_lines} /var/lib/qbittorrent/.local/share/qBittorrent/logs/qbittorrent.log 2>/dev/null || true
+                ;;
+            navidrome)
+                [ -f /var/log/navidrome.log ] && tail ${follow} -n ${tail_lines} /var/log/navidrome.log
+                ;;
+            ytdlp-web)
+                [ -f /var/log/ytdlp-web.log ] && tail ${follow} -n ${tail_lines} /var/log/ytdlp-web.log || grep -i ytdlp /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            all|*)
+                tail ${follow} -n ${tail_lines} /var/log/messages 2>/dev/null || true
+                ;;
+        esac
+        return 0
     fi
     if [ -n "$target" ]; then
         shift || true
@@ -668,22 +843,40 @@ cmd_doctor() {
             echo -e "  ${TAG_ERR} DNS Резолвер AdGuard Home (порт 53):    ${CLR_RED}[НЕ ОТВЕЧАЕТ]${CLR_RESET}"
         fi
 
-        if python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 1053)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
-            echo -e "  ${TAG_OK} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
-        else
-            echo -e "  ${TAG_WARN} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
-        fi
+        if is_native; then
+            if ip link show tun0 >/dev/null 2>&1; then
+                echo -e "  ${TAG_OK} Сетевой TUN интерфейс sing-box (tun0):  ${CLR_GREEN}[АКТИВЕН И ПОДНЯТ]${CLR_RESET}"
+            else
+                echo -e "  ${TAG_WARN} Сетевой TUN интерфейс sing-box (tun0):  ${CLR_YELLOW}[НЕ СОЗДАН/ОЖИДАНИЕ]${CLR_RESET}"
+            fi
 
-        if python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null; then
-            echo -e "  ${TAG_OK} REST API Mihomo (порт 9090):            ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
-        else
-            echo -e "  ${TAG_WARN} REST API Mihomo (порт 9090):            ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
-        fi
+            if python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null; then
+                echo -e "  ${TAG_OK} Clash API sing-box (порт 9090):         ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+            else
+                echo -e "  ${TAG_WARN} Clash API sing-box (порт 9090):         ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
+            fi
 
-        if ip link show Meta >/dev/null 2>&1; then
-            echo -e "  ${TAG_OK} Сетевой TUN интерфейс ядра (Meta):      ${CLR_GREEN}[АКТИВЕН И ПОДНЯТ]${CLR_RESET}"
+            if [ -f /etc/sing-box/config.json ] && grep -q 'vless' /etc/sing-box/config.json 2>/dev/null; then
+                echo -e "  ${TAG_OK} Прокси-узлы sing-box (VLESS/Reality):    ${CLR_GREEN}[АКТИВНЫ И ЗАГРУЖЕНЫ]${CLR_RESET}"
+            fi
         else
-            echo -e "  ${TAG_WARN} Сетевой TUN интерфейс ядра (Meta):      ${CLR_YELLOW}[НЕ СОЗДАН/ОЖИДАНИЕ]${CLR_RESET}"
+            if python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 1053)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
+                echo -e "  ${TAG_OK} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+            else
+                echo -e "  ${TAG_WARN} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
+            fi
+
+            if python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null; then
+                echo -e "  ${TAG_OK} REST API Mihomo (порт 9090):            ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+            else
+                echo -e "  ${TAG_WARN} REST API Mihomo (порт 9090):            ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
+            fi
+
+            if ip link show Meta >/dev/null 2>&1; then
+                echo -e "  ${TAG_OK} Сетевой TUN интерфейс ядра (Meta):      ${CLR_GREEN}[АКТИВЕН И ПОДНЯТ]${CLR_RESET}"
+            else
+                echo -e "  ${TAG_WARN} Сетевой TUN интерфейс ядра (Meta):      ${CLR_YELLOW}[НЕ СОЗДАН/ОЖИДАНИЕ]${CLR_RESET}"
+            fi
         fi
     else
         echo -e "  ${TAG_INFO} Сетевой шлюз (AdGuard + Mihomo):       ${CLR_DIM}[ОТКЛЮЧЕН В КОНФИГУРАЦИИ]${CLR_RESET}"
@@ -1221,6 +1414,7 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}update${CLR_RESET}              Обновление всех Docker-образов стека"
     echo -e "  ${CLR_WHITE}upgrade [--force]${CLR_RESET}   Бесшовный апгрейд ядра комплекса из GitHub (OTA)"
     echo -e "  ${CLR_WHITE}rollback${CLR_RESET}            Откат к предыдущей версии из снимка восстановления"
+    echo -e "  ${CLR_WHITE}mac [новый_mac]${CLR_RESET}     Просмотр или клонирование MAC-адреса WAN"
     echo -e "  ${CLR_WHITE}version${CLR_RESET}             Проверить установленную версию и обновления на GitHub"
     echo -e "  ${CLR_WHITE}unlock${CLR_RESET}              Ручная разблокировка шифрованного диска LUKS"
     echo -e "  ${CLR_WHITE}help${CLR_RESET}                Показать эту справку"
@@ -1233,6 +1427,7 @@ case "${1:-status}" in
     stop) shift; cmd_stop "$@" ;;
     start) shift; cmd_start "$@" ;;
     logs) shift; cmd_logs "$@" ;;
+    mac|spoof-mac|clone-mac) shift; cmd_mac "$@" ;;
     dump|dump-logs|export-logs|collect|report) shift; cmd_dump_logs "$@" ;;
     install-log|deploy-log|inst-log) shift; cmd_install_log "$@" ;;
     backup) cmd_backup ;;

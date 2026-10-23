@@ -57,12 +57,19 @@ detect_network() {
         chmod 660 /var/run/docker.sock 2>/dev/null || true
     fi
 
+    ALL_PHYS_IFACES=()
+    while read -r ifn; do
+        [ -n "$ifn" ] && ALL_PHYS_IFACES+=("$ifn")
+    done < <(ls -1 /sys/class/net 2>/dev/null | grep -E '^(eth|en|wl|enp|eno)' | sort -u || true)
+    [ ${#ALL_PHYS_IFACES[@]} -eq 0 ] && ALL_PHYS_IFACES=("${DEFAULT_IFACE}")
+
     log_ok "Сетевые параметры определены:"
     echo -e "      ${CLR_WHITE}• ОС и ядро:        ${PRETTY_NAME:-Linux} ($(uname -r)) [Init: ${INIT_SYSTEM}]${CLR_RESET}"
     echo -e "      ${CLR_WHITE}• Архитектура:      ${SYSTEM_ARCH} (Аппаратный AES: $([ $HAS_HARDWARE_AES -eq 1 ] && echo "Да" || echo "Нет"))${CLR_RESET}"
     echo -e "      ${CLR_WHITE}• IP сервера:       ${CLR_GREEN}${LOCAL_IP}${CLR_RESET}"
     echo -e "      ${CLR_WHITE}• Шлюз роутера:     ${CLR_CYAN}${ROUTER_GATEWAY}${CLR_RESET}"
-    echo -e "      ${CLR_WHITE}• Интерфейс LAN:    ${CLR_YELLOW}${DEFAULT_IFACE}${CLR_RESET}"
+    echo -e "      ${CLR_WHITE}• Основной адаптер: ${CLR_YELLOW}${DEFAULT_IFACE}${CLR_RESET}"
+    echo -e "      ${CLR_WHITE}• Все адаптеры:     ${CLR_CYAN}${ALL_PHYS_IFACES[*]}${CLR_RESET}"
     echo -e "      ${CLR_WHITE}• Подсеть LAN:      ${LAN_SUBNET}${CLR_RESET}"
     echo -e "      ${CLR_WHITE}• Пользователь:     ${TARGET_USER} (UID: ${USER_UID}, GID: ${USER_GID})${CLR_RESET}"
 }

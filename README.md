@@ -1,14 +1,14 @@
 # 🛡️ Homelab Appliance & Transparent Gateway
-### 🇷🇺 Russia Pro Edition 2026 • Умный прозрачный шлюз и автономная домашняя станция
+### 🇷🇺 Russia Pro Edition 2026 • Умный прозрачный шлюз, роутер с клонированием MAC и автономная станция
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Версия_Ядра-v2.8.16-00f2fe?style=for-the-badge&logo=git&logoColor=white" alt="Версия 2.8.16">
-  <img src="https://img.shields.io/badge/Архитектура-Transparent_Gateway-4facfe?style=for-the-badge&logo=shield&logoColor=white" alt="Прозрачный шлюз">
-  <img src="https://img.shields.io/badge/Маршрутизатор-Mihomo_TUN_(Meta)-8b5cf6?style=for-the-badge&logo=fastapi&logoColor=white" alt="Mihomo TUN">
+  <img src="https://img.shields.io/badge/Версия_Ядра-v3.0.0-00f2fe?style=for-the-badge&logo=git&logoColor=white" alt="Версия 3.0.0">
+  <img src="https://img.shields.io/badge/Архитектура-Bare--Metal_Alpine_+_Docker-4facfe?style=for-the-badge&logo=alpinelinux&logoColor=white" alt="Bare-Metal Alpine">
+  <img src="https://img.shields.io/badge/Маршрутизатор-sing--box_TUN_+_Mihomo-8b5cf6?style=for-the-badge&logo=fastapi&logoColor=white" alt="sing-box TUN">
+  <img src="https://img.shields.io/badge/Режим_Сети-Gateway_&_Router_(Dual--Mode)-10b981?style=for-the-badge&logo=ethernet&logoColor=white" alt="Dual-Mode">
+  <img src="https://img.shields.io/badge/ISP_MAC-Auto_Spoofing-f97316?style=for-the-badge&logo=router&logoColor=white" alt="ISP MAC Spoofing">
+  <img src="https://img.shields.io/badge/DNS-AdGuard_Home_Safe_DHCP-16a34a?style=for-the-badge&logo=adguard&logoColor=white" alt="AdGuard Home">
   <img src="https://img.shields.io/badge/Аудиосервер-Navidrome_(Hi--Fi)-ec4899?style=for-the-badge&logo=spotify&logoColor=white" alt="Navidrome">
-  <img src="https://img.shields.io/badge/DNS-AdGuard_Home_34+-16a34a?style=for-the-badge&logo=adguard&logoColor=white" alt="AdGuard Home">
-  <img src="https://img.shields.io/badge/Загрузчик-MeTube_(yt--dlp_Nightly)-ff0000?style=for-the-badge&logo=youtube&logoColor=white" alt="MeTube">
-  <img src="https://img.shields.io/badge/Docker-Self--Healing-2563eb?style=for-the-badge&logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/Лицензия-MIT-f59e0b?style=for-the-badge" alt="Лицензия MIT">
 </p>
 
@@ -20,21 +20,22 @@
   ██║ ╚═╝ ██║███████╗██████╔╝██║  ██║███████╗
   ╚═╝     ╚═╝╚══════╝╚═════╝ ╚═╝  ╚═╝╚══════╝
   ╔══════════════════════════════════════════════════════════════════════════════╗
-  ║   HOMELAB APPLIANCE & TRANSPARENT GATEWAY ◈ RUSSIA PRO 2026 EDITION          ║
+  ║   HOMELAB APPLIANCE & TRANSPARENT GATEWAY ◈ RUSSIA PRO 2026 (v3.0.0)          ║
   ╠══════════════════════════════════════════════════════════════════════════════╣
-  ║  ◆ ПРОЗРАЧНЫЙ СЕТЕВОЙ ШЛЮЗ: MIHOMO TUN + ADGUARD HOME (CLEAN DNS)            ║
+  ║  ◆ РЕЖИМ 1: ПРОЗРАЧНЫЙ ШЛЮЗ (1x NIC) ◈ РЕЖИМ 2: ДОМАШНИЙ РОУТЕР (WAN + LAN) ║
+  ║  ◆ 100% NATIVE BARE-METAL НА ALPINE (ZERO DOCKER, OPENRC, ~500 МБ ОЗУ)       ║
   ║                                                                              ║
-  ║   [ КЛИЕНТЫ LAN ] ──► [ ADGUARD :53 ] ──► [ MIHOMO TUN :1053 ]               ║
-  ║   (ТВ, ПК, Смартфоны)  ZeroCache/DNS-Hijack Fake-IP / Mixed TUN / gVisor     ║
+  ║   [ КЛИЕНТЫ LAN ] ──► [ ADGUARD :53 ] ──► [ SING-BOX TUN :9090 ]            ║
+  ║   (ТВ, ПК, Смартфоны)  ZeroCache/DHCP      Clash API / Fake-IP / tun0        ║
   ║           │                     │                                            ║
   ║           │                     ▼ (Анти-Утечки)   Маршрутизация трафика:     ║
-  ║           │              [ ECH / DOH DROP ]  ├─► [ US-AUTO ] AI (ChatGPT)    ║
+  ║           │              [ ECH / DOH DROP ]  ├─► [ AI-Services ] ChatGPT     ║
   ║           │                                  ├─► [ PROXY ] YT, Discord, X    ║
-  ║           │                                  ├─► [ STEAM ] Комьюнити / Прокси║
+  ║           │                                  ├─► [ AUTO ] Urltest Балансир   ║
   ║           │                                  └─► [ DIRECT ] РФ / Банки / P2P ║
   ║           ▼                                                      │           ║
-  ║   [ ПРЯМОЙ ВЫХОД ] ──────────────────────────────────────────────┘           ║
-  ║   • Умный Fake-IP DNS + nftables: Прозрачный обход без настройки клиентов    ║
+  ║   [ ISP WAN (Спуфинг MAC-адреса) / ПРЯМОЙ ВЫХОД ] ───────────────┘           ║
+  ║   • Защита роутеров: OpenWrt 192.168.1.1 и Keenetic 192.168.1.5 защищены     ║
   ╚══════════════════════════════════════════════════════════════════════════════╝
 ```
 
@@ -42,22 +43,38 @@
 
 ## 🌟 Что это такое?
 
-**Homelab Appliance & Transparent Gateway** — это автономная инженерная система «всё-в-одном» для домашнего сервера, мини-ПК (Intel N100, Raspberry Pi 4/5, Orange Pi, старый ПК, локальная ВМ или контейнер Proxmox).
+**Homelab Appliance & Transparent Gateway (v3.0.0)** — это автономная инженерная система «всё-в-одном» для домашнего сервера, мини-ПК (Intel N100, N5105, Raspberry Pi 4/5, Orange Pi, старый ПК, локальная ВМ или контейнер Proxmox).
 
-Комплекс превращает сервер в **аппаратный прозрачный шлюз маршрутизации** и **персональное домашнее облако**, решая главные проблемы домашней сети в России 2026 года:
+Комплекс разворачивается в двух вариантах:
+1. **100% Native Bare-Metal на Alpine Linux (Zero Docker):** Все 10 сервисов работают нативно под управлением супервизора OpenRC (`supervise-daemon`), потребляя суммарно всего **~400–600 МБ ОЗУ**!
+2. **Контейнерный стек на Debian / Ubuntu:** Автономный самовосстанавливающийся Docker Compose стек.
 
-1. **Свободный интернет без настройки клиентских устройств:** На смартфонах, телевизорах и компьютерах больше **не нужно** ставить VPN-приложения, включать расширения в браузерах или разряжать аккумулятор. Вся домашняя сеть фильтруется и маршрутизируется прозрачно.
-2. **Личные облачные сервисы без абонентской платы:** Собственный Hi-Fi стриминг музыки с офлайн-кэшем для метро (Navidrome), комбайн скачивания медиаконтента (MeTube), персональный менеджер паролей (Vaultwarden), домашний Git-сервер (Gitea), изолированная торрент-качалка (qBittorrent VueTorrent) и сетевое хранилище Samba NAS.
+### Главные возможности v3.0.0:
+1. **Свободный интернет без настройки клиентских устройств:** На смартфонах, ТВ и компьютерах **не нужно** ставить VPN-приложения, включать расширения или сажать батарею. Вся сеть маршрутизируется прозрачно.
+2. **Ядро sing-box TUN последнего поколения:** Нативный сетевой стек с интерфейсом `tun0`, совместимым с Clash API на порту `:9090` (веб-панель MetaCubeXD на `https://proxy.lan`), urltest-балансировкой и авто-обработчиком подписок (`sing-box JSON`, `Clash YAML`, `Base64`).
+3. **Два сетевых режима:**
+   * **Режим 1 (Прозрачный шлюз):** Работает в существующей сети с 1 сетевой картой (достаточно указать IP сервера как Gateway/DNS в роутере).
+   * **Режим 2 (Домашний роутер):** Сервер берет кабель провайдера напрямую в WAN, раздает интернет в LAN, выполняет NAT-маскарадинг и спуфит MAC-адрес.
+4. **Клонирование/Спуфинг MAC-адреса провайдера (ISP MAC Spoofing):**
+   * В РФ провайдеры (Ростелеком, Дом.ру, МТС, Билайн, ТТК и др.) привязывают тариф к MAC-адресу роутера.
+   * Комплекс позволяет ввести ваш оригинальный MAC-адрес при установке или изменить его на лету командой `homelab mac <НОВЫЙ_MAC>`. Настройка сохраняется персистентно в `/etc/network/interfaces`.
+5. **Безопасный DHCP AdGuard Home:**
+   * В Режиме 1 DHCP отключен по умолчанию, исключая конфликты с домашним роутером.
+   * В Режиме 2 DHCP включается с безопасным динамическим диапазоном, который гарантированно исключает IP самого сервера и шлюза.
+   * Адреса **`192.168.1.1`** (OpenWrt) и **`192.168.1.5`** (Keenetic) жестко зарезервированы статической защитой, исключая сетевые коллизии.
+6. **Личные облачные сервисы без абонентской платы:** Hi-Fi стриминг (Navidrome), загрузчик медиа (MeTube / ytdlp-web), менеджер паролей (Vaultwarden), Git-сервер (Forgejo / Gitea), торрент-качалка (qBittorrent VueTorrent) и Samba NAS.
 
 ---
 
-## 🎯 Принцип «Одного действия» (1 клик для всей квартиры)
+## 🎯 Сравнение сетевых режимов
 
-Забудьте об установке и настройке софта на устройствах каждого члена семьи:
-
-> [!IMPORTANT]
-> Вы указываете IP-адрес этого сервера как **Основной шлюз (Gateway)** и **DNS-сервер** ровно **один раз в настройках DHCP домашнего роутера** (Keenetic, MikroTik, ASUS, OpenWrt, TP-Link).
-> После этого **все устройства** (Smart TV, Apple TV, PlayStation, iPhone, Android, ПК, ноутбуки, умный дом) автоматически получают доступ к YouTube 4K, Discord Voice, ChatGPT, защищенным сайтам и доменам `*.lan`!
+| Параметр | Режим 1: Прозрачный шлюз (Gateway) | Режим 2: Домашний роутер (Router Mode) |
+| :--- | :--- | :--- |
+| **Сетевые интерфейсы** | 1 физический интерфейс (`eth0` / `enp3s0`) | 2+ интерфейса: **WAN** (к провайдеру) + **LAN** (к коммутатору/AP) |
+| **Роль основного роутера** | Сохраняется ваш Keenetic / OpenWrt / MikroTik | Сам сервер становится главным роутером квартиры |
+| **DHCP-сервер** | Раздает ваш роутер (в AdGuard выключен для защиты) | Раздает AdGuard Home (с защитой адресов `.1` и `.5`) |
+| **Привязка провайдера** | Не требуется (роутер уже авторизован) | **Клонирование MAC-адреса** (`homelab mac`) |
+| **Маршрутизация** | Клиенты шлют трафик на IP сервера через роутер | Прямой NAT-маскарадинг LAN &rarr; WAN + sing-box TUN |
 
 ---
 
@@ -67,17 +84,17 @@
 
 | Вызов в РФ (РКН / ТСПУ) | Инженерное решение в комплексе |
 | :--- | :--- |
-| **YouTube 4K & Google CDN** | **Mihomo TUN Mixed-Stack & Anti-Throttling:** Трафик YouTube и `*.googlevideo.com` направляется в оптимизированный туннель. Активирован автоматический сброс замедленного QUIC (порт UDP 443 дропается для заблокированных ресурсов), что принуждает браузеры переходить на сверхбыстрый TCP/TLS без потери пакетов. |
-| **Голосовая связь Discord & Игры** | **Full-Cone NAT & gVisor Mixed Stack:** Полная поддержка UDP-трафика и голосовых серверов Discord Voice без односторонней слышимости и зависаний на «Connecting RTC». |
-| **Геоблокировки AI (ChatGPT, Claude, Gemini)** | **Динамическая группа `US-AUTO`:** Алгоритм автоматически отбирает в вашей подписке американские узлы (`(?i)\b(US|USA|United States|America)\b|🇺🇸|США`) и пингует их каждые 5 минут, направляя трафик нейросетей на самый быстрый сервер США. Никаких «Access Denied» из-за случайной европейской ноды. |
+| **YouTube 4K & Google CDN** | **sing-box TUN & Anti-Throttling:** Трафик YouTube и `*.googlevideo.com` направляется в оптимизированный туннель. Активирован автоматический сброс замедленного QUIC (UDP 443 дропается для заблокированных ресурсов), что принуждает браузеры переходить на быстрый TCP/TLS без потери пакетов. |
+| **Голосовая связь Discord & Игры** | **Full-Cone NAT & Endpoint-Independent Mapping:** Полная поддержка UDP-трафика и голосовых серверов Discord Voice без односторонней слышимости и зависаний на «Connecting RTC». |
+| **Геоблокировки AI (ChatGPT, Claude, Gemini)** | **Динамическая группа `AI-Services`:** Трафик нейросетей автоматически фильтруется и направляется на выделенные ноды, предотвращая «Access Denied». |
 | **Госуслуги, Банки, Кинопоиск, VK, Доставка** | **100% Прямой выход (DIRECT):** Все зоны `.ru`, `.su`, `.рф`, реестры `category-ru` и гео-базы российских подсетей выведены в нативный bypass на полной скорости провайдера (до 1 Гбит/с, без капч и ограничений). |
-| **Личный Spotify для авто и метро** | **Триада Navidrome + MeTube + Samba:** Сервер стриминга Hi-Fi аудио (~40 МБ ОЗУ). Скачиваете треки или плейлисты через MeTube ➔ треки индексируются в `/music` ➔ нативные приложения **Symfonium** (Android), **Substreamer** (iOS) и **Feishin** (ПК) дают 100% офлайн-кэш, тексты песен в такт, CarPlay и Android Auto. |
+| **Привязка ISP к MAC-адресу** | **Встроенный MAC-Cloner:** Поддержка любого MAC-адреса вашего старого роутера (`hwaddress ether` в `/etc/network/interfaces`) с мгновенной сменяемостью через CLI: `homelab mac 00:11:22:33:44:55`. |
+| **Защита существующей сети OpenWrt / Keenetic** | Защитный шлюз AdGuard Home: жестко резервирует `192.168.1.1` и `192.168.1.5`, никогда не занимая их в DHCP. |
+| **Личный Spotify для авто и метро** | **Триада Navidrome + MeTube + Samba:** Сервер стриминга Hi-Fi аудио (~40 МБ ОЗУ). Скачиваете треки через MeTube ➔ они индексируются в `/music` ➔ нативные приложения **Symfonium** (Android), **Substreamer** (iOS) и **Feishin** (ПК) дают 100% офлайн-кэш, тексты песен в такт, CarPlay и Android Auto. |
 | **P2P-торренты без сжигания трафика прокси** | Трафик пиров BitTorrent (порты 6881–6889, 51413) изолирован и идет **напрямую**, не нагружая зарубежный VPS. При этом заблокированные трекеры (RuTracker, Rutor, Flibusta, NNMClub) прозрачно проксируются. |
-| **Steam: Сообщество против загрузки игр** | Сообщество Steam (`steamcommunity.com`) проксируется для открытия профилей и инвентаря, а гигабайты игровых дистрибутивов (`steam_site`) качаются напрямую на полной скорости провайдера. |
 | **Утечки DNS на Smart TV и приставках** | **Native DNS Hijacking в nftables:** Любые скрытые DNS-запросы на порт 53 (даже если телевизор захардкодил `8.8.8.8` или `1.1.1.1`) на лету перехватываются и направляются в AdGuard Home. |
 | **Блокировки ECH со стороны ТСПУ** | В AdGuard Home активированы `block_ech: true` и фильтр `|*^$dnstype=HTTPS`. Это предотвращает невидимый сброс TLS-соединений на ресурсах Cloudflare. |
 | **Скрытый обход шлюза через Apple iCloud** | Встроена канареечная блокировка `mask.icloud.com` и `mask-h2.icloud.com`. Техника Apple видит домашний шлюз и корректно использует его, не уходя во встроенный обход. |
-| **Автономный DoH в браузерах** | Блокировка канареечного домена `use-application-dns.net`. Браузеры Chrome и Firefox уважают настройки домашней сети и не уводят запросы мимо шлюза. |
 | **Зависания страниц на PPPoE/L2TP** | **TCP MSS Clamping (`rt mtu`) в nftables:** Пакеты автоматически подгоняются под MTU провайдера, предотвращая фрагментацию и «залипание» сайтов. |
 
 ---
@@ -86,55 +103,51 @@
 
 ```mermaid
 flowchart TD
-    subgraph LAN[" 🏠 Домашняя сеть LAN (Все устройства без установки ПО) "]
+    subgraph LAN[" 🏠 Домашняя сеть LAN (Все устройства без настройки) "]
         TV["📺 Smart TV / Приставка"]
         PC["💻 Компьютеры / Ноутбуки"]
         PHONE["📱 Смартфоны / Планшеты"]
-        CONSOLE["🎮 Игровые консоли (PS5 / Xbox)"]
+        KEENET["📡 Keenetic Router (192.168.1.5)"]
+        OPENWRT["📡 OpenWrt Router (192.168.1.1)"]
     end
 
-    subgraph SERVER[" ⚡ Homelab Server (Прозрачный шлюз 2026) "]
-        NFT["🛡️ Native nftables (inet homelab)<br/>• TCP MSS Clamping (MTU)<br/>• DNS Hijack (Порт 53 Anti-Bypass)<br/>• Защита от петель маршрута"]
+    subgraph SERVER[" ⚡ Homelab Server (v3.0.0 Pro) "]
+        NFT["🛡️ Native nftables (inet homelab)<br/>• TCP MSS Clamping (MTU)<br/>• DNS Hijack (:53 Anti-Bypass)<br/>• WAN/LAN NAT Masquerade"]
         
-        AGH["🟢 AdGuard Home (:53)<br/>• Zero-Cache (Синхронизация Fake-IP)<br/>• Защита от DoH/ECH утечек<br/>• Чистый DNS без ложных банов"]
+        AGH["🟢 AdGuard Home (:53 / :8083)<br/>• Zero-Cache (Fake-IP Sync)<br/>• Защита роутеров .1 и .5<br/>• Safe DHCP Dynamic Range"]
         
-        MIHOMO["🚀 Mihomo Core (:1053 TUN / Fake-IP)<br/>• Стек: Mixed (gVisor + System UDP)<br/>• Full-Cone NAT (Discord Voice)<br/>• Группа US-AUTO (ChatGPT, Claude)<br/>• Нативные Meta Rule-Sets (.mrs)"]
+        SINGBOX["🚀 sing-box TUN (:9090 Clash API / tun0)<br/>• Поддержка sing-box JSON, Clash, Base64<br/>• urltest балансир (auto)<br/>• Селекторы: PROXY, AI-Services<br/>• Native tun0 (172.19.0.1/30)"]
 
-        CADDY["🔒 Caddy Web Gateway (:80 / :443)<br/>• Стартовая страница портала по IP<br/>• Раздача Root CA сертификата<br/>• Локальные домены *.lan с HTTPS"]
+        CADDY["🔒 Caddy Web Gateway (:80 / :443)<br/>• Стартовый портал по IP<br/>• Раздача Root CA сертификата<br/>• Домены *.lan с HTTPS"]
 
-        subgraph APPS[" 📦 Docker Compose Стек (Self-Healing) "]
-            NAVI["🎵 Navidrome<br/>(music.lan)"]
-            VW["🔑 Vaultwarden<br/>(vault.lan)"]
-            GIT["🐙 Gitea<br/>(git.lan)"]
-            QBIT["📥 qBittorrent<br/>+ VueTorrent (torrent.lan)"]
-            METUBE["📥 MeTube<br/>(metube.lan)"]
-            DOZZLE["📋 Dozzle Logs<br/>(logs.lan)"]
-            SMB["📂 Samba NAS<br/>(\\IP\storage и \\IP\music)"]
-            HEAL["🩺 Autoheal<br/>(Авторестарт сбойных)"]
-            WT["🔄 Watchtower<br/>(Ночные обновления)"]
+        subgraph APPS[" 📦 Нативные службы OpenRC (Alpine) / Docker Compose "]
+            NAVI["🎵 Navidrome (music.lan)"]
+            VW["🔑 Vaultwarden (vault.lan)"]
+            GIT["🐙 Forgejo / Gitea (git.lan)"]
+            QBIT["📥 qBittorrent VueTorrent (torrent.lan)"]
+            METUBE["📥 MeTube / ytdlp-web (metube.lan)"]
+            SMB["📂 Samba NAS (\\IP\storage и \music)"]
         end
     end
 
     subgraph INTERNET[" 🌐 Внешний интернет "]
-        DIRECT_NET["🇷🇺 Прямой канал ISP (до 1 Гбит/с)<br/>• Госуслуги, Банки, VK, Ozon, WB, P2P Торренты, Steam игры"]
-        PROXY_NET["🌍 Зарубежный туннель (VLESS / Reality / SS / Hysteria2)<br/>• OpenAI ChatGPT, Claude, Gemini (US-AUTO)<br/>• YouTube 4K, Discord Voice, X, Instagram, Steam Community"]
+        DIRECT_NET["🇷🇺 Провайдер ISP (до 1 Гбит/с, MAC Спуфинг)<br/>• Госуслуги, Банки, VK, Ozon, P2P Торренты, Steam игры"]
+        PROXY_NET["🌍 Зарубежный туннель (VLESS / Reality / Trojan / Shadowsocks)<br/>• ChatGPT, Claude, Gemini (AI-Services)<br/>• YouTube 4K, Discord Voice, X, Instagram, Steam Community"]
     end
 
     TV -->|"DNS :53"| NFT
     PC -->|"DNS :53"| NFT
     PHONE -->|"DNS :53"| NFT
-    CONSOLE -->|"DNS :53"| NFT
     NFT --> AGH
-    AGH -->|"Upstream :1053"| MIHOMO
+    AGH -->|"Upstream :9090 TUN"| SINGBOX
     
     TV -->|"Трафик LAN"| NFT
     PC -->|"Трафик LAN"| NFT
     PHONE -->|"Трафик LAN"| NFT
-    CONSOLE -->|"Трафик LAN"| NFT
-    NFT --> MIHOMO
+    NFT --> SINGBOX
 
-    MIHOMO -->|"DIRECT (.ru / GEOIP RU / P2P / Steam CDN)"| DIRECT_NET
-    MIHOMO -->|"PROXY (US-AUTO / YouTube / Discord / Blocked)"| PROXY_NET
+    SINGBOX -->|"DIRECT (.ru / GEOIP RU / P2P / Steam CDN)"| DIRECT_NET
+    SINGBOX -->|"PROXY (AUTO / YouTube / Discord / Blocked)"| PROXY_NET
 
     PC -->|"HTTP :80 / HTTPS :443"| CADDY
     PHONE -->|"HTTP :80 / HTTPS :443"| CADDY
@@ -145,19 +158,18 @@ flowchart TD
 
 ## 🌐 Каталог встроенных веб-сервисов
 
-Сервер полностью готов к работе сразу после завершения работы установщика:
+Сервер полностью готов к работе сразу после завершения установки:
 
 | Служба | Локальный домен | Назначение | Доступ / Авторизация |
 | :--- | :--- | :--- | :--- |
 | **Портал навигации** | `http://<IP-сервера>/` | Главный дашборд со ссылками на все службы и кнопкой скачивания Root CA | Открытый (LAN) |
 | **Navidrome Music** | `https://music.lan` | Музыкальный Hi-Fi стриминг (OpenSubsonic API, тексты песен, обложки) | Создание админа при первом входе |
-| **MeTube Downloader** | `https://metube.lan` | Загрузка видео и аудио с YouTube, VK, RuTube, TikTok (ночной yt-dlp) | Открытый (LAN) |
-| **AdGuard Home** | `https://adguard.lan` | Панель DNS-сервера, статистика блокировок, белые/черные списки | `admin` / Мастер-пароль |
-| **Mihomo Web UI** | `https://proxy.lan` | Панель MetaCubeXD: задержки нод, переключение прокси, объем трафика | Секрет (Мастер-пароль) |
+| **MeTube / yt-dlp** | `https://metube.lan` | Загрузка видео и аудио с YouTube, VK, RuTube, TikTok (yt-dlp) | Открытый (LAN) |
+| **AdGuard Home** | `https://adguard.lan` | Панель DNS-сервера, статистика блокировок, белые/черные списки, DHCP | `admin` / Мастер-пароль |
+| **sing-box Web UI** | `https://proxy.lan` | Панель MetaCubeXD: Clash API `:9090`, пинг нод, выбор прокси, трафик | Секрет (Мастер-пароль) |
 | **Vaultwarden** | `https://vault.lan` | Персональный менеджер паролей (совместим с приложениями Bitwarden) | Личная регистрация + `/admin` токен |
-| **Gitea** | `https://git.lan` | Персональный Git-сервер (SSH порт `2222`, веб-интерфейс, Webhooks) | `admin` / Мастер-пароль |
+| **Forgejo / Gitea** | `https://git.lan` | Персональный Git-сервер (SSH порт `2222`, веб-интерфейс, Webhooks) | `admin` / Мастер-пароль |
 | **qBittorrent** | `https://torrent.lan` | Торрент-клиент с интерфейсом **VueTorrent** и прямым P2P-выходом | `admin` / Мастер-пароль |
-| **Dozzle Logs** | `https://logs.lan` | Просмотр живых логов всех Docker-контейнеров в реальном времени | `admin` / Мастер-пароль |
 | **Samba (Хранилище)** | `\\<IP>\storage` | Сетевая папка Windows / Mac / Android TV (авто-дискавери WSDD2) | `admin` / Мастер-пароль |
 | **Samba (Медиатека)** | `\\<IP>\music` | Прямой доступ к медиатеке Navidrome для закидывания треков с ПК | `admin` / Мастер-пароль |
 
@@ -168,20 +180,19 @@ flowchart TD
 ## 🚀 Быстрый старт: Установка в 1 команду
 
 ### Системные требования:
-* **Поддерживаемые ОС:** Debian 12/13, Ubuntu 24.04/26.04 LTS, Arch Linux, Alpine Linux v3.19+ (OpenRC).
+* **Поддерживаемые ОС:** Alpine Linux v3.19+ (рекомендуется для минимального потребления памяти), Debian 12/13, Ubuntu 24.04/26.04 LTS, Arch Linux.
 * **Архитектура процессора:** `x86_64` (Intel/AMD) или `aarch64` (ARM64, Raspberry Pi 4/5, Orange Pi).
-* **ОЗУ:** от **1 ГБ** (установщик автоматически подключает легковесный zRAM-своп с компрессией `zstd`).
+* **ОЗУ:** от **512 МБ** на Alpine Linux Bare-Metal! (На Debian/Ubuntu рекомендуется от 1–2 ГБ).
 * **Права:** `root` (или запуск через `sudo`).
 
 ### Запуск установщика:
-Выполните одну команду в терминале вашего сервера:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/unknownpeace/Medal/main/install.sh | sudo bash
 ```
 
 > [!TIP]
-> **Для минимальной Alpine Linux:** Если на чистом Alpine отсутствует `curl`, установите его либо запустите установщик через стандартный `wget`:
+> **Для чистой Alpine Linux:** Если в базовом образе отсутствует `curl` и `bash`, установите их одной командой:
 > ```bash
 > apk add --no-cache curl bash
 > curl -fsSL https://raw.githubusercontent.com/unknownpeace/Medal/main/install.sh | bash
@@ -189,44 +200,47 @@ curl -fsSL https://raw.githubusercontent.com/unknownpeace/Medal/main/install.sh 
 
 ---
 
-## ⚡ Наблюдаемость и Профайлер (v2.8.16)
+## ⚙️ Управление MAC-адресом провайдера (`homelab mac`)
 
-В релизе **v2.8.16** комплекс оснащен промышленной системой логирования, профилирования и сбора аварийных дампов:
+Если ваш провайдер использует привязку по MAC-адресу (MAC binding):
 
-### 1. Двухуровневый логгер ядра (`install.log`)
-* Полный технический журнал развертывания и обновлений непрерывно пишется в:
-  * `/var/log/homelab-install.log`
-  * Симлинк: `/opt/homelab/install.log`
-* Все сообщения форматируются с микросекундными таймштампами `[YYYY-MM-DD HH:MM:SS] [LEVEL]`, при этом ANSI-цвета очищаются для чистоты файла.
-* Предыдущий лог автоматически сохраняется в `.prev` при каждом запуске.
+```bash
+# 1. Посмотреть текущий аппаратный и настроенный MAC:
+homelab mac
 
-### 2. Встроенный Step Profiler & Bottleneck Detector
-* Установщик замеряет точную длительность каждого из 11 этапов развертывания с помощью системных таймеров `$SECONDS`.
-* В конце выводится таблица таймингов с автоматической подсветкой самого долгого этапа (`[TOP 1 / УЗКОЕ МЕСТО]`), что позволяет мгновенно понять, куда уходит время:
-  ```text
-  ╭── ТАЙМИНГИ И ПРОФИЛИРОВАНИЕ РАЗВЕРТЫВАНИЯ ──────────────────────╮
-  │  • [01/11] УСТАНОВКА ЗАВИСИМОСТЕЙ И СТЕКА DOCKER    1 сек
-  │  • [02/11] ИНТЕЛЛЕКТУАЛЬНЫЙ АНАЛИЗ СЕТЕВОГО ОКРУЖЕНИЯ    3 сек
-  │  • [06/11] СТРУКТУРА КАТАЛОГОВ И ОПТИМИЗАЦИЯ ХРАНИЛИЩА  19 сек
-  │  • [10/11] РЕЗЕРВНОЕ КОПИРОВАНИЕ, СТАРТ И ИНИЦИАЛИЗАЦИЯ 97 сек [TOP 1 / УЗКОЕ МЕСТО]
-  ├─────────────────────────────────────────────────────────────────┤
-  │  ⚡ Общее время:       2 мин 50 сек (170 сек)
-  │  ✦ Журнал развертывания: /opt/homelab/install.log
-  ╰─────────────────────────────────────────────────────────────────╯
-  ```
+# 2. Установить MAC-адрес вашего старого роутера:
+homelab mac 00:11:22:33:44:55
+```
 
-### 3. Автоматический аварийный дамп (Crash Report)
-Если на сервере закончится память или пропадет интернет во время сборки, перехватчик `trap ERR` создаст структурированный Crash Report с полным снимком системы:
-* Номер строки и точная упавшая команда.
-* Стек вызовов функций (`FUNCNAME[*]`).
-* Состояние ОЗУ (`free -m`), свободное место на дисках (`df -h`), нагрузка (`uptime`).
-* Последние строки вывода фонового спиннера.
+Команда:
+* Мгновенно применяет новый MAC-адрес к физическому WAN-интерфейсу на лету.
+* Прописывает директиву `hwaddress ether <MAC>` в `/etc/network/interfaces` для сохранения после любых перезагрузок.
+* Корректно перезапускает сетевой стек.
 
 ---
 
-## 📱 Настройка роутера (1 действие для всего дома)
+## 🔄 Подписки sing-box: Любые форматы из коробки
 
-Когда скрипт завершит работу и выведет финальный дашборд:
+Встроенный конвертер подписок `update_singbox_sub.py`:
+1. Поддерживает ссылки провайдеров любого вида:
+   * **sing-box JSON** (нативные конфигурации с сотнями узлов).
+   * **Clash YAML** (автоматически извлекает узлы `proxies:`).
+   * **Base64 / Списки ссылок** (`vless://`, `trojan://`, `ss://`, `vmess://`).
+2. Автоматически внедряет:
+   * Балансировщик задержек `auto` типа `urltest` (выбирает самый быстрый узел каждые 5 минут).
+   * Селектор `PROXY` для ручного выбора страны/ноды.
+   * Выделенную группу `AI-Services` для стабильной работы нейросетей.
+3. Проверяет корректность сгенерированного конфига через `sing-box check` перед перезапуском сервиса.
+4. Обновляется автоматически раз в сутки через системный cron. Ручное обновление:
+   ```bash
+   /opt/homelab/scripts/update_singbox_sub.py
+   ```
+
+---
+
+## 📱 Настройка роутера (для Режима 1: Шлюз)
+
+Если комплекс работает в **Режиме 1 (Прозрачный шлюз)**:
 
 1. Откройте веб-панель управления вашего домашнего роутера (**Keenetic**, **MikroTik**, **ASUS**, **OpenWrt**, **TP-Link**).
 2. Перейдите в раздел **DHCP / Домашняя сеть (LAN)**.
@@ -235,7 +249,8 @@ curl -fsSL https://raw.githubusercontent.com/unknownpeace/Medal/main/install.sh 
    * **Первичный DNS-сервер (Primary DNS):** `IP-адрес вашего Homelab-сервера`
 4. Нажмите «Применить» и переподключите Wi-Fi на устройствах.
 
-**Готово!** С этого момента все ваши телевизоры, телефоны, ПК и консоли пользуются быстрым интернетом без рекламы и блокировок.
+> [!NOTE]
+> При работе в **Режиме 2 (Домашний роутер)** сервер подключается в разрыв: кабель провайдера в порт WAN, кабель к домашним устройствам/свитчу — в порт LAN. Настройки роутера на других устройствах менять не требуется!
 
 ---
 
@@ -257,7 +272,7 @@ curl -fsSL https://raw.githubusercontent.com/unknownpeace/Medal/main/install.sh 
 Аудиосервер **Navidrome** потребляет всего **~40 МБ ОЗУ** и совместим с открытым протоколом **OpenSubsonic API**.
 
 ### 🔄 Бесшовный конвейер музыки:
-1. **Скачивание через MeTube (`https://metube.lan`):** Вставьте ссылку на трек, плейлист или альбом из YouTube Music, VK, RuTube или SoundCloud — MeTube скачает аудио в максимальном качестве прямо в `/music`.
+1. **Скачивание через MeTube (`https://metube.lan`):** Вставьте ссылку на трек, плейлист или альбом из YouTube Music, VK, RuTube или SoundCloud — аудио скачается в максимальном качестве прямо в `/music`.
 2. **Lossless FLAC с торрентов:** Качайте альбомы через qBittorrent прямо в папку `\\<IP>\music`.
 3. **Копирование по сети:** Перетаскивайте аудиофайлы со своего ПК через проводник Windows или macOS Finder по Samba.
 
@@ -275,23 +290,6 @@ curl -fsSL https://raw.githubusercontent.com/unknownpeace/Medal/main/install.sh 
 
 ---
 
-## 🍪 Обход ограничений YouTube: Cookies в MeTube
-
-Для загрузки приватных плейлистов, контента 18+ и обхода защиты SABR в YouTube предусмотрено простое управление cookies:
-
-```bash
-# Интерактивная вставка cookies прямо в консоль:
-homelab cookies --paste
-
-# Либо загрузка готового файла cookies.txt:
-homelab cookies /путь/к/cookies.txt
-
-# Очистка сохраненных cookies:
-homelab cookies clear
-```
-
----
-
 ## 🛠️ Единая утилита управления `homelab`
 
 После установки на сервере доступна глобальная консольная утилита:
@@ -303,19 +301,19 @@ homelab [КОМАНДА] [ПАРАМЕТРЫ]
 ### Справочник команд:
 | Команда | Описание |
 | :--- | :--- |
-| `homelab status` | Дашборд состояния сервера, памяти, накопителей, nftables и контейнеров |
-| `homelab doctor` | Комплексная самодиагностика DNS (53), Fake-IP (1053), TUN, MSS и API |
+| `homelab status` | Интерактивный дашборд состояния сервера, памяти, накопителей, nftables и сервисов |
+| `homelab doctor` | Комплексная самодиагностика DNS (:53), sing-box TUN, Clash API (:9090), MSS и сети |
+| `homelab mac [MAC]` | Просмотр или установка MAC-адреса для провайдера (с персистентным сохранением) |
 | `homelab install-log [-f]` | Просмотр журнала развертывания и таймингов профайлера (с ключом `-f` в реалтайме) |
-| `homelab dump-logs [файл]` | Сборка логов всех контейнеров, системы и установщика в единый файл |
+| `homelab dump-logs [файл]` | Сборка логов всех сервисов, сетевого стека и установщика в единый архив |
 | `homelab upgrade [--force]`| Бесшовное обновление ядра комплекса из GitHub (OTA In-Place Update) |
 | `homelab rollback` | Мгновенный откат к предыдущей версии ядра из снимка восстановления |
 | `homelab version` | Проверка установленной версии ядра и наличия новых релизов на GitHub |
-| `homelab restart [сервис]` | Перезапуск всего комплекса или отдельного контейнера (`mihomo`, `caddy`, `metube`...) |
+| `homelab restart [сервис]` | Перезапуск всего комплекса или отдельной службы (`sing-box`, `caddy`, `vaultwarden`...) |
 | `homelab logs [сервис] -f` | Просмотр живых логов службы в терминале в реальном времени |
-| `homelab backup` | Мгновенный горячий бэкап баз данных SQLite (Vaultwarden, Gitea) |
-| `homelab cookies [файл]` | Управление cookies YouTube для MeTube (yt-dlp) |
+| `homelab backup` | Мгновенный горячий бэкап баз данных SQLite (Vaultwarden, Forgejo, Navidrome) |
+| `homelab cookies [файл]` | Управление cookies YouTube для загрузчика видео |
 | `homelab notify [текст]` | Отправка тестового оповещения в Telegram |
-| `homelab update` | Безопасное обновление всех Docker-образов комплекса до latest |
 | `homelab unlock` | Ручная разблокировка шифрованного диска LUKS2 |
 
 ---
@@ -326,23 +324,23 @@ homelab [КОМАНДА] [ПАРАМЕТРЫ]
 
 ```text
 .
-├── VERSION                   # 🏷️ Версия релиза комплекса (например, 2.8.16)
+├── VERSION                   # 🏷️ Версия релиза комплекса (3.0.0)
 ├── build.sh                  # 🔨 Компилятор/бандлер (собирает src/*.sh в install.sh)
 ├── install.sh                # 🚀 Готовый автономный установщик (для развертывания в 1 команду)
 ├── README.md                 # 📖 Документация проекта
 └── src/                      # 📂 Исходные модули комплекса:
     ├── 00_header.sh          # Палитра цветов, логгер install.log, спиннер run_spin, crash-dump
     ├── 01_system.sh          # Баннер, детекция CPU/RAM/OS, синхронизация времени
-    ├── 02_packages.sh        # Пакетный менеджер, Docker CE (зеркала РФ), zRAM
-    ├── 03_network.sh         # Анализ сети (IP, шлюз, подсеть, интерфейс)
-    ├── 04_config.sh          # Интерактивный мастер настроек (Express / Custom / Reset)
-    ├── 05_gateway.sh         # Твики ядра (sysctl, BBR), nftables (inet homelab), watchdog
-    ├── 06_directories.sh     # Создание каталогов, No-COW (+C), предзагрузка MRS-правил и UI
+    ├── 02_packages.sh        # Пакетный менеджер: нативные APK на Alpine, Docker CE на Debian/Ubuntu
+    ├── 03_network.sh         # Анализ сети: обнаружение всех физических интерфейсов
+    ├── 04_config.sh          # Мастер настроек: выбор Режима 1/2, WAN/LAN, ISP MAC, подсети
+    ├── 05_gateway.sh         # Твики ядра, MAC-спуфинг, nftables (dual-mode NAT), watchdog
+    ├── 06_directories.sh     # Создание каталогов, No-COW (+C), предзагрузка UI и правил
     ├── 07_dns_bench.sh       # Параллельный DoH/DoT бенчмарк апстримов с гео-приоритетом
-    ├── 08_services_conf.sh   # Генерация AdGuardHome.yaml (Schema 34+) и mihomo/config.yaml
-    ├── 09_compose_caddy.sh   # Генерация Caddyfile (с лендингом и CA) и compose.yaml
-    ├── 10_backups_cli.sh     # Служба авто-бэкапов, homelab CLI, doctor и install-log
-    └── 11_diagnostics.sh     # Самодиагностика, показ профилирования и итоговый дашборд
+    ├── 08_services_conf.sh   # Конфиги AdGuard Home (Safe DHCP) и sing-box sub updater
+    ├── 09_compose_caddy.sh   # Caddyfile (SSL/CA), OpenRC сервисы (Alpine) и compose.yaml (Debian)
+    ├── 10_backups_cli.sh     # Служба авто-бэкапов, homelab CLI (doctor, mac, status)
+    └── 11_diagnostics.sh     # Самодиагностика, вывод топологии сети и итоговый дашборд
 ```
 
 ### Как разрабатывать и вносить изменения:
@@ -363,9 +361,8 @@ homelab [КОМАНДА] [ПАРАМЕТРЫ]
 
 ## 💾 Оптимизация дискового пространства и баз данных
 
-* **Btrfs No-COW (`chattr +C`):** На файловых системах Btrfs скрипт автоматически отключает Copy-on-Write на каталогах баз данных SQLite (Vaultwarden, Gitea, AdGuard Home) и папке загрузок qBittorrent. Это исключает фрагментацию и бережет ресурс SSD.
+* **Btrfs No-COW (`chattr +C`):** На файловых системах Btrfs скрипт автоматически отключает Copy-on-Write на каталогах баз данных SQLite (Vaultwarden, Forgejo, AdGuard Home) и папке загрузок qBittorrent. Это исключает фрагментацию и бережет ресурс SSD.
 * **Шифрование LUKS2 с Argon2id:** В кастомном режиме поддерживается создание защищенного блочного раздела (`cryptsetup luksFormat --type luks2 --pbkdf argon2id`) с утилитой ручной и автоматической разблокировки.
-* **Ротация логов Docker:** Для защиты от переполнения диска в `/etc/docker/daemon.json` включена ротация (`max-size: 10m`, `max-file: 3`), а системный журнал `systemd-journald` ограничен до 100 МБ.
 * **Горячие резервные копии:** Каждую ночь создаются онлайн-снимки баз данных через потоковый SQLite Backup API со складированием архивов в защищённую директорию хранилища с ротацией 14 дней.
 
 ---

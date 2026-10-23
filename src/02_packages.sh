@@ -4,12 +4,7 @@
 # =============================================================================
 
 install_pkgs() {
-    print_step_header "01/11" "УСТАНОВКА ЗАВИСИМОСТЕЙ И СТЕКА DOCKER"
-
-    if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1 && command -v nft >/dev/null 2>&1; then
-        log_ok "Системные зависимости и Docker CE уже установлены (пропуск в режиме обновления)"
-        return 0
-    fi
+    print_step_header "01/11" "УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ И ПАКЕТОВ СТЕКА"
 
     if [ "${DISTRO_FAMILY}" = "alpine" ]; then
         if [ -f /etc/apk/repositories ]; then
@@ -19,15 +14,35 @@ install_pkgs() {
                 mv /etc/apk/repositories.tmp /etc/apk/repositories 2>/dev/null || true
             fi
         fi
-        run_spin "Обновление индексов пакетов APK" apk update
+        run_spin "Обновление индексов пакетов APK" bash -c "apk update || apk update || true"
 
-        local ALP_PKGS=(bash python3 py3-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g \
-                        util-linux util-linux-misc lsblk curl openssl ca-certificates jq nftables apache2-utils \
-                        unzip tar sqlite argon2 iputils shadow procps e2fsprogs ffmpeg \
-                        docker docker-cli-compose chrony openrc)
-        run_spin "Установка системных пакетов Alpine" \
+        # Отключение устаревшего/избыточного Docker в пользу Native Bare-Metal Alpine
+        if command -v rc-service >/dev/null 2>&1 && rc-service docker status >/dev/null 2>&1; then
+            rc-service docker stop >/dev/null 2>&1 || true
+            rc-update del docker default >/dev/null 2>&1 || true
+        fi
+
+        local ALP_PKGS=(
+            bash python3 py3-bcrypt py3-aiohttp iproute2 cryptsetup btrfs-progs ntfs-3g \
+            util-linux util-linux-misc lsblk curl openssl ca-certificates jq nftables nftables-openrc apache2-utils \
+            unzip tar sqlite argon2 iputils shadow procps e2fsprogs ffmpeg \
+            chrony chrony-openrc openrc \
+            sing-box sing-box-openrc \
+            adguardhome adguardhome-openrc \
+            caddy caddy-openrc \
+            vaultwarden vaultwarden-openrc vaultwarden-web-vault \
+            forgejo forgejo-openrc \
+            samba samba-server-openrc wsdd wsdd-openrc \
+            qbittorrent-nox qbittorrent-nox-openrc \
+            navidrome navidrome-openrc \
+            yt-dlp
+        )
+        run_spin "Установка нативных пакетов Alpine Linux (Zero-Docker OpenRC)" \
             apk add --no-cache "${ALP_PKGS[@]}"
-        apk add --no-cache cryptsetup-openrc >/dev/null 2>&1 || true
+        apk add --no-cache cryptsetup-openrc chrony-openrc nftables-openrc >/dev/null 2>&1 || true
+
+        log_ok "Нативные сервисы Alpine Linux успешно установлены без использования Docker"
+        return 0
 
     elif [ "${DISTRO_FAMILY}" = "arch" ]; then
         local ARCH_PKGS=(python python-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g util-linux \
@@ -286,7 +301,8 @@ start() {
 }
 stop() {
     ebegin "Deactivating zRAM swap"
-    for zd in $(lsblk -lno NAME,TYPE 2>/dev/null | awk '$2=="zram"{print "/dev/"$1}'); do
+    for zd in /dev/zram* $(lsblk -lno NAME,TYPE 2>/dev/null | awk '$2=="zram"{print "/dev/"$1}'); do
+        [ -b "$zd" ] || continue
         swapoff "$zd" 2>/dev/null || true
         zramctl -r "$zd" 2>/dev/null || true
     done

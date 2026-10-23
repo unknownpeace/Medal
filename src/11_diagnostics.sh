@@ -32,67 +32,113 @@ EOF_DIAG
     echo -e "  ${CLR_CYAN}Проверка статуса запущенных сервисов и сетевых портов...${CLR_RESET}"
     echo ""
 
-    if docker info >/dev/null 2>&1; then
-        echo -e "    ${TAG_OK} Docker Daemon:           ${CLR_GREEN}[РАБОТАЕТ]${CLR_RESET}"
-        echo "Docker Daemon: OK" >> "${DIAG_LOG}"
-    else
-        echo -e "    ${TAG_ERR} Docker Daemon:           ${CLR_RED}[НЕ ОТВЕЧАЕТ]${CLR_RESET}"
-        echo "Docker Daemon: FAILED" >> "${DIAG_LOG}"
-        HAS_ISSUES=1
-    fi
+    if is_native; then
+        echo -e "    ${TAG_OK} OpenRC Init System:       ${CLR_GREEN}[АКТИВЕН (Native Bare-Metal)]${CLR_RESET}"
+        echo "Init System: OpenRC (Native Bare-Metal)" >> "${DIAG_LOG}"
 
-    declare -A EXPECTED_SERVICES
-    [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["adguardhome"]="AdGuard Home (DNS 53)"
-    [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["mihomo"]="Mihomo TUN (Ядро маршрутизации)"
-    [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["vaultwarden"]="Vaultwarden (Пароли)"
-    [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["gitea"]="Gitea (Git-сервер)"
-    [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["samba"]="Samba (Сетевой доступ)"
-    [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]    && EXPECTED_SERVICES["qbittorrent"]="qBittorrent (VueTorrent)"
-    [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]  && EXPECTED_SERVICES["metube"]="MeTube (Загрузка медиа)"
-    [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["navidrome"]="Navidrome Hi-Fi (Музыка)"
-    EXPECTED_SERVICES["caddy"]="Caddy Reverse Proxy"
-    EXPECTED_SERVICES["dozzle"]="Dozzle (Web Log Viewer)"
-    EXPECTED_SERVICES["watchtower"]="Watchtower (Автообновления)"
-    EXPECTED_SERVICES["autoheal"]="Autoheal (Самовосстановление)"
+        declare -A NATIVE_SERVICES
+        [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]] && NATIVE_SERVICES["sing-box"]="sing-box TUN (Маршрутизация)"
+        [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]] && NATIVE_SERVICES["adguardhome"]="AdGuard Home (DNS 53)"
+        [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]   && NATIVE_SERVICES["vaultwarden"]="Vaultwarden (Пароли)"
+        [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]   && NATIVE_SERVICES["forgejo"]="Forgejo (Git-сервер)"
+        [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]   && NATIVE_SERVICES["samba"]="Samba (Сетевой доступ)"
+        [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]   && NATIVE_SERVICES["wsdd"]="WSDD (Обнаружение)"
+        [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]    && NATIVE_SERVICES["qbittorrent-nox"]="qBittorrent (WebUI)"
+        [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]  && NATIVE_SERVICES["ytdlp-web"]="MeTube (yt-dlp WebUI)"
+        [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && NATIVE_SERVICES["navidrome"]="Navidrome Hi-Fi"
+        NATIVE_SERVICES["caddy"]="Caddy Reverse Proxy"
 
-    echo "" >> "${DIAG_LOG}"
-    echo "--- СТАТУС КОНТЕЙНЕРОВ DOCKER ---" >> "${DIAG_LOG}"
+        echo "" >> "${DIAG_LOG}"
+        echo "--- СТАТУС СЛУЖБ OPENRC (NATIVE BARE-METAL) ---" >> "${DIAG_LOG}"
 
-    for c_name in "${!EXPECTED_SERVICES[@]}"; do
-        local c_desc="${EXPECTED_SERVICES[$c_name]}"
-        local c_status="not_found"
+        for s_name in "${!NATIVE_SERVICES[@]}"; do
+            local s_desc="${NATIVE_SERVICES[$s_name]}"
+            local s_status="stopped"
 
-        for _ in {1..5}; do
-            c_status=$(docker inspect -f '{{.State.Status}}' "${c_name}" 2>/dev/null || echo "not_found")
-            [ "${c_status}" = "running" ] && break
-            sleep 1
+            for _ in {1..5}; do
+                if rc-service "${s_name}" status >/dev/null 2>&1; then
+                    s_status="running"
+                    break
+                fi
+                sleep 1
+            done
+
+            if [ "${s_status}" = "running" ]; then
+                printf "    ${TAG_OK} %-32s ${CLR_GREEN}[ОНЛАЙН / OpenRC]${CLR_RESET}\n" "${s_desc}"
+                echo "[OK] Service ${s_name} (${s_desc}): RUNNING (OpenRC)" >> "${DIAG_LOG}"
+            else
+                printf "    ${TAG_ERR} %-32s ${CLR_RED}[ОШИБКА: ОСТАНОВЛЕН]${CLR_RESET}\n" "${s_desc}"
+                echo "[FAIL] Service ${s_name} (${s_desc}): STOPPED" >> "${DIAG_LOG}"
+                HAS_ISSUES=1
+
+                echo "--- Логи / статус сервиса ${s_name}: ---" >> "${DIAG_LOG}"
+                rc-service "${s_name}" status >> "${DIAG_LOG}" 2>&1 || true
+                echo "--------------------------------------------------------" >> "${DIAG_LOG}"
+            fi
         done
-
-        local c_health
-        c_health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "${c_name}" 2>/dev/null || true)
-        local health_tag=""
-        if [ "$c_health" = "healthy" ]; then
-            health_tag=" / HEALTHY"
-        elif [ "$c_health" = "starting" ]; then
-            health_tag=" / ЗАПУСК"
-        elif [ "$c_health" = "unhealthy" ]; then
-            health_tag=" / СБОЙ"
-            HAS_ISSUES=1
-        fi
-
-        if [ "${c_status}" = "running" ] && [ "$c_health" != "unhealthy" ]; then
-            printf "    ${TAG_OK} %-32s ${CLR_GREEN}[ОНЛАЙН%s]${CLR_RESET}\n" "${c_desc}" "${health_tag}"
-            echo "[OK] Container ${c_name} (${c_desc}): RUNNING (Health: ${c_health:-none})" >> "${DIAG_LOG}"
+    else
+        if docker info >/dev/null 2>&1; then
+            echo -e "    ${TAG_OK} Docker Daemon:           ${CLR_GREEN}[РАБОТАЕТ]${CLR_RESET}"
+            echo "Docker Daemon: OK" >> "${DIAG_LOG}"
         else
-            printf "    ${TAG_ERR} %-32s ${CLR_RED}[ОШИБКА: %s%s]${CLR_RESET}\n" "${c_desc}" "${c_status}" "${health_tag}"
-            echo "[FAIL] Container ${c_name} (${c_desc}): STATUS=${c_status} (Health: ${c_health:-none})" >> "${DIAG_LOG}"
+            echo -e "    ${TAG_ERR} Docker Daemon:           ${CLR_RED}[НЕ ОТВЕЧАЕТ]${CLR_RESET}"
+            echo "Docker Daemon: FAILED" >> "${DIAG_LOG}"
             HAS_ISSUES=1
-
-            echo "--- Логи контейнера ${c_name} (последние 40 строк): ---" >> "${DIAG_LOG}"
-            docker logs --tail 40 "${c_name}" >> "${DIAG_LOG}" 2>&1 || true
-            echo "--------------------------------------------------------" >> "${DIAG_LOG}"
         fi
-    done
+
+        declare -A EXPECTED_SERVICES
+        [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["adguardhome"]="AdGuard Home (DNS 53)"
+        [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["mihomo"]="Mihomo TUN (Ядро маршрутизации)"
+        [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["vaultwarden"]="Vaultwarden (Пароли)"
+        [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["gitea"]="Gitea (Git-сервер)"
+        [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["samba"]="Samba (Сетевой доступ)"
+        [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]    && EXPECTED_SERVICES["qbittorrent"]="qBittorrent (VueTorrent)"
+        [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]  && EXPECTED_SERVICES["metube"]="MeTube (Загрузка медиа)"
+        [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["navidrome"]="Navidrome Hi-Fi (Музыка)"
+        EXPECTED_SERVICES["caddy"]="Caddy Reverse Proxy"
+        EXPECTED_SERVICES["dozzle"]="Dozzle (Web Log Viewer)"
+        EXPECTED_SERVICES["watchtower"]="Watchtower (Автообновления)"
+        EXPECTED_SERVICES["autoheal"]="Autoheal (Самовосстановление)"
+
+        echo "" >> "${DIAG_LOG}"
+        echo "--- СТАТУС КОНТЕЙНЕРОВ DOCKER ---" >> "${DIAG_LOG}"
+
+        for c_name in "${!EXPECTED_SERVICES[@]}"; do
+            local c_desc="${EXPECTED_SERVICES[$c_name]}"
+            local c_status="not_found"
+
+            for _ in {1..5}; do
+                c_status=$(docker inspect -f '{{.State.Status}}' "${c_name}" 2>/dev/null || echo "not_found")
+                [ "${c_status}" = "running" ] && break
+                sleep 1
+            done
+
+            local c_health
+            c_health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "${c_name}" 2>/dev/null || true)
+            local health_tag=""
+            if [ "$c_health" = "healthy" ]; then
+                health_tag=" / HEALTHY"
+            elif [ "$c_health" = "starting" ]; then
+                health_tag=" / ЗАПУСК"
+            elif [ "$c_health" = "unhealthy" ]; then
+                health_tag=" / СБОЙ"
+                HAS_ISSUES=1
+            fi
+
+            if [ "${c_status}" = "running" ] && [ "$c_health" != "unhealthy" ]; then
+                printf "    ${TAG_OK} %-32s ${CLR_GREEN}[ОНЛАЙН%s]${CLR_RESET}\n" "${c_desc}" "${health_tag}"
+                echo "[OK] Container ${c_name} (${c_desc}): RUNNING (Health: ${c_health:-none})" >> "${DIAG_LOG}"
+            else
+                printf "    ${TAG_ERR} %-32s ${CLR_RED}[ОШИБКА: %s%s]${CLR_RESET}\n" "${c_desc}" "${c_status}" "${health_tag}"
+                echo "[FAIL] Container ${c_name} (${c_desc}): STATUS=${c_status} (Health: ${c_health:-none})" >> "${DIAG_LOG}"
+                HAS_ISSUES=1
+
+                echo "--- Логи контейнера ${c_name} (последние 40 строк): ---" >> "${DIAG_LOG}"
+                docker logs --tail 40 "${c_name}" >> "${DIAG_LOG}" 2>&1 || true
+                echo "--------------------------------------------------------" >> "${DIAG_LOG}"
+            fi
+        done
+    fi
 
     echo ""
     echo -e "  ${CLR_CYAN}Проверка сетевых функций шлюза и прав доступа...${CLR_RESET}"
@@ -115,6 +161,20 @@ EOF_DIAG
         fi
         echo -e "    ${TAG_OK} Фаервол и NAT:            ${CLR_GREEN}[${FW_STATUS}]${CLR_RESET}"
         echo "Firewall status: ${FW_STATUS}" >> "${DIAG_LOG}"
+
+        if ip link show dev tun0 >/dev/null 2>&1; then
+            echo -e "    ${TAG_OK} TUN Интерфейс (tun0):      ${CLR_GREEN}[АКТИВЕН]${CLR_RESET}"
+            echo "TUN Interface (tun0): ACTIVE" >> "${DIAG_LOG}"
+        else
+            echo -e "    ${TAG_WARN} TUN Интерфейс (tun0):      ${CLR_YELLOW}[ОЖИДАНИЕ ИНИЦИАЛИЗАЦИИ]${CLR_RESET}"
+            echo "TUN Interface (tun0): PENDING" >> "${DIAG_LOG}"
+        fi
+
+        if [ "${ROUTER_MODE:-1}" = "2" ]; then
+            echo -e "    ${TAG_OK} Режим маршрутизатора:     ${CLR_GREEN}[АКТИВЕН (WAN: ${WAN_IFACE}, LAN: ${LAN_IFACE})]${CLR_RESET}"
+            [ -n "${WAN_MAC:-}" ] && echo -e "    ${TAG_OK} Клонированный WAN MAC:      ${CLR_GREEN}[${WAN_MAC}]${CLR_RESET}"
+            echo "Router Mode: 2 (WAN: ${WAN_IFACE}, LAN: ${LAN_IFACE}, MAC: ${WAN_MAC:-default})" >> "${DIAG_LOG}"
+        fi
     fi
 
     local DNS_TEST=0
@@ -200,9 +260,24 @@ show_summary_dashboard() {
 
     echo -e "  ${CLR_NEON_PURPLE}╭── СЕТЕВОЙ ШЛЮЗ И МАРШРУТИЗАЦИЯ (RUSSIA PRO 2026) ──────────────────────────╮${CLR_RESET}"
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
+        if [ "${ROUTER_MODE:-1}" = "2" ]; then
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Архитектура сети:${CLR_RESET}            ${CLR_NEON_GREEN}ПОЛНОЦЕННЫЙ ДОМАШНИЙ РОУТЕР (WAN + LAN)${CLR_RESET}"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ WAN (Провайдер):${CLR_RESET}             ${CLR_NEON_CYAN}${WAN_IFACE}${CLR_RESET} $([ -n "${WAN_MAC:-}" ] && echo -e "${CLR_NEON_GOLD}(Клонирован MAC: ${WAN_MAC})${CLR_RESET}")"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ LAN (Локальная сеть):${CLR_RESET}        ${CLR_NEON_CYAN}${LAN_IFACE}${CLR_RESET} (IP: ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET})"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ AdGuard Home DHCP:${CLR_RESET}           ${CLR_NEON_GREEN}АКТИВЕН (Пул: 192.168.1.50 - 192.168.1.250)${CLR_RESET}"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Защита роутеров:${CLR_RESET}             ${CLR_NEON_GREEN}192.168.1.1 (OpenWrt) и 192.168.1.5 (Keenetic) ИСКЛЮЧЕНЫ${CLR_RESET}"
+        else
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Архитектура сети:${CLR_RESET}            ${CLR_NEON_GREEN}ПРОЗРАЧНЫЙ ШЛЮЗ (1 сетевой интерфейс: ${DEFAULT_IFACE})${CLR_RESET}"
+        fi
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Портал навигации по IP:${CLR_RESET}      ${CLR_NEON_GREEN}http://${LOCAL_IP}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ AdGuard Home (DNS & AdBlock):${CLR_RESET}    ${CLR_NEON_CYAN}https://${ADGUARD_DOMAIN}${CLR_RESET}"
-        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Mihomo Smart Routing UI:${CLR_RESET}         ${CLR_NEON_CYAN}https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET}${CLR_RESET}"
+        if is_native; then
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ sing-box Smart Routing UI:${CLR_RESET}   ${CLR_NEON_CYAN}https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET}${CLR_RESET}"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Ядро маршрутизации:${CLR_RESET}          ${CLR_NEON_GREEN}sing-box TUN (Native Alpine, clash_api :9090)${CLR_RESET}"
+        else
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Mihomo Smart Routing UI:${CLR_RESET}         ${CLR_NEON_CYAN}https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET}${CLR_RESET}"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Ядро маршрутизации:${CLR_RESET}          ${CLR_NEON_GREEN}Mihomo TUN (Docker container)${CLR_RESET}"
+        fi
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Секрет API панели управления:${CLR_RESET}    ${CLR_NEON_GOLD}${MIHOMO_SECRET}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Госуслуги, банки и сервисы РФ:${CLR_RESET}   ${CLR_NEON_GREEN}100% ПРЯМОЙ ДОСТУП (DIRECT, без капч и задержек)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Маршрутизация YouTube & Media:${CLR_RESET}  ${CLR_NEON_GREEN}АКТИВНА (Туннелирование -> AUTO / PROXY)${CLR_RESET}"
@@ -227,7 +302,9 @@ show_summary_dashboard() {
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Панель администратора:${CLR_RESET}           ${CLR_NEON_CYAN}https://${VAULT_DOMAIN}/admin${CLR_RESET}"
     fi
     if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Gitea (Git-сервер):${CLR_RESET}              ${CLR_NEON_CYAN}https://${GITEA_DOMAIN}${CLR_RESET} ${CLR_DIM}(SSH порт: 2222)${CLR_RESET}"
+        local GIT_LABEL="Gitea"
+        is_native && GIT_LABEL="Forgejo"
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ ${GIT_LABEL} (Git-сервер):${CLR_RESET}              ${CLR_NEON_CYAN}https://${GITEA_DOMAIN}${CLR_RESET} ${CLR_DIM}(SSH порт: 2222)${CLR_RESET}"
     fi
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ qBittorrent (VueTorrent):${CLR_RESET}        ${CLR_NEON_CYAN}https://${TORRENT_DOMAIN}${CLR_RESET}"
@@ -240,7 +317,9 @@ show_summary_dashboard() {
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_DIM}    (Администратор создается в веб-панели при первом входе)${CLR_RESET}"
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_DIM}    (Клиенты: Symfonium для Android / Substreamer для iOS / Feishin для ПК)${CLR_RESET}"
     fi
-    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Dozzle (Логи контейнеров):${CLR_RESET}       ${CLR_NEON_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_DIM}(Авторизация: ${ADMIN_USER})${CLR_RESET}"
+    if ! is_native; then
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Dozzle (Логи контейнеров):${CLR_RESET}       ${CLR_NEON_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_DIM}(Авторизация: ${ADMIN_USER})${CLR_RESET}"
+    fi
     echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 
@@ -298,26 +377,43 @@ show_summary_dashboard() {
     echo -e "  ${CLR_NEON_PURPLE}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 
-    echo -e "  ${CLR_NEON_GREEN}╭── НАСТРОЙКА ДОМАШНЕГО РОУТЕРА (1 ДЕЙСТВИЕ ДЛЯ ВСЕЙ СЕТИ) ──────────────────╮${CLR_RESET}"
-    echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}В параметрах DHCP вашего роутера укажите:${CLR_RESET}"
-    echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}• Первичный DNS-сервер:${CLR_RESET}            ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET}"
-    if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}• Основной шлюз (Gateway):${CLR_RESET}         ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET}"
+    if [ "${ROUTER_MODE:-1}" = "2" ]; then
+        echo -e "  ${CLR_NEON_GREEN}╭── РЕЖИМ МАРШРУТИЗАТОРА (ДОМАШНИЙ РОУТЕР) ─────────────────────────────────╮${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}Кабель провайдера подключен в:${CLR_RESET}   ${CLR_NEON_GREEN}${WAN_IFACE}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}Локальная сеть подключена в:${CLR_RESET}     ${CLR_NEON_GREEN}${LAN_IFACE}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}IP-адрес шлюза (сервера):${CLR_RESET}        ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}AdGuard Home DHCP:${CLR_RESET}               ${CLR_NEON_GREEN}Выдает IP автоматически (192.168.1.50 - .250)${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_DIM}Роутеры OpenWrt (192.168.1.1) и Keenetic (192.168.1.5) защищены от коллизий!${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
+    else
+        echo -e "  ${CLR_NEON_GREEN}╭── НАСТРОЙКА ДОМАШНЕГО РОУТЕРА (1 ДЕЙСТВИЕ ДЛЯ ВСЕЙ СЕТИ) ──────────────────╮${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}В параметрах DHCP вашего роутера укажите:${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}• Первичный DNS-сервер:${CLR_RESET}            ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET}"
+        if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
+            echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}• Основной шлюз (Gateway):${CLR_RESET}         ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET}"
+        fi
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_DIM}После этого все смартфоны, ПК и Smart TV в сети сразу получат фильтрацию${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_DIM}рекламы, доступ к локальным *.lan доменам и интеллектуальную маршрутизацию!${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     fi
-    echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_DIM}После этого все смартфоны, ПК и Smart TV в сети сразу получат фильтрацию${CLR_RESET}"
-    echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_DIM}рекламы, доступ к локальным *.lan доменам и интеллектуальную маршрутизацию!${CLR_RESET}"
-    echo -e "  ${CLR_NEON_GREEN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 
     echo -e "  ${CLR_NEON_CYAN}╭── ЕДИНАЯ КОНСОЛЬНАЯ УТИЛИТА УПРАВЛЕНИЯ (HOMELAB CLI) ───────────────────────╮${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Статус и дашборд:${CLR_RESET}            ${CLR_NEON_GREEN}homelab status${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Полная самодиагностика:${CLR_RESET}      ${CLR_NEON_GREEN}homelab doctor${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Клонирование / статус MAC:${CLR_RESET}   ${CLR_NEON_GREEN}homelab mac [новый_mac]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журналы сервисов в реалтайме:${CLR_RESET} ${CLR_NEON_GREEN}homelab logs [сервис] -f${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Экспорт всех логов в файл:${CLR_RESET}   ${CLR_NEON_GREEN}homelab dump-logs${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Перезапуск стека/сервиса:${CLR_RESET}    ${CLR_NEON_GREEN}homelab restart [сервис]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Горячий бэкап баз данных:${CLR_RESET}    ${CLR_NEON_GREEN}homelab backup${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Тестовое оповещение в TG:${CLR_RESET}    ${CLR_NEON_GREEN}homelab notify [текст]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Управление cookies YouTube:${CLR_RESET}  ${CLR_NEON_GREEN}homelab cookies [файл]${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журнал развертывания ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab install-log [-f]${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Безопасный апдейт образов:${CLR_RESET}   ${CLR_NEON_GREEN}homelab update${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Бесшовный апгрейд ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab upgrade${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Проверка версии и обновлений:${CLR_RESET} ${CLR_NEON_GREEN}homelab version${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
+    echo ""
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журнал развертывания ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab install-log [-f]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Безопасный апдейт образов:${CLR_RESET}   ${CLR_NEON_GREEN}homelab update${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Бесшовный апгрейд ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab upgrade${CLR_RESET}"

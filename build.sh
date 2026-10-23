@@ -1,8 +1,26 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # ==============================================================================
 # BUNDLER / COMPILER FOR HOMELAB INSTALLER
 # Собирает модули из src/*.sh в единый монолитный install.sh для однострочной установки
 # ==============================================================================
+
+# Self-bootstrap into bash if started under /bin/sh on Alpine / Debian
+if [ -z "${BASH_VERSION:-}" ]; then
+    if command -v bash >/dev/null 2>&1; then
+        exec bash "$0" "$@"
+    else
+        echo "[*] Bash required for build.sh, installing..." >&2
+        if command -v apk >/dev/null 2>&1; then
+            apk add --no-cache bash
+        elif command -v apt-get >/dev/null 2>&1; then
+            apt-get update -y && apt-get install -y bash
+        elif command -v pacman >/dev/null 2>&1; then
+            pacman -Sy --noconfirm bash
+        fi
+        exec bash "$0" "$@"
+    fi
+fi
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

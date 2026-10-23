@@ -10,6 +10,11 @@ save_configuration() {
         printf "SAVED_LOCAL_IP=%q\n" "${LOCAL_IP}"
         printf "SAVED_ROUTER_GATEWAY=%q\n" "${ROUTER_GATEWAY}"
         printf "SAVED_LAN_SUBNET=%q\n" "${LAN_SUBNET}"
+        printf "SAVED_ROUTER_MODE=%q\n" "${ROUTER_MODE:-1}"
+        printf "SAVED_WAN_IFACE=%q\n" "${WAN_IFACE:-}"
+        printf "SAVED_LAN_IFACE=%q\n" "${LAN_IFACE:-}"
+        printf "SAVED_WAN_MAC=%q\n" "${WAN_MAC:-}"
+        printf "SAVED_LAN_IP=%q\n" "${LAN_IP:-}"
         printf "SAVED_ENABLE_GATEWAY=%q\n" "${ENABLE_GATEWAY}"
         printf "SAVED_ENABLE_VAULT=%q\n" "${ENABLE_VAULT}"
         printf "SAVED_ENABLE_GITEA=%q\n" "${ENABLE_GITEA}"
@@ -37,7 +42,7 @@ save_configuration() {
         printf "SAVED_VAULT_DOMAIN=%q\n" "${VAULT_DOMAIN}"
         printf "SAVED_GITEA_DOMAIN=%q\n" "${GITEA_DOMAIN}"
         printf "SAVED_ADGUARD_DOMAIN=%q\n" "${ADGUARD_DOMAIN}"
-        printf "SAVED_TORRENT_DOMAIN=%q\n" "${TORRENT_DOMAIN}"
+        printf "TORRENT_DOMAIN=%q\n" "${TORRENT_DOMAIN}"
         printf "SAVED_PROXY_DOMAIN=%q\n" "${PROXY_DOMAIN}"
         printf "SAVED_VAULT_DATA_DIR=%q\n" "${VAULT_DATA_DIR}"
         printf "SAVED_GITEA_DATA_DIR=%q\n" "${GITEA_DATA_DIR}"
@@ -290,6 +295,44 @@ prompt_configuration() {
             log_ok "Режим шлюза: DIRECT (чистая маршрутизация, без прокси)"
         else
             log_ok "Подписка сохранена"
+        fi
+
+        echo ""
+        echo -e "  ${CLR_CYAN}--- Сетевая топология и режим маршрутизации ---${CLR_RESET}"
+        echo -e "    ${CLR_GREEN}1) Прозрачный шлюз (1 сетевой адаптер)${CLR_RESET} [Enter] - работает рядом с текущими роутерами"
+        echo -e "    ${CLR_YELLOW}2) Домашний роутер (WAN + LAN)${CLR_RESET} - сервер заменяет роутер, NAT, DHCP, клонирование MAC провайдера"
+        DEF_RMODE="${SAVED_ROUTER_MODE:-1}"
+        prompt_read "  [?] Выберите режим сети [1/2] [${DEF_RMODE}]: " ROUTER_MODE
+        ROUTER_MODE=${ROUTER_MODE:-${DEF_RMODE}}
+
+        if [ "$ROUTER_MODE" = "2" ]; then
+            log_info "Выбран режим: Домашний маршрутизатор (WAN + LAN)"
+            DEF_WAN="${SAVED_WAN_IFACE:-${ALL_PHYS_IFACES[0]:-${DEFAULT_IFACE}}}"
+            prompt_read "  [?] WAN-интерфейс (кабель провайдера) [${DEF_WAN}]: " WAN_IFACE
+            WAN_IFACE=${WAN_IFACE:-${DEF_WAN}}
+
+            DEF_LAN="${SAVED_LAN_IFACE:-${ALL_PHYS_IFACES[1]:-eth1}}"
+            prompt_read "  [?] LAN-интерфейс (домашняя сеть / свитч) [${DEF_LAN}]: " LAN_IFACE
+            LAN_IFACE=${LAN_IFACE:-${DEF_LAN}}
+
+            DEF_MAC="${SAVED_WAN_MAC:-}"
+            [ -z "${DEF_MAC}" ] && DEF_MAC=$(cat "/sys/class/net/${WAN_IFACE}/address" 2>/dev/null || echo "")
+            echo -e "  ${CLR_WHITE}Клонирование MAC-адреса провайдера (привязка договора):${CLR_RESET}"
+            prompt_read "  [?] MAC-адрес WAN [Enter - ${DEF_MAC}]: " INPUT_MAC
+            WAN_MAC=${INPUT_MAC:-${DEF_MAC}}
+
+            DEF_LAN_IP="${SAVED_LAN_IP:-192.168.10.1}"
+            prompt_read "  [?] IP-адрес сервера в LAN [${DEF_LAN_IP}]: " INPUT_LAN_IP
+            LAN_IP=${INPUT_LAN_IP:-${DEF_LAN_IP}}
+            LAN_SUBNET="$(echo "${LAN_IP}" | sed -E 's/\.[0-9]+$/\.0\/24/')"
+            LOCAL_IP="${LAN_IP}"
+        else
+            ROUTER_MODE="1"
+            WAN_IFACE=""
+            LAN_IFACE=""
+            WAN_MAC=""
+            LAN_IP="${LOCAL_IP}"
+            log_ok "Режим: Прозрачный сетевой шлюз (LAN адаптер: ${DEFAULT_IFACE}, IP: ${LOCAL_IP})"
         fi
 
         DEF_ADMIN_USER="${SAVED_ADMIN_USER:-${TARGET_USER}}"
@@ -654,6 +697,44 @@ EOF_UNLOCK
                 log_ok "Режим шлюза: DIRECT (чистая маршрутизация, без прокси)"
             else
                 log_ok "Подписка сохранена"
+            fi
+
+            echo ""
+            echo -e "  ${CLR_CYAN}--- Сетевая топология и режим маршрутизации ---${CLR_RESET}"
+            echo -e "    ${CLR_GREEN}1) Прозрачный шлюз (1 сетевой адаптер)${CLR_RESET} [Enter] - работает рядом с текущими роутерами"
+            echo -e "    ${CLR_YELLOW}2) Домашний роутер (WAN + LAN)${CLR_RESET} - сервер заменяет роутер, NAT, DHCP, клонирование MAC провайдера"
+            DEF_RMODE="${SAVED_ROUTER_MODE:-1}"
+            prompt_read "  [?] Выберите режим сети [1/2] [${DEF_RMODE}]: " ROUTER_MODE
+            ROUTER_MODE=${ROUTER_MODE:-${DEF_RMODE}}
+
+            if [ "$ROUTER_MODE" = "2" ]; then
+                log_info "Выбран режим: Домашний маршрутизатор (WAN + LAN)"
+                DEF_WAN="${SAVED_WAN_IFACE:-${ALL_PHYS_IFACES[0]:-${DEFAULT_IFACE}}}"
+                prompt_read "  [?] WAN-интерфейс (кабель провайдера) [${DEF_WAN}]: " WAN_IFACE
+                WAN_IFACE=${WAN_IFACE:-${DEF_WAN}}
+
+                DEF_LAN="${SAVED_LAN_IFACE:-${ALL_PHYS_IFACES[1]:-eth1}}"
+                prompt_read "  [?] LAN-интерфейс (домашняя сеть / свитч) [${DEF_LAN}]: " LAN_IFACE
+                LAN_IFACE=${LAN_IFACE:-${DEF_LAN}}
+
+                DEF_MAC="${SAVED_WAN_MAC:-}"
+                [ -z "${DEF_MAC}" ] && DEF_MAC=$(cat "/sys/class/net/${WAN_IFACE}/address" 2>/dev/null || echo "")
+                echo -e "  ${CLR_WHITE}Клонирование MAC-адреса провайдера (привязка договора):${CLR_RESET}"
+                prompt_read "  [?] MAC-адрес WAN [Enter - ${DEF_MAC}]: " INPUT_MAC
+                WAN_MAC=${INPUT_MAC:-${DEF_MAC}}
+
+                DEF_LAN_IP="${SAVED_LAN_IP:-192.168.10.1}"
+                prompt_read "  [?] IP-адрес сервера в LAN [${DEF_LAN_IP}]: " INPUT_LAN_IP
+                LAN_IP=${INPUT_LAN_IP:-${DEF_LAN_IP}}
+                LAN_SUBNET="$(echo "${LAN_IP}" | sed -E 's/\.[0-9]+$/\.0\/24/')"
+                LOCAL_IP="${LAN_IP}"
+            else
+                ROUTER_MODE="1"
+                WAN_IFACE=""
+                LAN_IFACE=""
+                WAN_MAC=""
+                LAN_IP="${LOCAL_IP}"
+                log_ok "Режим: Прозрачный сетевой шлюз (LAN адаптер: ${DEFAULT_IFACE}, IP: ${LOCAL_IP})"
             fi
         fi
 

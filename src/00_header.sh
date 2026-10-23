@@ -373,6 +373,11 @@ yaml_escape() {
     python3 -c "import sys, json; print(json.dumps(sys.argv[1]))" "${str}" 2>/dev/null || printf '"%s"' "${str//\"/\\\"}"
 }
 
+is_native() {
+    [ -f /etc/alpine-release ] || [ "${OS_ID:-}" = "alpine" ]
+}
+export -f is_native 2>/dev/null || true
+
 APP_DIR="/opt/homelab"
 ENV_FILE="${APP_DIR}/.env"
 LUKS_MAP_NAME="homelab_secure_storage"
@@ -390,6 +395,13 @@ LOCAL_IP=""
 ROUTER_GATEWAY=""
 LAN_SUBNET=""
 INSTALL_MODE="1"
+
+ROUTER_MODE="1"
+WAN_IFACE=""
+LAN_IFACE=""
+WAN_MAC=""
+LAN_IP=""
+SINGBOX_SECRET=""
 
 ENABLE_GATEWAY="Y"
 ENABLE_VAULT="Y"
@@ -451,7 +463,7 @@ SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.16"
+HOMELAB_VERSION="3.0.0"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0

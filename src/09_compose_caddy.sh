@@ -44,6 +44,28 @@ configure_caddy_and_compose() {
     IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>📋 Dozzle Web Logs</span><a href=\"https://${LOGS_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${LOGS_DOMAIN}</a></li>"
 
+    local VAULT_UPSTREAM="127.0.0.1:8000"
+    local GITEA_UPSTREAM="127.0.0.1:3000"
+    local QBIT_UPSTREAM="127.0.0.1:8080"
+    local METUBE_UPSTREAM="127.0.0.1:8081"
+    local NAVI_UPSTREAM="127.0.0.1:4533"
+    local AGH_UPSTREAM="127.0.0.1:8083"
+    local PROXY_API_UPSTREAM="127.0.0.1:9090"
+    local CADDY_CERT_DIR="/var/lib/caddy/.local/share/caddy/pki/authorities/local"
+    local CADDY_UI_ROOT="${APP_DIR}/mihomo/ui"
+
+    if [ "${DISTRO_FAMILY}" != "alpine" ]; then
+        VAULT_UPSTREAM="vaultwarden:80"
+        GITEA_UPSTREAM="gitea:3000"
+        QBIT_UPSTREAM="qbittorrent:8080"
+        METUBE_UPSTREAM="metube:8081"
+        NAVI_UPSTREAM="navidrome:4533"
+        AGH_UPSTREAM="host.docker.internal:8083"
+        PROXY_API_UPSTREAM="host.docker.internal:9090"
+        CADDY_CERT_DIR="/data/caddy/pki/authorities/local"
+        CADDY_UI_ROOT="/srv/mihomo-ui"
+    fi
+
     cat <<EOF_CADDY > "${APP_DIR}/caddy/Caddyfile"
 {
     admin off
@@ -63,7 +85,7 @@ configure_caddy_and_compose() {
 http://${LOCAL_IP} {
     @cert path /caddy-root.crt /root.crt
     handle @cert {
-        root * /data/caddy/pki/authorities/local
+        root * ${CADDY_CERT_DIR}
         rewrite * /root.crt
         file_server
     }
@@ -125,7 +147,7 @@ EOF_CADDY
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @vault host ${VAULT_DOMAIN}
     handle @vault {
-        reverse_proxy vaultwarden:80
+        reverse_proxy ${VAULT_UPSTREAM}
     }
 EOF_CADDY
         fi
@@ -134,7 +156,7 @@ EOF_CADDY
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @gitea host ${GITEA_DOMAIN}
     handle @gitea {
-        reverse_proxy gitea:3000
+        reverse_proxy ${GITEA_UPSTREAM}
     }
 EOF_CADDY
         fi
@@ -143,7 +165,7 @@ EOF_CADDY
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @torrent host ${TORRENT_DOMAIN}
     handle @torrent {
-        reverse_proxy qbittorrent:8080
+        reverse_proxy ${QBIT_UPSTREAM}
     }
 EOF_CADDY
         fi
@@ -152,17 +174,16 @@ EOF_CADDY
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @metube host ${METUBE_DOMAIN} tube.${BASE_DOMAIN}
     handle @metube {
-        reverse_proxy metube:8081
+        reverse_proxy ${METUBE_UPSTREAM}
     }
 EOF_CADDY
         fi
-
 
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @music host ${MUSIC_DOMAIN}
     handle @music {
-        reverse_proxy navidrome:4533
+        reverse_proxy ${NAVI_UPSTREAM}
     }
 EOF_CADDY
         fi
@@ -171,7 +192,7 @@ EOF_CADDY
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @adguard host ${ADGUARD_DOMAIN}
     handle @adguard {
-        reverse_proxy host.docker.internal:8083
+        reverse_proxy ${AGH_UPSTREAM}
     }
 
     @proxy host ${PROXY_DOMAIN}
@@ -179,11 +200,11 @@ EOF_CADDY
         @api path /api*
         handle @api {
             uri strip_prefix /api
-            reverse_proxy host.docker.internal:9090
+            reverse_proxy ${PROXY_API_UPSTREAM}
         }
 
         handle {
-            root * /srv/mihomo-ui
+            root * ${CADDY_UI_ROOT}
             file_server
             try_files {path} {path}/ /index.html
         }
@@ -197,9 +218,7 @@ EOF_CADDY
         basic_auth {
             ${ADMIN_USER} ${AGH_HASH_CADDY}
         }
-        reverse_proxy dozzle:8080 {
-            header_up Remote-User {http.auth.user.id}
-        }
+        reverse_proxy 127.0.0.1:8083
     }
 EOF_CADDY
         echo "}" >> "${APP_DIR}/caddy/Caddyfile"
@@ -211,7 +230,7 @@ ${VAULT_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy vaultwarden:80
+    reverse_proxy ${VAULT_UPSTREAM}
 }
 EOF_CADDY
         fi
@@ -222,7 +241,7 @@ ${GITEA_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy gitea:3000
+    reverse_proxy ${GITEA_UPSTREAM}
 }
 EOF_CADDY
         fi
@@ -233,7 +252,7 @@ ${TORRENT_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy qbittorrent:8080
+    reverse_proxy ${QBIT_UPSTREAM}
 }
 EOF_CADDY
         fi
@@ -244,11 +263,10 @@ ${METUBE_DOMAIN}, tube.lan {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy metube:8081
+    reverse_proxy ${METUBE_UPSTREAM}
 }
 EOF_CADDY
         fi
-
 
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
@@ -256,7 +274,7 @@ ${MUSIC_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy navidrome:4533
+    reverse_proxy ${NAVI_UPSTREAM}
 }
 EOF_CADDY
         fi
@@ -267,7 +285,7 @@ ${ADGUARD_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy host.docker.internal:8083
+    reverse_proxy ${AGH_UPSTREAM}
 }
 
 ${PROXY_DOMAIN} {
@@ -278,11 +296,11 @@ ${PROXY_DOMAIN} {
     @api path /api*
     handle @api {
         uri strip_prefix /api
-        reverse_proxy host.docker.internal:9090
+        reverse_proxy ${PROXY_API_UPSTREAM}
     }
 
     handle {
-        root * /srv/mihomo-ui
+        root * ${CADDY_UI_ROOT}
         file_server
         try_files {path} {path}/ /index.html
     }
@@ -298,11 +316,291 @@ ${LOGS_DOMAIN} {
     basic_auth {
         ${ADMIN_USER} ${AGH_HASH_CADDY}
     }
-    reverse_proxy dozzle:8080 {
-        header_up Remote-User {http.auth.user.id}
-    }
+    reverse_proxy ${AGH_UPSTREAM}
 }
 EOF_CADDY
+    fi
+
+    if [ "${DISTRO_FAMILY}" = "alpine" ] || is_native; then
+        log_info "Конфигурация нативных служб Alpine Linux (Zero-Docker OpenRC)..."
+
+        # 1. Caddy
+        mkdir -p /etc/caddy /var/lib/caddy
+        cp -f "${APP_DIR}/caddy/Caddyfile" /etc/caddy/Caddyfile 2>/dev/null || true
+        chown -R caddy:caddy /etc/caddy /var/lib/caddy 2>/dev/null || true
+        cat << 'EOF_CADDY_CONF' > /etc/conf.d/caddy
+output_log="/var/log/caddy.log"
+error_log="/var/log/caddy.log"
+EOF_CADDY_CONF
+        cat << 'EOF_AGH_CONF' >> /etc/conf.d/adguardhome
+output_log="/var/log/adguardhome.log"
+error_log="/var/log/adguardhome.log"
+EOF_AGH_CONF
+
+        # 2. Samba & WSDD
+        if [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]; then
+            mkdir -p /etc/samba
+            cat << EOF_SMB > /etc/samba/smb.conf
+[global]
+    workgroup = WORKGROUP
+    server string = Homelab Appliance Storage
+    security = user
+    map to guest = Bad User
+    dns proxy = no
+    log file = /var/log/samba/%m.log
+    max log size = 50
+
+[${SHARE_NAME}]
+    path = ${SAVE_DIR}
+    valid users = ${ADMIN_USER_SAFE}
+    read only = no
+    browsable = yes
+    create mask = 0664
+    directory mask = 0775
+
+[music]
+    path = ${SAVE_DIR}/music
+    valid users = ${ADMIN_USER_SAFE}
+    read only = no
+    browsable = yes
+    create mask = 0664
+    directory mask = 0775
+EOF_SMB
+            id -u "${ADMIN_USER_SAFE}" >/dev/null 2>&1 || adduser -D -s /sbin/nologin "${ADMIN_USER_SAFE}" 2>/dev/null || true
+            (echo "${SAMBA_PASS}"; echo "${SAMBA_PASS}") | smbpasswd -a -s "${ADMIN_USER_SAFE}" 2>/dev/null || true
+            smbpasswd -e "${ADMIN_USER_SAFE}" 2>/dev/null || true
+        fi
+
+        # 3. Vaultwarden
+        if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
+            mkdir -p /var/lib/vaultwarden
+            cat << EOF_VW > /etc/conf.d/vaultwarden
+export ROCKET_ADDRESS=127.0.0.1
+export ROCKET_PORT=8000
+export DATA_FOLDER=/var/lib/vaultwarden
+export WEB_VAULT_FOLDER=/usr/share/webapps/vaultwarden-web
+export ADMIN_TOKEN='${VAULT_ADMIN_HASH}'
+export SIGNUPS_ALLOWED=true
+output_log="/var/log/vaultwarden.log"
+error_log="/var/log/vaultwarden.log"
+EOF_VW
+            ln -sf /usr/share/webapps/vaultwarden-web /var/lib/vaultwarden/web-vault 2>/dev/null || true
+            chown -R vaultwarden:vaultwarden /var/lib/vaultwarden "${VAULT_DATA_DIR}" /usr/share/webapps/vaultwarden-web 2>/dev/null || true
+        fi
+
+        # 4. Forgejo (Git-сервер)
+        if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
+            mkdir -p /var/lib/forgejo/data /etc/forgejo /var/log/forgejo
+            cat << EOF_FORGEJO > /etc/forgejo/app.ini
+APP_NAME = Homelab Git Server
+RUN_USER = forgejo
+RUN_MODE = prod
+
+[server]
+PROTOCOL = http
+DOMAIN = ${GITEA_DOMAIN}
+ROOT_URL = https://${GITEA_DOMAIN}/
+HTTP_ADDR = 127.0.0.1
+HTTP_PORT = 3000
+DISABLE_SSH = false
+SSH_PORT = 22
+
+[database]
+DB_TYPE = sqlite3
+PATH = /var/lib/forgejo/data/forgejo.db
+
+[security]
+INSTALL_LOCK = true
+SECRET_KEY = 4f9e1b2c3d4e5f6a7b8c9d0e1f2a3b4c
+REVERSE_PROXY_TRUSTED_PROXIES = 127.0.0.1
+EOF_FORGEJO
+            chown -R forgejo:www-data /var/lib/forgejo /var/log/forgejo /etc/forgejo 2>/dev/null || true
+        fi
+
+        # 5. Navidrome (Hi-Fi Music)
+        if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+            mkdir -p /var/lib/navidrome "${SAVE_DIR}/music"
+            cat << EOF_NAVI > /etc/navidrome.toml
+Address = "127.0.0.1"
+Port = 4533
+MusicFolder = "${SAVE_DIR}/music"
+DataFolder = "/var/lib/navidrome"
+LogLevel = "info"
+ScanSchedule = "1m"
+EOF_NAVI
+            chown -R navidrome:navidrome /var/lib/navidrome "${SAVE_DIR}/music" 2>/dev/null || true
+        fi
+
+        # 6. qBittorrent
+        if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
+            mkdir -p /var/lib/qbittorrent/.config/qBittorrent
+            cp -f "${APP_DIR}/qbittorrent/config/qBittorrent/qBittorrent.conf" /var/lib/qbittorrent/.config/qBittorrent/qBittorrent.conf 2>/dev/null || true
+            sed -i "s|/downloads/temp/|${SAVE_DIR}/temp/|g; s|/downloads/|${SAVE_DIR}/downloads/|g; s|/vuetorrent|${APP_DIR}/qbittorrent/vuetorrent|g" /var/lib/qbittorrent/.config/qBittorrent/qBittorrent.conf 2>/dev/null || true
+            chown -R qbittorrent:qbittorrent /var/lib/qbittorrent 2>/dev/null || true
+            cat << 'EOF_QBIT_CONF' > /etc/conf.d/qbittorrent-nox
+pidfile="/run/qbittorrent-nox.pid"
+EOF_QBIT_CONF
+        fi
+
+        # 7. Native yt-dlp Web UI Downloader
+        if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+            cat << 'EOF_YTDL_PY' > "${APP_DIR}/scripts/ytdlp_web.py"
+#!/usr/bin/env python3
+import sys, os, subprocess, json, threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import parse_qs
+
+SAVE_DIR = os.environ.get("SAVED_SAVE_DIR", "/opt/homelab/save")
+DOWNLOADS_DIR = os.path.join(SAVE_DIR, "downloads")
+MUSIC_DIR = os.path.join(SAVE_DIR, "music")
+os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+os.makedirs(MUSIC_DIR, exist_ok=True)
+
+HTML_PAGE = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homelab Downloader</title>
+<style>
+:root { --bg: #0b0f19; --card: #111827; --border: #1f2937; --accent: #38bdf8; --green: #10b981; --text: #f3f4f6; }
+body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px; max-width: 520px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+h1 { color: var(--accent); font-size: 22px; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
+input[type="text"] { width: 100%; box-sizing: border-box; padding: 12px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 14px; }
+select { width: 100%; box-sizing: border-box; padding: 12px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 18px; }
+button { width: 100%; padding: 12px; background: #0284c7; color: #fff; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+button:hover { background: #0369a1; }
+.msg { margin-top: 14px; padding: 10px; border-radius: 6px; font-size: 13px; display: none; }
+.msg.ok { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #10b981; display: block; }
+.msg.err { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid #ef4444; display: block; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🎬 Homelab Downloader</h1>
+  <p style="color:#94a3b8; font-size:13px; margin-bottom:16px;">Вставьте ссылку на видео или музыку (YouTube, VK, RuTube и др.):</p>
+  <form method="POST" action="/download">
+    <input type="text" name="url" placeholder="https://..." required autofocus>
+    <select name="format">
+      <option value="video">Видео (MP4 Лучшее качество)</option>
+      <option value="audio">Аудио (MP3 Музыка)</option>
+    </select>
+    <button type="submit">⬇ Скачать в хранилище</button>
+  </form>
+  <div id="status" class="msg"></div>
+</div>
+</body>
+</html>"""
+
+def run_download(url, fmt):
+    dest = MUSIC_DIR if fmt == "audio" else DOWNLOADS_DIR
+    cmd = ["yt-dlp", "--no-warnings", "-P", dest]
+    if fmt == "audio":
+        cmd += ["-x", "--audio-format", "mp3", "--audio-quality", "0"]
+    else:
+        cmd += ["-f", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]
+    cmd.append(url)
+    try:
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+class DownloaderHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(HTML_PAGE.encode("utf-8"))
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length).decode("utf-8", errors="ignore")
+        data = parse_qs(body)
+        url = data.get("url", [""])[0].strip()
+        fmt = data.get("format", ["video"])[0].strip()
+        if url:
+            threading.Thread(target=run_download, args=(url, fmt), daemon=True).start()
+            resp = HTML_PAGE.replace('<div id="status" class="msg"></div>', '<div id="status" class="msg ok">✔ Загрузка запущена в фоновом режиме! Файл будет сохранен в хранилище.</div>')
+        else:
+            resp = HTML_PAGE.replace('<div id="status" class="msg"></div>', '<div id="status" class="msg err">✖ Введите корректную ссылку.</div>')
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(resp.encode("utf-8"))
+
+if __name__ == "__main__":
+    server = HTTPServer(("127.0.0.1", 8081), DownloaderHandler)
+    server.serve_forever()
+EOF_YTDL_PY
+            chmod 755 "${APP_DIR}/scripts/ytdlp_web.py"
+
+            cat << EOF_YTDL_INIT > /etc/init.d/ytdlp-web
+#!/sbin/openrc-run
+name="ytdlp-web"
+description="yt-dlp Web Media Downloader"
+supervisor="supervise-daemon"
+command="/usr/bin/python3"
+command_args="${APP_DIR}/scripts/ytdlp_web.py"
+output_log="/var/log/ytdlp-web.log"
+error_log="/var/log/ytdlp-web.log"
+respawn_delay=2
+respawn_max=5
+
+depend() {
+    need net
+}
+EOF_YTDL_INIT
+            chmod 755 /etc/init.d/ytdlp-web
+        fi
+
+        # 8. Master OpenRC meta-service
+        cat << 'EOF_HOMELAB_RC' > /etc/init.d/homelab
+#!/sbin/openrc-run
+description="Homelab Native Bare-Metal Appliance"
+
+depend() {
+    need net
+    after network
+}
+
+start() {
+    ebegin "Starting Homelab Appliance Services"
+    for svc in sing-box adguardhome caddy vaultwarden forgejo samba wsdd qbittorrent-nox navidrome ytdlp-web; do
+        if [ -f "/etc/init.d/$svc" ]; then
+            rc-service "$svc" status >/dev/null 2>&1 || rc-service "$svc" start >/dev/null 2>&1 || true
+        fi
+    done
+    [ -x /usr/local/bin/gateway-watchdog.sh ] && /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
+    eend 0
+}
+
+stop() {
+    ebegin "Stopping Homelab Appliance Services"
+    for svc in ytdlp-web navidrome qbittorrent-nox wsdd samba forgejo vaultwarden caddy adguardhome sing-box; do
+        if [ -f "/etc/init.d/$svc" ]; then
+            rc-service "$svc" stop >/dev/null 2>&1 || true
+        fi
+    done
+    eend 0
+}
+
+restart() {
+    ebegin "Restarting Homelab Appliance Services"
+    for svc in sing-box adguardhome caddy vaultwarden forgejo samba wsdd qbittorrent-nox navidrome ytdlp-web; do
+        if [ -f "/etc/init.d/$svc" ]; then
+            rc-service "$svc" restart >/dev/null 2>&1 || true
+        fi
+    done
+    [ -x /usr/local/bin/gateway-watchdog.sh ] && /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
+    eend 0
+}
+EOF_HOMELAB_RC
+        chmod 755 /etc/init.d/homelab
+        rc-update add homelab default >/dev/null 2>&1 || true
+
+        log_ok "Нативные конфигурации OpenRC и Caddyfile успешно подготовлены"
+        return 0
     fi
 
     local CADDY_IMAGE="serfriz/caddy-duckdns:latest"
@@ -680,9 +978,14 @@ depend() {
 }
 start() {
     ebegin "Starting Homelab Docker Compose Stack"
+    local retries=0
+    while [ ! -S /var/run/docker.sock ] && [ \$retries -lt 15 ]; do
+        sleep 1
+        retries=\$((retries + 1))
+    done
     cd "${APP_DIR}" && /usr/local/bin/dc up -d
-    local ec=$?
-    /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
+    local ec=\$?
+    [ -x /usr/local/bin/gateway-watchdog.sh ] && /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
     eend \$ec
 }
 stop() {

@@ -31,9 +31,9 @@ EOF_LOGO
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   ${CLR_NEON_GREEN}[ ПРЯМОЙ ВЫХОД ]${CLR_RESET} ────────────────────────────────────────────────────────────┘        ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   • Умный Fake-IP DNS + nftables: Прозрачный обход без настройки клиентов ║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}╠══════════════════════════════════════════════════════════════════════════╣${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ЯДРО:${CLR_RESET} ${CLR_CYAN}Mihomo TUN${CLR_RESET} │ ${CLR_CYAN}AdGuard Home${CLR_RESET} │ ${CLR_CYAN}nftables${CLR_RESET} │ ${CLR_CYAN}Caddy SSL${CLR_RESET} │ ${CLR_CYAN}Docker${CLR_RESET}              ${CLR_NEON_PURPLE}║${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ПРИЛОЖЕНИЯ:${CLR_RESET} ${CLR_CYAN}Navidrome (Spotify)${CLR_RESET} │ ${CLR_CYAN}MeTube${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}qBittorrent${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Gitea${CLR_RESET}   ${CLR_NEON_PURPLE}║${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ СИСТЕМА:${CLR_RESET} ${CLR_GRAY}Debian • Ubuntu • Arch Linux • Alpine Linux (OpenRC & Systemd)${CLR_RESET}   ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ЯДРО:${CLR_RESET} ${CLR_CYAN}sing-box TUN${CLR_RESET} │ ${CLR_CYAN}AdGuard Home${CLR_RESET} │ ${CLR_CYAN}nftables${CLR_RESET} │ ${CLR_CYAN}Caddy SSL${CLR_RESET} │ ${CLR_CYAN}Native OpenRC${CLR_RESET}       ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ПРИЛОЖЕНИЯ:${CLR_RESET} ${CLR_CYAN}Navidrome (Spotify)${CLR_RESET} │ ${CLR_CYAN}yt-dlp${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}qBittorrent${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Forgejo${CLR_RESET} ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ СИСТЕМА:${CLR_RESET} ${CLR_GRAY}Alpine Linux v3.24+ (Native Bare-Metal & OpenRC, Zero-Docker)${CLR_RESET}      ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}╚══════════════════════════════════════════════════════════════════════════╝${CLR_RESET}"
     echo ""
 }
@@ -189,6 +189,12 @@ load_previous_config() {
         SUBDIR_NAME="${SAVED_SUBDIR_NAME:-$SUBDIR_NAME}"
         USER_UID="${SAVED_USER_UID:-${USER_UID:-1000}}"
         USER_GID="${SAVED_USER_GID:-${USER_GID:-1000}}"
+        ROUTER_MODE="${SAVED_ROUTER_MODE:-${ROUTER_MODE:-1}}"
+        WAN_IFACE="${SAVED_WAN_IFACE:-${WAN_IFACE:-}}"
+        LAN_IFACE="${SAVED_LAN_IFACE:-${LAN_IFACE:-}}"
+        WAN_MAC="${SAVED_WAN_MAC:-${WAN_MAC:-}}"
+        LAN_SUBNET="${SAVED_LAN_SUBNET:-${LAN_SUBNET:-}}"
+        LAN_IP="${SAVED_LAN_IP:-${LAN_IP:-}}"
     fi
     return 0
 }

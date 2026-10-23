@@ -373,6 +373,11 @@ yaml_escape() {
     python3 -c "import sys, json; print(json.dumps(sys.argv[1]))" "${str}" 2>/dev/null || printf '"%s"' "${str//\"/\\\"}"
 }
 
+is_native() {
+    [ -f /etc/alpine-release ] || [ "${OS_ID:-}" = "alpine" ]
+}
+export -f is_native 2>/dev/null || true
+
 APP_DIR="/opt/homelab"
 ENV_FILE="${APP_DIR}/.env"
 LUKS_MAP_NAME="homelab_secure_storage"
@@ -390,6 +395,13 @@ LOCAL_IP=""
 ROUTER_GATEWAY=""
 LAN_SUBNET=""
 INSTALL_MODE="1"
+
+ROUTER_MODE="1"
+WAN_IFACE=""
+LAN_IFACE=""
+WAN_MAC=""
+LAN_IP=""
+SINGBOX_SECRET=""
 
 ENABLE_GATEWAY="Y"
 ENABLE_VAULT="Y"
@@ -451,7 +463,7 @@ SELECTED_DOT_2=""
 SELECTED_BOOTSTRAP_IPS="77.88.8.8 1.1.1.1 9.9.9.9 8.8.8.8"
 SELECTED_BOOTSTRAP_IP_1="77.88.8.8"
 NAVIDROME_IMAGE="deluan/navidrome:latest"
-HOMELAB_VERSION="2.8.16"
+HOMELAB_VERSION="3.0.0"
 HOMELAB_REPO="unknownpeace/Medal"
 HOMELAB_RAW_URL="https://raw.githubusercontent.com/${HOMELAB_REPO}/main"
 IS_UPGRADE_MODE=0
@@ -489,9 +501,9 @@ EOF_LOGO
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   ${CLR_NEON_GREEN}[ ПРЯМОЙ ВЫХОД ]${CLR_RESET} ────────────────────────────────────────────────────────────┘        ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}   • Умный Fake-IP DNS + nftables: Прозрачный обход без настройки клиентов ║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}╠══════════════════════════════════════════════════════════════════════════╣${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ЯДРО:${CLR_RESET} ${CLR_CYAN}Mihomo TUN${CLR_RESET} │ ${CLR_CYAN}AdGuard Home${CLR_RESET} │ ${CLR_CYAN}nftables${CLR_RESET} │ ${CLR_CYAN}Caddy SSL${CLR_RESET} │ ${CLR_CYAN}Docker${CLR_RESET}              ${CLR_NEON_PURPLE}║${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ПРИЛОЖЕНИЯ:${CLR_RESET} ${CLR_CYAN}Navidrome (Spotify)${CLR_RESET} │ ${CLR_CYAN}MeTube${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}qBittorrent${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Gitea${CLR_RESET}   ${CLR_NEON_PURPLE}║${CLR_RESET}"
-    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ СИСТЕМА:${CLR_RESET} ${CLR_GRAY}Debian • Ubuntu • Arch Linux • Alpine Linux (OpenRC & Systemd)${CLR_RESET}   ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ЯДРО:${CLR_RESET} ${CLR_CYAN}sing-box TUN${CLR_RESET} │ ${CLR_CYAN}AdGuard Home${CLR_RESET} │ ${CLR_CYAN}nftables${CLR_RESET} │ ${CLR_CYAN}Caddy SSL${CLR_RESET} │ ${CLR_CYAN}Native OpenRC${CLR_RESET}       ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ ПРИЛОЖЕНИЯ:${CLR_RESET} ${CLR_CYAN}Navidrome (Spotify)${CLR_RESET} │ ${CLR_CYAN}yt-dlp${CLR_RESET} │ ${CLR_CYAN}Vaultwarden${CLR_RESET} │ ${CLR_CYAN}qBittorrent${CLR_RESET} │ ${CLR_CYAN}Samba NAS${CLR_RESET} │ ${CLR_CYAN}Forgejo${CLR_RESET} ${CLR_NEON_PURPLE}║${CLR_RESET}"
+    echo -e "  ${CLR_NEON_PURPLE}║${CLR_RESET}  ${CLR_WHITE}⚡ СИСТЕМА:${CLR_RESET} ${CLR_GRAY}Alpine Linux v3.24+ (Native Bare-Metal & OpenRC, Zero-Docker)${CLR_RESET}      ${CLR_NEON_PURPLE}║${CLR_RESET}"
     echo -e "  ${CLR_NEON_PURPLE}╚══════════════════════════════════════════════════════════════════════════╝${CLR_RESET}"
     echo ""
 }
@@ -647,6 +659,12 @@ load_previous_config() {
         SUBDIR_NAME="${SAVED_SUBDIR_NAME:-$SUBDIR_NAME}"
         USER_UID="${SAVED_USER_UID:-${USER_UID:-1000}}"
         USER_GID="${SAVED_USER_GID:-${USER_GID:-1000}}"
+        ROUTER_MODE="${SAVED_ROUTER_MODE:-${ROUTER_MODE:-1}}"
+        WAN_IFACE="${SAVED_WAN_IFACE:-${WAN_IFACE:-}}"
+        LAN_IFACE="${SAVED_LAN_IFACE:-${LAN_IFACE:-}}"
+        WAN_MAC="${SAVED_WAN_MAC:-${WAN_MAC:-}}"
+        LAN_SUBNET="${SAVED_LAN_SUBNET:-${LAN_SUBNET:-}}"
+        LAN_IP="${SAVED_LAN_IP:-${LAN_IP:-}}"
     fi
     return 0
 }
@@ -719,12 +737,7 @@ EOF_TIMESYNC
 # =============================================================================
 
 install_pkgs() {
-    print_step_header "01/11" "УСТАНОВКА ЗАВИСИМОСТЕЙ И СТЕКА DOCKER"
-
-    if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ] && command -v docker >/dev/null 2>&1 && command -v nft >/dev/null 2>&1; then
-        log_ok "Системные зависимости и Docker CE уже установлены (пропуск в режиме обновления)"
-        return 0
-    fi
+    print_step_header "01/11" "УСТАНОВКА СИСТЕМНЫХ ЗАВИСИМОСТЕЙ И ПАКЕТОВ СТЕКА"
 
     if [ "${DISTRO_FAMILY}" = "alpine" ]; then
         if [ -f /etc/apk/repositories ]; then
@@ -736,13 +749,33 @@ install_pkgs() {
         fi
         run_spin "Обновление индексов пакетов APK" apk update
 
-        local ALP_PKGS=(bash python3 py3-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g \
-                        util-linux util-linux-misc lsblk curl openssl ca-certificates jq nftables apache2-utils \
-                        unzip tar sqlite argon2 iputils shadow procps e2fsprogs ffmpeg \
-                        docker docker-cli-compose chrony openrc)
-        run_spin "Установка системных пакетов Alpine" \
+        # Отключение устаревшего/избыточного Docker в пользу Native Bare-Metal Alpine
+        if command -v rc-service >/dev/null 2>&1 && rc-service docker status >/dev/null 2>&1; then
+            rc-service docker stop >/dev/null 2>&1 || true
+            rc-update del docker default >/dev/null 2>&1 || true
+        fi
+
+        local ALP_PKGS=(
+            bash python3 py3-bcrypt py3-aiohttp iproute2 cryptsetup btrfs-progs ntfs-3g \
+            util-linux util-linux-misc lsblk curl openssl ca-certificates jq nftables nftables-openrc apache2-utils \
+            unzip tar sqlite argon2 iputils shadow procps e2fsprogs ffmpeg \
+            chrony chrony-openrc openrc \
+            sing-box sing-box-openrc \
+            adguardhome adguardhome-openrc \
+            caddy caddy-openrc \
+            vaultwarden vaultwarden-openrc vaultwarden-web-vault \
+            forgejo forgejo-openrc \
+            samba samba-server-openrc wsdd wsdd-openrc \
+            qbittorrent-nox qbittorrent-nox-openrc \
+            navidrome navidrome-openrc \
+            yt-dlp
+        )
+        run_spin "Установка нативных пакетов Alpine Linux (Zero-Docker OpenRC)" \
             apk add --no-cache "${ALP_PKGS[@]}"
-        apk add --no-cache cryptsetup-openrc >/dev/null 2>&1 || true
+        apk add --no-cache cryptsetup-openrc chrony-openrc nftables-openrc >/dev/null 2>&1 || true
+
+        log_ok "Нативные сервисы Alpine Linux успешно установлены без использования Docker"
+        return 0
 
     elif [ "${DISTRO_FAMILY}" = "arch" ]; then
         local ARCH_PKGS=(python python-bcrypt iproute2 cryptsetup btrfs-progs ntfs-3g util-linux \
@@ -1001,7 +1034,8 @@ start() {
 }
 stop() {
     ebegin "Deactivating zRAM swap"
-    for zd in $(lsblk -lno NAME,TYPE 2>/dev/null | awk '$2=="zram"{print "/dev/"$1}'); do
+    for zd in /dev/zram* $(lsblk -lno NAME,TYPE 2>/dev/null | awk '$2=="zram"{print "/dev/"$1}'); do
+        [ -b "$zd" ] || continue
         swapoff "$zd" 2>/dev/null || true
         zramctl -r "$zd" 2>/dev/null || true
     done
@@ -1121,12 +1155,19 @@ detect_network() {
         chmod 660 /var/run/docker.sock 2>/dev/null || true
     fi
 
+    ALL_PHYS_IFACES=()
+    while read -r ifn; do
+        [ -n "$ifn" ] && ALL_PHYS_IFACES+=("$ifn")
+    done < <(ls -1 /sys/class/net 2>/dev/null | grep -E '^(eth|en|wl|enp|eno)' | sort -u || true)
+    [ ${#ALL_PHYS_IFACES[@]} -eq 0 ] && ALL_PHYS_IFACES=("${DEFAULT_IFACE}")
+
     log_ok "Сетевые параметры определены:"
     echo -e "      ${CLR_WHITE}• ОС и ядро:        ${PRETTY_NAME:-Linux} ($(uname -r)) [Init: ${INIT_SYSTEM}]${CLR_RESET}"
     echo -e "      ${CLR_WHITE}• Архитектура:      ${SYSTEM_ARCH} (Аппаратный AES: $([ $HAS_HARDWARE_AES -eq 1 ] && echo "Да" || echo "Нет"))${CLR_RESET}"
     echo -e "      ${CLR_WHITE}• IP сервера:       ${CLR_GREEN}${LOCAL_IP}${CLR_RESET}"
     echo -e "      ${CLR_WHITE}• Шлюз роутера:     ${CLR_CYAN}${ROUTER_GATEWAY}${CLR_RESET}"
-    echo -e "      ${CLR_WHITE}• Интерфейс LAN:    ${CLR_YELLOW}${DEFAULT_IFACE}${CLR_RESET}"
+    echo -e "      ${CLR_WHITE}• Основной адаптер: ${CLR_YELLOW}${DEFAULT_IFACE}${CLR_RESET}"
+    echo -e "      ${CLR_WHITE}• Все адаптеры:     ${CLR_CYAN}${ALL_PHYS_IFACES[*]}${CLR_RESET}"
     echo -e "      ${CLR_WHITE}• Подсеть LAN:      ${LAN_SUBNET}${CLR_RESET}"
     echo -e "      ${CLR_WHITE}• Пользователь:     ${TARGET_USER} (UID: ${USER_UID}, GID: ${USER_GID})${CLR_RESET}"
 }
@@ -1337,6 +1378,11 @@ save_configuration() {
         printf "SAVED_LOCAL_IP=%q\n" "${LOCAL_IP}"
         printf "SAVED_ROUTER_GATEWAY=%q\n" "${ROUTER_GATEWAY}"
         printf "SAVED_LAN_SUBNET=%q\n" "${LAN_SUBNET}"
+        printf "SAVED_ROUTER_MODE=%q\n" "${ROUTER_MODE:-1}"
+        printf "SAVED_WAN_IFACE=%q\n" "${WAN_IFACE:-}"
+        printf "SAVED_LAN_IFACE=%q\n" "${LAN_IFACE:-}"
+        printf "SAVED_WAN_MAC=%q\n" "${WAN_MAC:-}"
+        printf "SAVED_LAN_IP=%q\n" "${LAN_IP:-}"
         printf "SAVED_ENABLE_GATEWAY=%q\n" "${ENABLE_GATEWAY}"
         printf "SAVED_ENABLE_VAULT=%q\n" "${ENABLE_VAULT}"
         printf "SAVED_ENABLE_GITEA=%q\n" "${ENABLE_GITEA}"
@@ -1364,7 +1410,7 @@ save_configuration() {
         printf "SAVED_VAULT_DOMAIN=%q\n" "${VAULT_DOMAIN}"
         printf "SAVED_GITEA_DOMAIN=%q\n" "${GITEA_DOMAIN}"
         printf "SAVED_ADGUARD_DOMAIN=%q\n" "${ADGUARD_DOMAIN}"
-        printf "SAVED_TORRENT_DOMAIN=%q\n" "${TORRENT_DOMAIN}"
+        printf "TORRENT_DOMAIN=%q\n" "${TORRENT_DOMAIN}"
         printf "SAVED_PROXY_DOMAIN=%q\n" "${PROXY_DOMAIN}"
         printf "SAVED_VAULT_DATA_DIR=%q\n" "${VAULT_DATA_DIR}"
         printf "SAVED_GITEA_DATA_DIR=%q\n" "${GITEA_DATA_DIR}"
@@ -1617,6 +1663,44 @@ prompt_configuration() {
             log_ok "Режим шлюза: DIRECT (чистая маршрутизация, без прокси)"
         else
             log_ok "Подписка сохранена"
+        fi
+
+        echo ""
+        echo -e "  ${CLR_CYAN}--- Сетевая топология и режим маршрутизации ---${CLR_RESET}"
+        echo -e "    ${CLR_GREEN}1) Прозрачный шлюз (1 сетевой адаптер)${CLR_RESET} [Enter] - работает рядом с текущими роутерами"
+        echo -e "    ${CLR_YELLOW}2) Домашний роутер (WAN + LAN)${CLR_RESET} - сервер заменяет роутер, NAT, DHCP, клонирование MAC провайдера"
+        DEF_RMODE="${SAVED_ROUTER_MODE:-1}"
+        prompt_read "  [?] Выберите режим сети [1/2] [${DEF_RMODE}]: " ROUTER_MODE
+        ROUTER_MODE=${ROUTER_MODE:-${DEF_RMODE}}
+
+        if [ "$ROUTER_MODE" = "2" ]; then
+            log_info "Выбран режим: Домашний маршрутизатор (WAN + LAN)"
+            DEF_WAN="${SAVED_WAN_IFACE:-${ALL_PHYS_IFACES[0]:-${DEFAULT_IFACE}}}"
+            prompt_read "  [?] WAN-интерфейс (кабель провайдера) [${DEF_WAN}]: " WAN_IFACE
+            WAN_IFACE=${WAN_IFACE:-${DEF_WAN}}
+
+            DEF_LAN="${SAVED_LAN_IFACE:-${ALL_PHYS_IFACES[1]:-eth1}}"
+            prompt_read "  [?] LAN-интерфейс (домашняя сеть / свитч) [${DEF_LAN}]: " LAN_IFACE
+            LAN_IFACE=${LAN_IFACE:-${DEF_LAN}}
+
+            DEF_MAC="${SAVED_WAN_MAC:-}"
+            [ -z "${DEF_MAC}" ] && DEF_MAC=$(cat "/sys/class/net/${WAN_IFACE}/address" 2>/dev/null || echo "")
+            echo -e "  ${CLR_WHITE}Клонирование MAC-адреса провайдера (привязка договора):${CLR_RESET}"
+            prompt_read "  [?] MAC-адрес WAN [Enter - ${DEF_MAC}]: " INPUT_MAC
+            WAN_MAC=${INPUT_MAC:-${DEF_MAC}}
+
+            DEF_LAN_IP="${SAVED_LAN_IP:-192.168.10.1}"
+            prompt_read "  [?] IP-адрес сервера в LAN [${DEF_LAN_IP}]: " INPUT_LAN_IP
+            LAN_IP=${INPUT_LAN_IP:-${DEF_LAN_IP}}
+            LAN_SUBNET="$(echo "${LAN_IP}" | sed -E 's/\.[0-9]+$/\.0\/24/')"
+            LOCAL_IP="${LAN_IP}"
+        else
+            ROUTER_MODE="1"
+            WAN_IFACE=""
+            LAN_IFACE=""
+            WAN_MAC=""
+            LAN_IP="${LOCAL_IP}"
+            log_ok "Режим: Прозрачный сетевой шлюз (LAN адаптер: ${DEFAULT_IFACE}, IP: ${LOCAL_IP})"
         fi
 
         DEF_ADMIN_USER="${SAVED_ADMIN_USER:-${TARGET_USER}}"
@@ -1982,6 +2066,44 @@ EOF_UNLOCK
             else
                 log_ok "Подписка сохранена"
             fi
+
+            echo ""
+            echo -e "  ${CLR_CYAN}--- Сетевая топология и режим маршрутизации ---${CLR_RESET}"
+            echo -e "    ${CLR_GREEN}1) Прозрачный шлюз (1 сетевой адаптер)${CLR_RESET} [Enter] - работает рядом с текущими роутерами"
+            echo -e "    ${CLR_YELLOW}2) Домашний роутер (WAN + LAN)${CLR_RESET} - сервер заменяет роутер, NAT, DHCP, клонирование MAC провайдера"
+            DEF_RMODE="${SAVED_ROUTER_MODE:-1}"
+            prompt_read "  [?] Выберите режим сети [1/2] [${DEF_RMODE}]: " ROUTER_MODE
+            ROUTER_MODE=${ROUTER_MODE:-${DEF_RMODE}}
+
+            if [ "$ROUTER_MODE" = "2" ]; then
+                log_info "Выбран режим: Домашний маршрутизатор (WAN + LAN)"
+                DEF_WAN="${SAVED_WAN_IFACE:-${ALL_PHYS_IFACES[0]:-${DEFAULT_IFACE}}}"
+                prompt_read "  [?] WAN-интерфейс (кабель провайдера) [${DEF_WAN}]: " WAN_IFACE
+                WAN_IFACE=${WAN_IFACE:-${DEF_WAN}}
+
+                DEF_LAN="${SAVED_LAN_IFACE:-${ALL_PHYS_IFACES[1]:-eth1}}"
+                prompt_read "  [?] LAN-интерфейс (домашняя сеть / свитч) [${DEF_LAN}]: " LAN_IFACE
+                LAN_IFACE=${LAN_IFACE:-${DEF_LAN}}
+
+                DEF_MAC="${SAVED_WAN_MAC:-}"
+                [ -z "${DEF_MAC}" ] && DEF_MAC=$(cat "/sys/class/net/${WAN_IFACE}/address" 2>/dev/null || echo "")
+                echo -e "  ${CLR_WHITE}Клонирование MAC-адреса провайдера (привязка договора):${CLR_RESET}"
+                prompt_read "  [?] MAC-адрес WAN [Enter - ${DEF_MAC}]: " INPUT_MAC
+                WAN_MAC=${INPUT_MAC:-${DEF_MAC}}
+
+                DEF_LAN_IP="${SAVED_LAN_IP:-192.168.10.1}"
+                prompt_read "  [?] IP-адрес сервера в LAN [${DEF_LAN_IP}]: " INPUT_LAN_IP
+                LAN_IP=${INPUT_LAN_IP:-${DEF_LAN_IP}}
+                LAN_SUBNET="$(echo "${LAN_IP}" | sed -E 's/\.[0-9]+$/\.0\/24/')"
+                LOCAL_IP="${LAN_IP}"
+            else
+                ROUTER_MODE="1"
+                WAN_IFACE=""
+                LAN_IFACE=""
+                WAN_MAC=""
+                LAN_IP="${LOCAL_IP}"
+                log_ok "Режим: Прозрачный сетевой шлюз (LAN адаптер: ${DEFAULT_IFACE}, IP: ${LOCAL_IP})"
+            fi
         fi
 
         echo ""
@@ -2159,6 +2281,16 @@ EOF_NM
             systemctl reload NetworkManager 2>/dev/null || true
         fi
 
+        # Защита /etc/resolv.conf от перезаписи DHCP-клиентом udhcpc в Alpine Linux
+        if [ -d /etc/udhcpc ] || command -v udhcpc >/dev/null 2>&1; then
+            mkdir -p /etc/udhcpc
+            if [ -f /etc/udhcpc/udhcpc.conf ]; then
+                sed -i 's/^#\(RESOLV_CONF="no"\)/\1/' /etc/udhcpc/udhcpc.conf 2>/dev/null || true
+                grep -q '^RESOLV_CONF="no"' /etc/udhcpc/udhcpc.conf 2>/dev/null || echo 'RESOLV_CONF="no"' >> /etc/udhcpc/udhcpc.conf
+            else
+                echo 'RESOLV_CONF="no"' > /etc/udhcpc/udhcpc.conf
+            fi
+        fi
 
         chattr -i /etc/resolv.conf 2>/dev/null || true
         rm -f /etc/resolv.conf
@@ -2179,6 +2311,29 @@ EOF_DNS
         if [ ! -c /dev/net/tun ]; then
             mknod /dev/net/tun c 10 200 2>/dev/null || true
             chmod 666 /dev/net/tun 2>/dev/null || true
+        fi
+
+        # Настройка MAC-адреса и топологии роутера при необходимости
+        if [ "${ROUTER_MODE:-1}" = "2" ] && [ -n "${WAN_IFACE:-}" ]; then
+            log_info "Настройка сетевых интерфейсов домашнего маршрутизатора (WAN: ${WAN_IFACE}, LAN: ${LAN_IFACE})..."
+            if [ -n "${WAN_MAC:-}" ]; then
+                log_info "Применение клонированного MAC-адреса провайдера на ${WAN_IFACE}: ${WAN_MAC}..."
+                ip link set dev "${WAN_IFACE}" down 2>/dev/null || true
+                ip link set dev "${WAN_IFACE}" address "${WAN_MAC}" 2>/dev/null || true
+                ip link set dev "${WAN_IFACE}" up 2>/dev/null || true
+
+                # Персистентное сохранение в /etc/network/interfaces для Alpine Linux
+                if [ -f /etc/network/interfaces ]; then
+                    if ! grep -q "hwaddress ether ${WAN_MAC}" /etc/network/interfaces; then
+                        sed -i "/iface ${WAN_IFACE} inet/a \    hwaddress ether ${WAN_MAC}" /etc/network/interfaces 2>/dev/null || true
+                    fi
+                fi
+            fi
+
+            if [ -n "${LAN_IFACE:-}" ] && [ -n "${LAN_IP:-}" ]; then
+                ip addr add "${LAN_IP}/24" dev "${LAN_IFACE}" 2>/dev/null || true
+                ip link set dev "${LAN_IFACE}" up 2>/dev/null || true
+            fi
         fi
 
         log_info "Настройка sysctl: IP-форвардинг, BBR и loose rp_filter для TUN-маршрутизации..."
@@ -2211,7 +2366,43 @@ EOF_SYSCTL
         fi
         log_info "Настройка декларативного фаервола nftables (таблица inet homelab)..."
         mkdir -p /etc/nftables.d
-        cat <<EOF_NFT > /etc/nftables.d/homelab.nft
+
+        if [ "${ROUTER_MODE:-1}" = "2" ] && [ -n "${WAN_IFACE:-}" ] && [ -n "${LAN_IFACE:-}" ]; then
+            cat <<EOF_NFT > /etc/nftables.d/homelab.nft
+table inet homelab {
+    chain forward {
+        type filter hook forward priority -10; policy accept;
+        tcp flags syn tcp option maxseg size set rt mtu
+        iifname "${LAN_IFACE}" oifname "${WAN_IFACE}" accept
+        iifname "${LAN_IFACE}" oifname "tun0" accept
+        ct state { established, related } accept
+    }
+
+    chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+        iifname "${LAN_IFACE}" tcp dport 53 redirect to :53
+        iifname "${LAN_IFACE}" udp dport 53 redirect to :53
+        iifname "${LAN_IFACE}" tcp dport 853 reject with tcp reset
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname "${WAN_IFACE}" masquerade
+        oifname "tun0" masquerade
+    }
+
+    chain input {
+        type filter hook input priority filter; policy accept;
+        iifname "lo" accept
+        ct state { established, related } accept
+        iifname "${LAN_IFACE}" accept
+        iifname "${WAN_IFACE}" tcp dport { 22, 80, 443 } accept
+        iifname "${WAN_IFACE}" drop
+    }
+}
+EOF_NFT
+        else
+            cat <<EOF_NFT > /etc/nftables.d/homelab.nft
 table inet homelab {
     chain forward {
         type filter hook forward priority -10; policy accept;
@@ -2229,7 +2420,7 @@ table inet homelab {
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         oifname "${DEFAULT_IFACE}" masquerade
-        oifname "Meta" masquerade
+        oifname "tun0" masquerade
     }
 
     chain input {
@@ -2238,6 +2429,7 @@ table inet homelab {
     }
 }
 EOF_NFT
+        fi
 
         local NFT_APPLIED=0
         if command -v nft >/dev/null 2>&1; then
@@ -2249,8 +2441,17 @@ EOF_NFT
         fi
 
         for nft_conf in /etc/nftables.conf /etc/nftables.nft; do
-            if [ -f "$nft_conf" ] && ! grep -q 'homelab.nft' "$nft_conf" 2>/dev/null; then
-                echo 'include "/etc/nftables.d/homelab.nft"' >> "$nft_conf" 2>/dev/null || true
+            if [ -f "$nft_conf" ]; then
+                # Очистка стандартной блокирующей таблицы inet filter в Alpine Linux
+                if grep -q 'table inet filter' "$nft_conf" 2>/dev/null && grep -q 'policy drop' "$nft_conf" 2>/dev/null; then
+                    cat << 'EOF_NFT_ROOT' > "$nft_conf"
+#!/usr/sbin/nft -f
+flush ruleset
+include "/etc/nftables.d/*.nft"
+EOF_NFT_ROOT
+                elif ! grep -q 'homelab.nft' "$nft_conf" 2>/dev/null && ! grep -q 'include "/etc/nftables.d/\*.nft"' "$nft_conf" 2>/dev/null; then
+                    echo 'include "/etc/nftables.d/homelab.nft"' >> "$nft_conf" 2>/dev/null || true
+                fi
             fi
         done
 
@@ -2392,7 +2593,20 @@ if [ "$APPLIED_NFT" -eq 1 ] || ! nft list chain ip filter DOCKER-USER 2>/dev/nul
     fi
 fi
 
-if command -v docker >/dev/null 2>&1 && docker inspect adguardhome >/dev/null 2>&1; then
+if command -v rc-service >/dev/null 2>&1 && rc-service adguardhome status >/dev/null 2>&1; then
+    DNS_CHECK_OK=0
+    if timeout 2 nc -z 127.0.0.1 53 2>/dev/null || python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 53)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
+        DNS_CHECK_OK=1
+    fi
+    if [ "$DNS_CHECK_OK" -eq 0 ]; then
+        sleep 2
+        if ! (timeout 2 nc -z 127.0.0.1 53 2>/dev/null); then
+            logger -t gateway-watchdog "DNS-резолвер AdGuard Home не отвечает, перезапуск службы OpenRC..." 2>/dev/null || true
+            rc-service adguardhome restart >/dev/null 2>&1 || true
+            /usr/local/bin/homelab-notify "Самовосстановление DNS" "Порт 53 не отвечал на запросы. Служба AdGuard Home автоматически перезапущена сторожем." "WARN" 2>/dev/null || true
+        fi
+    fi
+elif command -v docker >/dev/null 2>&1 && docker inspect adguardhome >/dev/null 2>&1; then
     AG_STATUS=$(docker inspect -f '{{.State.Status}}' adguardhome 2>/dev/null || echo "none")
     AG_HEALTH=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' adguardhome 2>/dev/null || echo "none")
     if [ "$AG_STATUS" = "running" ] && [ "$AG_HEALTH" != "starting" ]; then
@@ -2411,7 +2625,21 @@ if command -v docker >/dev/null 2>&1 && docker inspect adguardhome >/dev/null 2>
     fi
 fi
 
-if command -v docker >/dev/null 2>&1 && docker inspect mihomo >/dev/null 2>&1; then
+if command -v rc-service >/dev/null 2>&1 && rc-service sing-box status >/dev/null 2>&1; then
+    SINGBOX_CHECK_OK=0
+    if python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null || \
+       timeout 2 nc -z 127.0.0.1 9090 2>/dev/null; then
+        SINGBOX_CHECK_OK=1
+    fi
+    if [ "$SINGBOX_CHECK_OK" -eq 0 ]; then
+        sleep 2
+        if ! (python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null || timeout 2 nc -z 127.0.0.1 9090 2>/dev/null); then
+            logger -t gateway-watchdog "Ядро маршрутизации sing-box (порт 9090) не отвечает, выполняется автоматический перезапуск..." 2>/dev/null || true
+            rc-service sing-box restart >/dev/null 2>&1 || true
+            /usr/local/bin/homelab-notify "Самовосстановление sing-box" "Ядро маршрутизации не отвечало на порту 9090. Служба sing-box автоматически перезапущена сторожем." "WARN" 2>/dev/null || true
+        fi
+    fi
+elif command -v docker >/dev/null 2>&1 && docker inspect mihomo >/dev/null 2>&1; then
     MH_STATUS=$(docker inspect -f '{{.State.Status}}' mihomo 2>/dev/null || echo "none")
     MH_HEALTH=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' mihomo 2>/dev/null || echo "none")
     if [ "$MH_STATUS" = "running" ] && [ "$MH_HEALTH" != "starting" ]; then
@@ -3353,6 +3581,18 @@ configure_gateway_services() {
         fi
 
         local AGH_CONF="${APP_DIR}/adguard/conf/AdGuardHome.yaml"
+        local IP_OCTET
+        IP_OCTET=$(echo "${LOCAL_IP}" | awk -F. '{print $4}')
+        local AGH_RANGE_START="192.168.1.50"
+        local AGH_RANGE_END="192.168.1.250"
+        if [ -n "${IP_OCTET}" ] && [ "${IP_OCTET}" -ge 50 ] && [ "${IP_OCTET}" -le 149 ]; then
+            AGH_RANGE_START="192.168.1.$(( IP_OCTET + 1 ))"
+        elif [ -n "${IP_OCTET}" ] && [ "${IP_OCTET}" -ge 150 ] && [ "${IP_OCTET}" -le 250 ]; then
+            AGH_RANGE_END="192.168.1.$(( IP_OCTET - 1 ))"
+        fi
+        local AGH_DHCP_ENABLED="false"
+        [ "${ROUTER_MODE:-1}" = "2" ] && AGH_DHCP_ENABLED="true"
+
         if [ -s "${AGH_CONF}" ] && [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
             log_ok "Обновление DNS-переопределений в AdGuardHome.yaml (фильтры и правила сохранены)"
             python3 -c "
@@ -3493,484 +3733,528 @@ user_rules:
   - '@@||anilibria.top^\$important'
   - '@@||aniliberty.top^\$important'
   - '@@||*.libria.fun^\$important'
+dhcp:
+  enabled: ${AGH_DHCP_ENABLED}
+  interface_name: "${LAN_IFACE:-$DEFAULT_IFACE}"
+  local_domain_name: "lan"
+  dhcpv4:
+    gateway_ip: "${LOCAL_IP}"
+    subnet_mask: "255.255.255.0"
+    range_start: "${AGH_RANGE_START}"
+    range_end: "${AGH_RANGE_END}"
+    lease_duration: 86400
+    icmp_timeout_msec: 1000
+    options: []
+    static_leases:
+      - mac: "00:00:00:00:00:01"
+        ip: "192.168.1.1"
+        hostname: "OpenWrt-Router"
+      - mac: "00:00:00:00:00:05"
+        ip: "192.168.1.5"
+        hostname: "Keenetic-Router"
+  dhcpv6:
+    enabled: false
 EOF_AGH
         fi
 
-        local ESCAPED_MIHOMO_SECRET
-        ESCAPED_MIHOMO_SECRET=$(python3 -c "import sys, json; print(json.dumps(sys.stdin.read().rstrip('\r\n')))" <<< "${MIHOMO_SECRET}")
+        # Копирование конфигурации AdGuard Home в системный каталог OpenRC
+        mkdir -p /var/lib/adguardhome
+        cp -f "${AGH_CONF}" /var/lib/adguardhome/AdGuardHome.yaml 2>/dev/null || true
+        chown -R adguardhome:adguardhome /var/lib/adguardhome 2>/dev/null || true
 
-        log_info "Формирование конфигурации Mihomo TUN (Mixed-Stack, Full-Cone NAT и умный обход замедлений)..."
-        local PROXY_PROVIDERS_CONFIG=""
-        local PROXY_GROUPS_CONFIG=""
+        log_info "Формирование конфигурации sing-box TUN (Mixed-Stack, Clash API и умная маршрутизация)..."
+        mkdir -p /etc/sing-box /var/lib/sing-box "${APP_DIR}/sing-box"
+
+        cat <<EOF_SINGBOX > /etc/sing-box/config.json
+{
+  "log": {
+    "level": "info",
+    "output": "/var/log/sing-box.log",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "local",
+        "tag": "dns-direct"
+      },
+      {
+        "type": "udp",
+        "tag": "dns-remote",
+        "server": "77.88.8.8"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "type": "direct",
+      "tag": "dns-in",
+      "listen": "127.0.0.1",
+      "listen_port": 1053
+    },
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "interface_name": "tun0",
+      "address": [
+        "172.19.0.1/30"
+      ],
+      "auto_route": true,
+      "strict_route": false,
+      "stack": "mixed"
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "0.0.0.0",
+      "listen_port": 7890
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
+    },
+    {
+      "type": "selector",
+      "tag": "PROXY",
+      "outbounds": [
+        "direct"
+      ]
+    },
+    {
+      "type": "selector",
+      "tag": "AI-Services",
+      "outbounds": [
+        "PROXY",
+        "direct"
+      ]
+    }
+  ],
+  "route": {
+    "default_domain_resolver": "dns-direct",
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "inbound": [
+          "dns-in"
+        ],
+        "action": "hijack-dns"
+      },
+      {
+        "port": [
+          53
+        ],
+        "action": "hijack-dns"
+      },
+      {
+        "network": "udp",
+        "port": [
+          443
+        ],
+        "outbound": "block"
+      },
+      {
+        "ip_is_private": true,
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": [
+          "ru",
+          "su",
+          "xn--p1ai",
+          "xn--80asehdb",
+          "xn--80aswg",
+          "xn--80adxhks",
+          "xn--c1avg",
+          "gosuslugi.org",
+          "gosuslugi.ru",
+          "emias.info",
+          "yandex.ru",
+          "yandex.net",
+          "yastatic.net",
+          "vk.com",
+          "userapi.com",
+          "vk-portal.net",
+          "vk-cdn.net",
+          "vkusercontent.com",
+          "ozonusercontent.com",
+          "wbstatic.net",
+          "avito.st",
+          "2gis.com",
+          "4pda.to",
+          "ntc.party",
+          "lan",
+          "duckdns.org",
+          "connectivitycheck.gstatic.com",
+          "connectivitycheck.android.com",
+          "clients3.google.com",
+          "play.googleapis.com",
+          "captive.apple.com",
+          "connect.rom.miui.com",
+          "wifi.miui.com",
+          "connectivity.samsung.com.cn",
+          "msftconnecttest.com",
+          "msftncsi.com"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": [
+          "openai.com",
+          "chatgpt.com",
+          "oaistatic.com",
+          "oaiusercontent.com",
+          "anthropic.com",
+          "claude.ai",
+          "perplexity.ai",
+          "gemini.google.com",
+          "aistudio.google.com",
+          "generativelanguage.googleapis.com",
+          "cursor.com",
+          "cursor.sh",
+          "copilot.microsoft.com",
+          "suno.com",
+          "suno.ai",
+          "midjourney.com",
+          "x.ai",
+          "grok.com",
+          "deepseek.com",
+          "v0.dev",
+          "huggingface.co"
+        ],
+        "outbound": "AI-Services"
+      },
+      {
+        "domain_suffix": [
+          "googlevideo.com",
+          "youtube.com",
+          "youtu.be",
+          "ytimg.com",
+          "ggpht.com",
+          "gvt1.com",
+          "youtube-nocookie.com",
+          "youtubekids.com",
+          "discord.com",
+          "discord.gg",
+          "discordapp.com",
+          "discordapp.net",
+          "discord.media",
+          "discordcdn.com",
+          "t.me",
+          "telegram.org",
+          "telegram.me",
+          "telegra.ph",
+          "instagram.com",
+          "cdninstagram.com",
+          "facebook.com",
+          "fbcdn.net",
+          "meta.com",
+          "twitter.com",
+          "x.com",
+          "twimg.com",
+          "linkedin.com",
+          "notion.so",
+          "notion.site",
+          "rutracker.org",
+          "rutracker.net",
+          "rutracker.nl",
+          "t-ru.org",
+          "nnmclub.to",
+          "nnm-club.me",
+          "rutor.info",
+          "rutor.is",
+          "opentor.org",
+          "flibusta.is",
+          "flibusta.site",
+          "libria.fun",
+          "anilibria.top"
+        ],
+        "outbound": "PROXY"
+      }
+    ],
+    "auto_detect_interface": true
+  },
+  "experimental": {
+    "clash_api": {
+      "external_controller": "0.0.0.0:9090",
+      "external_ui": "${APP_DIR}/mihomo/ui",
+      "secret": "${MIHOMO_SECRET}",
+      "default_mode": "rule"
+    }
+  }
+}
+EOF_SINGBOX
+        cp -f /etc/sing-box/config.json "${APP_DIR}/sing-box/config.json" 2>/dev/null || true
+
+        # Скрипт автоматического обновления подписок в sing-box
+        cat << 'EOF_SUB_PY' > "${APP_DIR}/scripts/update_singbox_sub.py"
+#!/usr/bin/env python3
+import sys, os, json, re, urllib.request, urllib.parse, ssl, base64, subprocess
+
+sub_url = sys.argv[1] if len(sys.argv) > 1 else ""
+config_path = "/etc/sing-box/config.json"
+
+if not sub_url or sub_url in ("none", "direct", "-"):
+    sys.exit(0)
+
+ctx = ssl._create_unverified_context()
+
+urls_to_try = []
+if "fmt=" in sub_url:
+    urls_to_try.append(re.sub(r'fmt=[^&]+', 'fmt=sing-box', sub_url))
+else:
+    sep = "&" if "?" in sub_url else "?"
+    urls_to_try.append(f"{sub_url}{sep}fmt=sing-box")
+urls_to_try.append(sub_url)
+
+content = ""
+for u in urls_to_try:
+    try:
+        req = urllib.request.Request(
+            u,
+            headers={
+                "User-Agent": "sing-box/1.13.11",
+                "Accept": "application/json, text/plain, */*"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+            data_str = resp.read().decode("utf-8", errors="ignore").strip()
+            if data_str:
+                content = data_str
+                # Если уже получили JSON с outbounds, дальше можно не искать
+                if '"outbounds"' in data_str:
+                    break
+    except Exception:
+        continue
+
+if not content:
+    print("[-] Не удалось загрузить содержимое подписки")
+    sys.exit(1)
+
+PROXY_TYPES = {"vless", "vmess", "trojan", "shadowsocks", "hysteria", "hysteria2", "tuic", "wireguard"}
+
+new_outbounds = []
+
+# 1. Попытка парсинга как нативный JSON sing-box
+try:
+    if content.startswith("{") or content.startswith("["):
+        parsed_json = json.loads(content)
+        if isinstance(parsed_json, dict) and "outbounds" in parsed_json:
+            for o in parsed_json["outbounds"]:
+                if isinstance(o, dict) and o.get("type") in PROXY_TYPES:
+                    new_outbounds.append(o)
+        elif isinstance(parsed_json, list):
+            for item in parsed_json:
+                if isinstance(item, dict) and item.get("type") in PROXY_TYPES:
+                    new_outbounds.append(item)
+                elif isinstance(item, dict) and "outbounds" in item:
+                    for o in item["outbounds"]:
+                        if isinstance(o, dict) and o.get("type") in PROXY_TYPES:
+                            new_outbounds.append(o)
+except Exception:
+    pass
+
+# 2. Если JSON не содержал нод, пробуем base64-декодирование списка ссылок
+if not new_outbounds:
+    clean_c = "".join(content.split())
+    try:
+        padded = clean_c + "=" * (-len(clean_c) % 4)
+        decoded = base64.b64decode(padded).decode("utf-8", errors="ignore")
+        if "://" in decoded:
+            content = decoded
+    except Exception:
+        pass
+
+    def parse_proxy_uri(uri):
+        uri = uri.strip()
+        if uri.startswith("vless://"):
+            m = re.match(r"vless://([^@]+)@([^:]+):(\d+)\?([^#]+)(?:#(.*))?", uri)
+            if m:
+                uuid, server, port, query_str, name = m.groups()
+                params = dict(q.split("=", 1) for q in query_str.split("&") if "=" in q)
+                tag = urllib.parse.unquote(name).strip() if name else f"vless-{server}"
+                outbound = {
+                    "type": "vless",
+                    "tag": tag,
+                    "server": server,
+                    "server_port": int(port),
+                    "uuid": uuid,
+                    "packet_encoding": "xudp"
+                }
+                if params.get("security") == "reality":
+                    outbound["tls"] = {
+                        "enabled": True,
+                        "server_name": params.get("sni", server),
+                        "utls": {"enabled": True, "fingerprint": params.get("fp", "chrome")},
+                        "reality": {
+                            "enabled": True,
+                            "public_key": params.get("pbk", ""),
+                            "short_id": params.get("sid", "")
+                        }
+                    }
+                elif params.get("security") == "tls":
+                    outbound["tls"] = {
+                        "enabled": True,
+                        "server_name": params.get("sni", server),
+                        "utls": {"enabled": True, "fingerprint": params.get("fp", "chrome")}
+                    }
+                net = params.get("type", "tcp")
+                if net in ("ws", "websocket"):
+                    outbound["transport"] = {
+                        "type": "ws",
+                        "path": params.get("path", "/"),
+                        "headers": {"Host": params.get("host", server)}
+                    }
+                elif net == "grpc":
+                    outbound["transport"] = {
+                        "type": "grpc",
+                        "service_name": params.get("serviceName", "")
+                    }
+                return outbound
+        elif uri.startswith("trojan://"):
+            m = re.match(r"trojan://([^@]+)@([^:]+):(\d+)(?:\?([^#]+))?(?:#(.*))?", uri)
+            if m:
+                password, server, port, query_str, name = m.groups()
+                params = dict(q.split("=", 1) for q in (query_str or "").split("&") if "=" in q)
+                tag = urllib.parse.unquote(name).strip() if name else f"trojan-{server}"
+                outbound = {
+                    "type": "trojan",
+                    "tag": tag,
+                    "server": server,
+                    "server_port": int(port),
+                    "password": password
+                }
+                outbound["tls"] = {
+                    "enabled": True,
+                    "server_name": params.get("sni", server),
+                    "utls": {"enabled": True, "fingerprint": params.get("fp", "chrome")}
+                }
+                return outbound
+        return None
+
+    for line in content.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        out = parse_proxy_uri(line)
+        if out:
+            new_outbounds.append(out)
+
+# 3. Применение полученных серверов к конфигурации sing-box
+if new_outbounds and os.path.exists(config_path):
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+
+        # Гарантируем уникальность тегов
+        seen_tags = set()
+        deduped = []
+        for o in new_outbounds:
+            orig_tag = o.get("tag", "proxy")
+            tag = orig_tag
+            idx = 2
+            while tag in seen_tags:
+                tag = f"{orig_tag}-{idx}"
+                idx += 1
+            o["tag"] = tag
+            seen_tags.add(tag)
+            deduped.append(o)
+
+        proxy_tags = [o["tag"] for o in deduped]
+
+        # Формируем гарантированный список системных outbounds с балансировщиком
+        auto_outbound = {
+            "type": "urltest",
+            "tag": "auto",
+            "outbounds": proxy_tags,
+            "url": "https://cp.cloudflare.com/generate_204",
+            "interval": "3m",
+            "tolerance": 50
+        }
+        proxy_selector = {
+            "type": "selector",
+            "tag": "PROXY",
+            "outbounds": ["auto"] + proxy_tags + ["direct"]
+        }
+        ai_selector = {
+            "type": "selector",
+            "tag": "AI-Services",
+            "outbounds": ["auto"] + proxy_tags + ["direct"]
+        }
+        direct_outbound = {"type": "direct", "tag": "direct"}
+        block_outbound = {"type": "block", "tag": "block"}
+
+        cfg["outbounds"] = [direct_outbound, block_outbound, auto_outbound, proxy_selector, ai_selector] + deduped
+
+        # Гарантируем наличие dns-in inbound и hijack-dns для AdGuard Home
+        inbounds = cfg.get("inbounds", [])
+        if not any(ib.get("tag") == "dns-in" for ib in inbounds):
+            inbounds.append({
+                "type": "direct",
+                "tag": "dns-in",
+                "listen": "127.0.0.1",
+                "listen_port": 1053
+            })
+        cfg["inbounds"] = inbounds
+
+        route = cfg.get("route", {})
+        rules = route.get("rules", [])
+        if not any(r.get("action") == "hijack-dns" and "dns-in" in r.get("inbound", []) for r in rules):
+            rules.insert(0, {
+                "inbound": ["dns-in"],
+                "action": "hijack-dns"
+            })
+        route["rules"] = rules
+        cfg["route"] = route
+
+        cfg.setdefault("log", {})
+        cfg["log"]["output"] = "/var/log/sing-box.log"
+        cfg["log"]["level"] = "info"
+        cfg["log"]["timestamp"] = True
+
+        # Проверка валидности конфигурации утилитой sing-box check
+        test_path = config_path + ".test"
+        with open(test_path, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+
+        res = subprocess.run(["sing-box", "check", "-c", test_path], capture_output=True, text=True)
+        if res.returncode == 0:
+            os.replace(test_path, config_path)
+            print(f"[+] Успешно импортировано {len(deduped)} прокси-серверов в sing-box")
+            # Перезапуск службы sing-box
+            if os.path.exists("/etc/init.d/sing-box"):
+                subprocess.run(["rc-service", "sing-box", "restart"], capture_output=True)
+            elif os.path.exists("/usr/bin/systemctl"):
+                subprocess.run(["systemctl", "restart", "sing-box"], capture_output=True)
+        else:
+            if os.path.exists(test_path):
+                os.remove(test_path)
+            print(f"[-] Ошибка валидации конфигурации sing-box: {res.stderr}")
+            sys.exit(1)
+    except Exception as e:
+        print(f"[-] Ошибка обновления sing-box: {e}")
+        sys.exit(1)
+else:
+    print("[-] Подходящих прокси-серверов в подписке не найдено.")
+EOF_SUB_PY
+        chmod 755 "${APP_DIR}/scripts/update_singbox_sub.py" 2>/dev/null || true
 
         if [ -n "${SUB_URL}" ] && [ "${SUB_URL}" != "none" ]; then
-            PROXY_PROVIDERS_CONFIG="
-proxy-providers:
-  my-sub:
-    type: http
-    url: \"${SUB_URL}\"
-    path: ./providers/proxies.yaml
-    interval: 86400
-    health-check:
-      enable: true
-      url: https://cp.cloudflare.com/generate_204
-      interval: 300
-      lazy: true"
-
-            PROXY_GROUPS_CONFIG="
-proxy-groups:
-  - name: PROXY
-    type: select
-    proxies:
-      - AUTO
-      - DIRECT
-    use:
-      - my-sub
-
-  - name: AUTO
-    type: url-test
-    use:
-      - my-sub
-    url: https://cp.cloudflare.com/generate_204
-    interval: 300
-    tolerance: 50
-    lazy: true
-
-  - name: AI-Services
-    type: select
-    proxies:
-      - AUTO
-      - PROXY
-      - DIRECT
-    use:
-      - my-sub"
-        else
-            PROXY_PROVIDERS_CONFIG=""
-            PROXY_GROUPS_CONFIG="
-proxy-groups:
-  - name: PROXY
-    type: select
-    proxies:
-      - DIRECT
-
-  - name: AI-Services
-    type: select
-    proxies:
-      - DIRECT"
+            python3 "${APP_DIR}/scripts/update_singbox_sub.py" "${SUB_URL}" 2>/dev/null || true
         fi
-
-        cat <<EOF_MIHOMO > "${APP_DIR}/mihomo/config.yaml"
-mixed-port: 7890
-allow-lan: true
-mode: rule
-log-level: info
-ipv6: false
-secret: ${ESCAPED_MIHOMO_SECRET}
-external-controller: 0.0.0.0:9090
-external-ui: ui
-external-controller-cors:
-  allow-origins:
-    - "*"
-  allow-private-network: true
-
-rule-providers:
-  ru_site:
-    type: http
-    behavior: domain
-    format: mrs
-    path: ./ruleset/category-ru.mrs
-    url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/category-ru.mrs"
-    interval: 86400
-
-  gemini_site:
-    type: http
-    behavior: domain
-    format: mrs
-    path: ./ruleset/google-gemini.mrs
-    url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/google-gemini.mrs"
-    interval: 86400
-
-  ai_chat:
-    type: http
-    behavior: domain
-    format: mrs
-    path: ./ruleset/category-ai-chat-!cn.mrs
-    url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/category-ai-chat-!cn.mrs"
-    interval: 86400
-
-  youtube_site:
-    type: http
-    behavior: domain
-    format: mrs
-    path: ./ruleset/youtube.mrs
-    url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/youtube.mrs"
-    interval: 86400
-
-  telegram_site:
-    type: http
-    behavior: domain
-    format: mrs
-    path: ./ruleset/telegram.mrs
-    url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/telegram.mrs"
-    interval: 86400
-
-  meta_site:
-    type: http
-    behavior: domain
-    format: mrs
-    path: ./ruleset/meta.mrs
-    url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/meta.mrs"
-    interval: 86400
-
-  twitter_site:
-    type: http
-    behavior: domain
-    format: mrs
-    path: ./ruleset/twitter.mrs
-    url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/twitter.mrs"
-    interval: 86400
-
-  discord_site:
-    type: http
-    behavior: domain
-    format: mrs
-    path: ./ruleset/discord.mrs
-    url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/discord.mrs"
-    interval: 86400
-
-  steam_site:
-    type: http
-    behavior: domain
-    format: mrs
-    path: ./ruleset/steam.mrs
-    url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/steam.mrs"
-    interval: 86400
-
-  github_site:
-    type: http
-    behavior: domain
-    format: mrs
-    path: ./ruleset/github.mrs
-    url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/github.mrs"
-    interval: 86400
-
-  ru_ip:
-    type: http
-    behavior: ipcidr
-    format: mrs
-    path: ./ruleset/ru.mrs
-    url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/ru.mrs"
-    interval: 86400
-
-dns:
-  enable: true
-  listen: 127.0.0.1:1053
-  enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
-  respect-rules: true
-  store-fake-ip: true
-  cache-algorithm: arc
-  fake-ip-filter:
-    - "+.lan"
-    - "+.local"
-    - "+.duckdns.org"
-    - "+.pool.ntp.org"
-    - "time.*.com"
-    - "time.*.gov"
-    - "time.*.apple.com"
-    # Автоматическое прямое разрешение для всей базы российских доменов
-    - "rule-set:ru_site"
-    - "+.ru"
-    - "+.su"
-    - "+.xn--p1ai"
-    - "+.xn--80asehdb"
-    - "+.xn--80aswg"
-    - "+.xn--80adxhks"
-    - "+.xn--c1avg"
-    - "+.gosuslugi.org"
-    - "+.emias.info"
-    - "+.yandex.net"
-    - "+.yastatic.net"
-    - "+.vk.com"
-    - "+.userapi.com"
-    - "+.vk-portal.net"
-    - "+.2gis.com"
-    # Captive Portal и проверка доступности сети (Android, Apple, Windows, Xiaomi, Samsung, Huawei)
-    - "+.connectivitycheck.gstatic.com"
-    - "+.connectivitycheck.android.com"
-    - "clients3.google.com"
-    - "play.googleapis.com"
-    - "+.gvt2.com"
-    - "captive.apple.com"
-    - "+.apple.com"
-    - "connect.rom.miui.com"
-    - "wifi.miui.com"
-    - "connectivity.samsung.com.cn"
-    - "connectivitycheck.platform.hicloud.com"
-    - "+.msftconnecttest.com"
-    - "+.msftncsi.com"
-    - "detectportal.firefox.com"
-  nameserver-policy:
-    "rule-set:ru_site":
-      - 77.88.8.8
-      - 77.88.8.1
-    "+.ru,+.su,+.xn--p1ai,+.xn--80asehdb,+.xn--80aswg,+.xn--80adxhks,+.xn--c1avg,+.yandex.net,+.yastatic.net,+.vk.com,+.userapi.com,+.vk-portal.net,+.gosuslugi.org,+.emias.info,+.2gis.com":
-      - 77.88.8.8
-      - 77.88.8.1
-    "connectivitycheck.gstatic.com,+.connectivitycheck.gstatic.com,connectivitycheck.android.com,+.connectivitycheck.android.com,clients3.google.com,play.googleapis.com,captive.apple.com,+.apple.com,connect.rom.miui.com,wifi.miui.com,detectportal.firefox.com":
-      - 77.88.8.8
-      - 77.88.8.1
-  default-nameserver:
-    - 77.88.8.8
-    - 77.88.8.1
-    - ${SELECTED_BOOTSTRAP_IP_1:-77.88.8.8}
-  proxy-server-nameserver:
-    - 77.88.8.8
-    - 77.88.8.1
-    - ${SELECTED_BOOTSTRAP_IP_1:-77.88.8.8}
-  direct-nameserver:
-    - 77.88.8.8
-    - 77.88.8.1
-  nameserver:
-    - 77.88.8.8
-    - ${SELECTED_DOH_1:-https://common.dot.dns.yandex.net/dns-query}
-    - 77.88.8.1
-
-unified-delay: true
-tcp-concurrent: true
-
-sniffer:
-  enable: true
-  parse-pure-ip: true
-  sniff:
-    TLS:
-      ports: [443, 8443]
-    HTTP:
-      ports: [80, "8080-8880"]
-    QUIC:
-      ports: [443]
-  force-domain:
-    - "+.google.com"
-    - "+.youtube.com"
-    - "+.googlevideo.com"
-    - "+.gvt1.com"
-    - "+.ytimg.com"
-    - "+.ggpht.com"
-    - "+.discord.gg"
-    - "+.discord.com"
-    - "+.discordapp.com"
-    - "+.discordapp.net"
-  skip-domain:
-    - "Mijia Cloud"
-    - "dlg.io.mi.com"
-    - "+.apple.com"
-
-tun:
-  enable: true
-  device: Meta
-  stack: mixed
-  mtu: 1400
-  auto-route: true
-  auto-detect-interface: true
-  endpoint-independent-nat: true
-  strict-route: false
-  route-exclude-address:
-    - "${LAN_SUBNET}"
-    - "${ROUTER_GATEWAY}/32"
-    - "${LOCAL_IP}/32"
-    - "192.168.0.0/16"
-    - "172.16.0.0/12"
-    - "10.0.0.0/8"
-
-proxies: []
-${PROXY_PROVIDERS_CONFIG}
-${PROXY_GROUPS_CONFIG}
-
-rules:
-  # Проверка доступности сети (Captive Portal Android, Apple, Windows, Xiaomi, Samsung) — МГНОВЕННО НАПРЯМУЮ!
-  - DOMAIN-SUFFIX,connectivitycheck.gstatic.com,DIRECT
-  - DOMAIN-SUFFIX,connectivitycheck.android.com,DIRECT
-  - DOMAIN,clients3.google.com,DIRECT
-  - DOMAIN,play.googleapis.com,DIRECT
-  - DOMAIN,detectportal.firefox.com,DIRECT
-  - DOMAIN,captive.apple.com,DIRECT
-  - DOMAIN-SUFFIX,apple.com,DIRECT
-  - DOMAIN,connect.rom.miui.com,DIRECT
-  - DOMAIN,wifi.miui.com,DIRECT
-  - DOMAIN,connectivity.samsung.com.cn,DIRECT
-  - DOMAIN,connectivitycheck.platform.hicloud.com,DIRECT
-  - DOMAIN-SUFFIX,msftconnecttest.com,DIRECT
-  - DOMAIN-SUFFIX,msftncsi.com,DIRECT
-  - DOMAIN-KEYWORD,connectivitycheck,DIRECT
-
-  # Блокировка QUIC (UDP 443) для форсирования надежного TCP/HTTP2 (YouTube/браузеры)
-  - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT
-
-  # Прямой трафик локального шлюза, сервера и локальной сети
-  - IP-CIDR,${ROUTER_GATEWAY}/32,DIRECT,no-resolve
-  - IP-CIDR,${LOCAL_IP}/32,DIRECT,no-resolve
-  - DOMAIN-SUFFIX,lan,DIRECT
-  - DOMAIN-SUFFIX,duckdns.org,DIRECT
-  - IP-CIDR,${LAN_SUBNET},DIRECT,no-resolve
-  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
-  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
-  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
-  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
-  - GEOIP,private,DIRECT,no-resolve
-  - GEOIP,lan,DIRECT,no-resolve
-
-  # Торрент-клиенты и P2P-пиры — напрямую на полной скорости провайдера (без расхода трафика прокси)
-  - PROCESS-NAME,qbittorrent,DIRECT
-  - PROCESS-NAME,qbittorrent-nox,DIRECT
-  - PROCESS-NAME,transmission-daemon,DIRECT
-  - PROCESS-NAME,transmission-qt,DIRECT
-  - PROCESS-NAME,uTorrent,DIRECT
-  - PROCESS-NAME,BitComet,DIRECT
-  - DST-PORT,6881-6889,DIRECT
-  - SRC-PORT,6881-6889,DIRECT
-  - DST-PORT,51413,DIRECT
-  - SRC-PORT,51413,DIRECT
-
-  # Торрент-трекеры, каталоги и анонсеры (обход блокировок РКН для поиска и подключения к раздачам)
-  - DOMAIN-SUFFIX,rutracker.org,PROXY
-  - DOMAIN-SUFFIX,rutracker.net,PROXY
-  - DOMAIN-SUFFIX,rutracker.nl,PROXY
-  - DOMAIN-SUFFIX,t-ru.org,PROXY
-  - DOMAIN-SUFFIX,nnmclub.to,PROXY
-  - DOMAIN-SUFFIX,nnm-club.me,PROXY
-  - DOMAIN-SUFFIX,rutor.info,PROXY
-  - DOMAIN-SUFFIX,rutor.is,PROXY
-  - DOMAIN-SUFFIX,opentor.org,PROXY
-  - DOMAIN-SUFFIX,open.stealth.si,PROXY
-  - DOMAIN-SUFFIX,opentrackr.org,PROXY
-  - DOMAIN-SUFFIX,kinozal.tv,PROXY
-  - DOMAIN-SUFFIX,flibusta.is,PROXY
-  - DOMAIN-SUFFIX,flibusta.site,PROXY
-  - DOMAIN-SUFFIX,libria.fun,PROXY
-  - DOMAIN-SUFFIX,anilibria.top,PROXY
-  - DOMAIN-KEYWORD,announce,PROXY
-  - DOMAIN-KEYWORD,tracker,PROXY
-
-  # Steam Community (заблокирован/замедлен в РФ) через PROXY, а загрузка игр — напрямую DIRECT
-  - DOMAIN-SUFFIX,steamcommunity.com,PROXY
-  - RULE-SET,steam_site,DIRECT
-  - RULE-SET,github_site,DIRECT
-
-  # Нейросети и искусственный интеллект (OpenAI, Anthropic, Gemini, Copilot, Perplexity, Cursor и др.)
-  - DOMAIN-SUFFIX,openai.com,AI-Services
-  - DOMAIN-SUFFIX,chatgpt.com,AI-Services
-  - DOMAIN-SUFFIX,oaistatic.com,AI-Services
-  - DOMAIN-SUFFIX,oaiusercontent.com,AI-Services
-  - DOMAIN-SUFFIX,anthropic.com,AI-Services
-  - DOMAIN-SUFFIX,claude.ai,AI-Services
-  - DOMAIN-SUFFIX,perplexity.ai,AI-Services
-  - DOMAIN-SUFFIX,gemini.google.com,AI-Services
-  - DOMAIN-SUFFIX,aistudio.google.com,AI-Services
-  - DOMAIN-SUFFIX,generativelanguage.googleapis.com,AI-Services
-  - DOMAIN-SUFFIX,alkalimakersuite-pa.clients6.google.com,AI-Services
-  - DOMAIN-SUFFIX,cursor.com,AI-Services
-  - DOMAIN-SUFFIX,cursor.sh,AI-Services
-  - DOMAIN-SUFFIX,copilot.microsoft.com,AI-Services
-  - DOMAIN-SUFFIX,suno.com,AI-Services
-  - DOMAIN-SUFFIX,suno.ai,AI-Services
-  - DOMAIN-SUFFIX,midjourney.com,AI-Services
-  - DOMAIN-SUFFIX,x.ai,AI-Services
-  - DOMAIN-SUFFIX,grok.com,AI-Services
-  - DOMAIN-SUFFIX,deepseek.com,AI-Services
-  - DOMAIN-SUFFIX,v0.dev,AI-Services
-  - DOMAIN-SUFFIX,huggingface.co,AI-Services
-  - DOMAIN-KEYWORD,gemini.google,AI-Services
-  - RULE-SET,gemini_site,AI-Services
-  - RULE-SET,ai_chat,AI-Services
-
-  # YouTube и Google Video CDN — через группу PROXY (без замедления РКН)
-  - DOMAIN-SUFFIX,googlevideo.com,PROXY
-  - DOMAIN-SUFFIX,youtube.com,PROXY
-  - DOMAIN-SUFFIX,youtu.be,PROXY
-  - DOMAIN-SUFFIX,ytimg.com,PROXY
-  - DOMAIN-SUFFIX,ggpht.com,PROXY
-  - DOMAIN-SUFFIX,gvt1.com,PROXY
-  - DOMAIN-SUFFIX,youtube-nocookie.com,PROXY
-  - DOMAIN-SUFFIX,youtubekids.com,PROXY
-  - RULE-SET,youtube_site,PROXY
-
-  # Discord (голосовые серверы RTC, чаты, вложения, шлюз) — через группу PROXY
-  - DOMAIN-SUFFIX,discord.com,PROXY
-  - DOMAIN-SUFFIX,discord.gg,PROXY
-  - DOMAIN-SUFFIX,discordapp.com,PROXY
-  - DOMAIN-SUFFIX,discordapp.net,PROXY
-  - DOMAIN-SUFFIX,discord.media,PROXY
-  - DOMAIN-SUFFIX,discordcdn.com,PROXY
-  - DOMAIN-KEYWORD,discord,PROXY
-  - RULE-SET,discord_site,PROXY
-
-  # Telegram — через группу PROXY
-  - DOMAIN-SUFFIX,t.me,PROXY
-  - DOMAIN-SUFFIX,telegram.org,PROXY
-  - DOMAIN-SUFFIX,telegram.me,PROXY
-  - DOMAIN-SUFFIX,telegra.ph,PROXY
-  - RULE-SET,telegram_site,PROXY
-
-  # Заблокированные в РФ соцсети и популярные платформы
-  - DOMAIN-SUFFIX,instagram.com,PROXY
-  - DOMAIN-SUFFIX,cdninstagram.com,PROXY
-  - DOMAIN-SUFFIX,facebook.com,PROXY
-  - DOMAIN-SUFFIX,fbcdn.net,PROXY
-  - DOMAIN-SUFFIX,meta.com,PROXY
-  - DOMAIN-SUFFIX,twitter.com,PROXY
-  - DOMAIN-SUFFIX,x.com,PROXY
-  - DOMAIN-SUFFIX,twimg.com,PROXY
-  - DOMAIN-SUFFIX,linkedin.com,PROXY
-  - DOMAIN-SUFFIX,notion.so,PROXY
-  - DOMAIN-SUFFIX,notion.site,PROXY
-  - DOMAIN-SUFFIX,canva.com,PROXY
-  - DOMAIN-SUFFIX,soundcloud.com,PROXY
-  - DOMAIN-SUFFIX,spotify.com,PROXY
-  # Платформы контента, арта и медиа (Pixiv, Booth, Fanbox)
-  - DOMAIN-SUFFIX,pixiv.net,PROXY
-  - DOMAIN-SUFFIX,pximg.net,PROXY
-  - DOMAIN-SUFFIX,pixiv.org,PROXY
-  - DOMAIN-SUFFIX,booth.pm,PROXY
-  - DOMAIN-SUFFIX,fanbox.cc,PROXY
-  - RULE-SET,meta_site,PROXY
-  - RULE-SET,twitter_site,PROXY
-
-  # Российские зоны, государственные порталы, банки, маркетплейсы и сервисы — 100% НАПРЯМУЮ DIRECT!
-  # Национальные TLD (перехватывают ВСЕ *.ru, *.su, *.рф без необходимости дублировать отдельные домены)
-  - DOMAIN-SUFFIX,ru,DIRECT
-  - DOMAIN-SUFFIX,su,DIRECT
-  - DOMAIN-SUFFIX,xn--p1ai,DIRECT
-  - DOMAIN-SUFFIX,xn--80asehdb,DIRECT
-  - DOMAIN-SUFFIX,xn--80aswg,DIRECT
-  - DOMAIN-SUFFIX,xn--80adxhks,DIRECT
-  - DOMAIN-SUFFIX,xn--c1avg,DIRECT
-
-  # Российские ресурсы и CDN вне зон .ru/.su/.рф
-  - DOMAIN-SUFFIX,gosuslugi.org,DIRECT
-  - DOMAIN-SUFFIX,emias.info,DIRECT
-  - DOMAIN-SUFFIX,yandex.net,DIRECT
-  - DOMAIN-SUFFIX,yastatic.net,DIRECT
-  - DOMAIN-SUFFIX,vk.com,DIRECT
-  - DOMAIN-SUFFIX,userapi.com,DIRECT
-  - DOMAIN-SUFFIX,vk-portal.net,DIRECT
-  - DOMAIN-SUFFIX,vk-cdn.net,DIRECT
-  - DOMAIN-SUFFIX,vkusercontent.com,DIRECT
-  - DOMAIN-SUFFIX,ozonusercontent.com,DIRECT
-  - DOMAIN-SUFFIX,wbstatic.net,DIRECT
-  - DOMAIN-SUFFIX,avito.st,DIRECT
-  - DOMAIN-SUFFIX,2gis.com,DIRECT
-  - DOMAIN-SUFFIX,4pda.to,DIRECT
-  - DOMAIN-SUFFIX,ntc.party,DIRECT
-
-  # Базы правил и диапазоны IP РФ (geosite/geoip)
-  - RULE-SET,ru_site,DIRECT
-  - RULE-SET,ru_ip,DIRECT,no-resolve
-
-  # Весь остальной внешний трафик — через группу PROXY
-  - MATCH,PROXY
-EOF_MIHOMO
     fi
-    log_ok "Конфигурации шлюза AdGuard и Mihomo сгенерированы"
+    log_ok "Конфигурации шлюза AdGuard Home и sing-box успешно сгенерированы"
 }
 
 # ==============================================================================
@@ -4018,6 +4302,28 @@ configure_caddy_and_compose() {
     IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>📋 Dozzle Web Logs</span><a href=\"https://${LOGS_DOMAIN}\" target=\"_blank\" rel=\"noopener\">https://${LOGS_DOMAIN}</a></li>"
 
+    local VAULT_UPSTREAM="127.0.0.1:8000"
+    local GITEA_UPSTREAM="127.0.0.1:3000"
+    local QBIT_UPSTREAM="127.0.0.1:8080"
+    local METUBE_UPSTREAM="127.0.0.1:8081"
+    local NAVI_UPSTREAM="127.0.0.1:4533"
+    local AGH_UPSTREAM="127.0.0.1:8083"
+    local PROXY_API_UPSTREAM="127.0.0.1:9090"
+    local CADDY_CERT_DIR="/var/lib/caddy/.local/share/caddy/pki/authorities/local"
+    local CADDY_UI_ROOT="${APP_DIR}/mihomo/ui"
+
+    if [ "${DISTRO_FAMILY}" != "alpine" ]; then
+        VAULT_UPSTREAM="vaultwarden:80"
+        GITEA_UPSTREAM="gitea:3000"
+        QBIT_UPSTREAM="qbittorrent:8080"
+        METUBE_UPSTREAM="metube:8081"
+        NAVI_UPSTREAM="navidrome:4533"
+        AGH_UPSTREAM="host.docker.internal:8083"
+        PROXY_API_UPSTREAM="host.docker.internal:9090"
+        CADDY_CERT_DIR="/data/caddy/pki/authorities/local"
+        CADDY_UI_ROOT="/srv/mihomo-ui"
+    fi
+
     cat <<EOF_CADDY > "${APP_DIR}/caddy/Caddyfile"
 {
     admin off
@@ -4037,7 +4343,7 @@ configure_caddy_and_compose() {
 http://${LOCAL_IP} {
     @cert path /caddy-root.crt /root.crt
     handle @cert {
-        root * /data/caddy/pki/authorities/local
+        root * ${CADDY_CERT_DIR}
         rewrite * /root.crt
         file_server
     }
@@ -4099,7 +4405,7 @@ EOF_CADDY
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @vault host ${VAULT_DOMAIN}
     handle @vault {
-        reverse_proxy vaultwarden:80
+        reverse_proxy ${VAULT_UPSTREAM}
     }
 EOF_CADDY
         fi
@@ -4108,7 +4414,7 @@ EOF_CADDY
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @gitea host ${GITEA_DOMAIN}
     handle @gitea {
-        reverse_proxy gitea:3000
+        reverse_proxy ${GITEA_UPSTREAM}
     }
 EOF_CADDY
         fi
@@ -4117,7 +4423,7 @@ EOF_CADDY
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @torrent host ${TORRENT_DOMAIN}
     handle @torrent {
-        reverse_proxy qbittorrent:8080
+        reverse_proxy ${QBIT_UPSTREAM}
     }
 EOF_CADDY
         fi
@@ -4126,17 +4432,16 @@ EOF_CADDY
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @metube host ${METUBE_DOMAIN} tube.${BASE_DOMAIN}
     handle @metube {
-        reverse_proxy metube:8081
+        reverse_proxy ${METUBE_UPSTREAM}
     }
 EOF_CADDY
         fi
-
 
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @music host ${MUSIC_DOMAIN}
     handle @music {
-        reverse_proxy navidrome:4533
+        reverse_proxy ${NAVI_UPSTREAM}
     }
 EOF_CADDY
         fi
@@ -4145,7 +4450,7 @@ EOF_CADDY
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
     @adguard host ${ADGUARD_DOMAIN}
     handle @adguard {
-        reverse_proxy host.docker.internal:8083
+        reverse_proxy ${AGH_UPSTREAM}
     }
 
     @proxy host ${PROXY_DOMAIN}
@@ -4153,11 +4458,11 @@ EOF_CADDY
         @api path /api*
         handle @api {
             uri strip_prefix /api
-            reverse_proxy host.docker.internal:9090
+            reverse_proxy ${PROXY_API_UPSTREAM}
         }
 
         handle {
-            root * /srv/mihomo-ui
+            root * ${CADDY_UI_ROOT}
             file_server
             try_files {path} {path}/ /index.html
         }
@@ -4171,9 +4476,7 @@ EOF_CADDY
         basic_auth {
             ${ADMIN_USER} ${AGH_HASH_CADDY}
         }
-        reverse_proxy dozzle:8080 {
-            header_up Remote-User {http.auth.user.id}
-        }
+        reverse_proxy 127.0.0.1:8083
     }
 EOF_CADDY
         echo "}" >> "${APP_DIR}/caddy/Caddyfile"
@@ -4185,7 +4488,7 @@ ${VAULT_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy vaultwarden:80
+    reverse_proxy ${VAULT_UPSTREAM}
 }
 EOF_CADDY
         fi
@@ -4196,7 +4499,7 @@ ${GITEA_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy gitea:3000
+    reverse_proxy ${GITEA_UPSTREAM}
 }
 EOF_CADDY
         fi
@@ -4207,7 +4510,7 @@ ${TORRENT_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy qbittorrent:8080
+    reverse_proxy ${QBIT_UPSTREAM}
 }
 EOF_CADDY
         fi
@@ -4218,11 +4521,10 @@ ${METUBE_DOMAIN}, tube.lan {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy metube:8081
+    reverse_proxy ${METUBE_UPSTREAM}
 }
 EOF_CADDY
         fi
-
 
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
@@ -4230,7 +4532,7 @@ ${MUSIC_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy navidrome:4533
+    reverse_proxy ${NAVI_UPSTREAM}
 }
 EOF_CADDY
         fi
@@ -4241,7 +4543,7 @@ ${ADGUARD_DOMAIN} {
     tls internal
     import security_headers
     encode zstd gzip
-    reverse_proxy host.docker.internal:8083
+    reverse_proxy ${AGH_UPSTREAM}
 }
 
 ${PROXY_DOMAIN} {
@@ -4252,11 +4554,11 @@ ${PROXY_DOMAIN} {
     @api path /api*
     handle @api {
         uri strip_prefix /api
-        reverse_proxy host.docker.internal:9090
+        reverse_proxy ${PROXY_API_UPSTREAM}
     }
 
     handle {
-        root * /srv/mihomo-ui
+        root * ${CADDY_UI_ROOT}
         file_server
         try_files {path} {path}/ /index.html
     }
@@ -4272,11 +4574,291 @@ ${LOGS_DOMAIN} {
     basic_auth {
         ${ADMIN_USER} ${AGH_HASH_CADDY}
     }
-    reverse_proxy dozzle:8080 {
-        header_up Remote-User {http.auth.user.id}
-    }
+    reverse_proxy ${AGH_UPSTREAM}
 }
 EOF_CADDY
+    fi
+
+    if [ "${DISTRO_FAMILY}" = "alpine" ] || is_native; then
+        log_info "Конфигурация нативных служб Alpine Linux (Zero-Docker OpenRC)..."
+
+        # 1. Caddy
+        mkdir -p /etc/caddy /var/lib/caddy
+        cp -f "${APP_DIR}/caddy/Caddyfile" /etc/caddy/Caddyfile 2>/dev/null || true
+        chown -R caddy:caddy /etc/caddy /var/lib/caddy 2>/dev/null || true
+        cat << 'EOF_CADDY_CONF' > /etc/conf.d/caddy
+output_log="/var/log/caddy.log"
+error_log="/var/log/caddy.log"
+EOF_CADDY_CONF
+        cat << 'EOF_AGH_CONF' >> /etc/conf.d/adguardhome
+output_log="/var/log/adguardhome.log"
+error_log="/var/log/adguardhome.log"
+EOF_AGH_CONF
+
+        # 2. Samba & WSDD
+        if [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]; then
+            mkdir -p /etc/samba
+            cat << EOF_SMB > /etc/samba/smb.conf
+[global]
+    workgroup = WORKGROUP
+    server string = Homelab Appliance Storage
+    security = user
+    map to guest = Bad User
+    dns proxy = no
+    log file = /var/log/samba/%m.log
+    max log size = 50
+
+[${SHARE_NAME}]
+    path = ${SAVE_DIR}
+    valid users = ${ADMIN_USER_SAFE}
+    read only = no
+    browsable = yes
+    create mask = 0664
+    directory mask = 0775
+
+[music]
+    path = ${SAVE_DIR}/music
+    valid users = ${ADMIN_USER_SAFE}
+    read only = no
+    browsable = yes
+    create mask = 0664
+    directory mask = 0775
+EOF_SMB
+            id -u "${ADMIN_USER_SAFE}" >/dev/null 2>&1 || adduser -D -s /sbin/nologin "${ADMIN_USER_SAFE}" 2>/dev/null || true
+            (echo "${SAMBA_PASS}"; echo "${SAMBA_PASS}") | smbpasswd -a -s "${ADMIN_USER_SAFE}" 2>/dev/null || true
+            smbpasswd -e "${ADMIN_USER_SAFE}" 2>/dev/null || true
+        fi
+
+        # 3. Vaultwarden
+        if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
+            mkdir -p /var/lib/vaultwarden
+            cat << EOF_VW > /etc/conf.d/vaultwarden
+export ROCKET_ADDRESS=127.0.0.1
+export ROCKET_PORT=8000
+export DATA_FOLDER=/var/lib/vaultwarden
+export WEB_VAULT_FOLDER=/usr/share/webapps/vaultwarden-web
+export ADMIN_TOKEN='${VAULT_ADMIN_HASH}'
+export SIGNUPS_ALLOWED=true
+output_log="/var/log/vaultwarden.log"
+error_log="/var/log/vaultwarden.log"
+EOF_VW
+            ln -sf /usr/share/webapps/vaultwarden-web /var/lib/vaultwarden/web-vault 2>/dev/null || true
+            chown -R vaultwarden:vaultwarden /var/lib/vaultwarden "${VAULT_DATA_DIR}" /usr/share/webapps/vaultwarden-web 2>/dev/null || true
+        fi
+
+        # 4. Forgejo (Git-сервер)
+        if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
+            mkdir -p /var/lib/forgejo/data /etc/forgejo /var/log/forgejo
+            cat << EOF_FORGEJO > /etc/forgejo/app.ini
+APP_NAME = Homelab Git Server
+RUN_USER = forgejo
+RUN_MODE = prod
+
+[server]
+PROTOCOL = http
+DOMAIN = ${GITEA_DOMAIN}
+ROOT_URL = https://${GITEA_DOMAIN}/
+HTTP_ADDR = 127.0.0.1
+HTTP_PORT = 3000
+DISABLE_SSH = false
+SSH_PORT = 22
+
+[database]
+DB_TYPE = sqlite3
+PATH = /var/lib/forgejo/data/forgejo.db
+
+[security]
+INSTALL_LOCK = true
+SECRET_KEY = 4f9e1b2c3d4e5f6a7b8c9d0e1f2a3b4c
+REVERSE_PROXY_TRUSTED_PROXIES = 127.0.0.1
+EOF_FORGEJO
+            chown -R forgejo:www-data /var/lib/forgejo /var/log/forgejo /etc/forgejo 2>/dev/null || true
+        fi
+
+        # 5. Navidrome (Hi-Fi Music)
+        if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+            mkdir -p /var/lib/navidrome "${SAVE_DIR}/music"
+            cat << EOF_NAVI > /etc/navidrome.toml
+Address = "127.0.0.1"
+Port = 4533
+MusicFolder = "${SAVE_DIR}/music"
+DataFolder = "/var/lib/navidrome"
+LogLevel = "info"
+ScanSchedule = "1m"
+EOF_NAVI
+            chown -R navidrome:navidrome /var/lib/navidrome "${SAVE_DIR}/music" 2>/dev/null || true
+        fi
+
+        # 6. qBittorrent
+        if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
+            mkdir -p /var/lib/qbittorrent/.config/qBittorrent
+            cp -f "${APP_DIR}/qbittorrent/config/qBittorrent/qBittorrent.conf" /var/lib/qbittorrent/.config/qBittorrent/qBittorrent.conf 2>/dev/null || true
+            sed -i "s|/downloads/temp/|${SAVE_DIR}/temp/|g; s|/downloads/|${SAVE_DIR}/downloads/|g; s|/vuetorrent|${APP_DIR}/qbittorrent/vuetorrent|g" /var/lib/qbittorrent/.config/qBittorrent/qBittorrent.conf 2>/dev/null || true
+            chown -R qbittorrent:qbittorrent /var/lib/qbittorrent 2>/dev/null || true
+            cat << 'EOF_QBIT_CONF' > /etc/conf.d/qbittorrent-nox
+pidfile="/run/qbittorrent-nox.pid"
+EOF_QBIT_CONF
+        fi
+
+        # 7. Native yt-dlp Web UI Downloader
+        if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
+            cat << 'EOF_YTDL_PY' > "${APP_DIR}/scripts/ytdlp_web.py"
+#!/usr/bin/env python3
+import sys, os, subprocess, json, threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import parse_qs
+
+SAVE_DIR = os.environ.get("SAVED_SAVE_DIR", "/opt/homelab/save")
+DOWNLOADS_DIR = os.path.join(SAVE_DIR, "downloads")
+MUSIC_DIR = os.path.join(SAVE_DIR, "music")
+os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+os.makedirs(MUSIC_DIR, exist_ok=True)
+
+HTML_PAGE = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homelab Downloader</title>
+<style>
+:root { --bg: #0b0f19; --card: #111827; --border: #1f2937; --accent: #38bdf8; --green: #10b981; --text: #f3f4f6; }
+body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px; max-width: 520px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+h1 { color: var(--accent); font-size: 22px; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
+input[type="text"] { width: 100%; box-sizing: border-box; padding: 12px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 14px; }
+select { width: 100%; box-sizing: border-box; padding: 12px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 18px; }
+button { width: 100%; padding: 12px; background: #0284c7; color: #fff; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+button:hover { background: #0369a1; }
+.msg { margin-top: 14px; padding: 10px; border-radius: 6px; font-size: 13px; display: none; }
+.msg.ok { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #10b981; display: block; }
+.msg.err { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid #ef4444; display: block; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🎬 Homelab Downloader</h1>
+  <p style="color:#94a3b8; font-size:13px; margin-bottom:16px;">Вставьте ссылку на видео или музыку (YouTube, VK, RuTube и др.):</p>
+  <form method="POST" action="/download">
+    <input type="text" name="url" placeholder="https://..." required autofocus>
+    <select name="format">
+      <option value="video">Видео (MP4 Лучшее качество)</option>
+      <option value="audio">Аудио (MP3 Музыка)</option>
+    </select>
+    <button type="submit">⬇ Скачать в хранилище</button>
+  </form>
+  <div id="status" class="msg"></div>
+</div>
+</body>
+</html>"""
+
+def run_download(url, fmt):
+    dest = MUSIC_DIR if fmt == "audio" else DOWNLOADS_DIR
+    cmd = ["yt-dlp", "--no-warnings", "-P", dest]
+    if fmt == "audio":
+        cmd += ["-x", "--audio-format", "mp3", "--audio-quality", "0"]
+    else:
+        cmd += ["-f", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]
+    cmd.append(url)
+    try:
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+class DownloaderHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(HTML_PAGE.encode("utf-8"))
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length).decode("utf-8", errors="ignore")
+        data = parse_qs(body)
+        url = data.get("url", [""])[0].strip()
+        fmt = data.get("format", ["video"])[0].strip()
+        if url:
+            threading.Thread(target=run_download, args=(url, fmt), daemon=True).start()
+            resp = HTML_PAGE.replace('<div id="status" class="msg"></div>', '<div id="status" class="msg ok">✔ Загрузка запущена в фоновом режиме! Файл будет сохранен в хранилище.</div>')
+        else:
+            resp = HTML_PAGE.replace('<div id="status" class="msg"></div>', '<div id="status" class="msg err">✖ Введите корректную ссылку.</div>')
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(resp.encode("utf-8"))
+
+if __name__ == "__main__":
+    server = HTTPServer(("127.0.0.1", 8081), DownloaderHandler)
+    server.serve_forever()
+EOF_YTDL_PY
+            chmod 755 "${APP_DIR}/scripts/ytdlp_web.py"
+
+            cat << EOF_YTDL_INIT > /etc/init.d/ytdlp-web
+#!/sbin/openrc-run
+name="ytdlp-web"
+description="yt-dlp Web Media Downloader"
+supervisor="supervise-daemon"
+command="/usr/bin/python3"
+command_args="${APP_DIR}/scripts/ytdlp_web.py"
+output_log="/var/log/ytdlp-web.log"
+error_log="/var/log/ytdlp-web.log"
+respawn_delay=2
+respawn_max=5
+
+depend() {
+    need net
+}
+EOF_YTDL_INIT
+            chmod 755 /etc/init.d/ytdlp-web
+        fi
+
+        # 8. Master OpenRC meta-service
+        cat << 'EOF_HOMELAB_RC' > /etc/init.d/homelab
+#!/sbin/openrc-run
+description="Homelab Native Bare-Metal Appliance"
+
+depend() {
+    need net
+    after network
+}
+
+start() {
+    ebegin "Starting Homelab Appliance Services"
+    for svc in sing-box adguardhome caddy vaultwarden forgejo samba wsdd qbittorrent-nox navidrome ytdlp-web; do
+        if [ -f "/etc/init.d/$svc" ]; then
+            rc-service "$svc" status >/dev/null 2>&1 || rc-service "$svc" start >/dev/null 2>&1 || true
+        fi
+    done
+    [ -x /usr/local/bin/gateway-watchdog.sh ] && /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
+    eend 0
+}
+
+stop() {
+    ebegin "Stopping Homelab Appliance Services"
+    for svc in ytdlp-web navidrome qbittorrent-nox wsdd samba forgejo vaultwarden caddy adguardhome sing-box; do
+        if [ -f "/etc/init.d/$svc" ]; then
+            rc-service "$svc" stop >/dev/null 2>&1 || true
+        fi
+    done
+    eend 0
+}
+
+restart() {
+    ebegin "Restarting Homelab Appliance Services"
+    for svc in sing-box adguardhome caddy vaultwarden forgejo samba wsdd qbittorrent-nox navidrome ytdlp-web; do
+        if [ -f "/etc/init.d/$svc" ]; then
+            rc-service "$svc" restart >/dev/null 2>&1 || true
+        fi
+    done
+    [ -x /usr/local/bin/gateway-watchdog.sh ] && /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
+    eend 0
+}
+EOF_HOMELAB_RC
+        chmod 755 /etc/init.d/homelab
+        rc-update add homelab default >/dev/null 2>&1 || true
+
+        log_ok "Нативные конфигурации OpenRC и Caddyfile успешно подготовлены"
+        return 0
     fi
 
     local CADDY_IMAGE="serfriz/caddy-duckdns:latest"
@@ -4654,9 +5236,14 @@ depend() {
 }
 start() {
     ebegin "Starting Homelab Docker Compose Stack"
+    local retries=0
+    while [ ! -S /var/run/docker.sock ] && [ \$retries -lt 15 ]; do
+        sleep 1
+        retries=\$((retries + 1))
+    done
     cd "${APP_DIR}" && /usr/local/bin/dc up -d
-    local ec=$?
-    /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
+    local ec=\$?
+    [ -x /usr/local/bin/gateway-watchdog.sh ] && /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
     eend \$ec
 }
 stop() {
@@ -4903,8 +5490,49 @@ EOF_NAVI_BKP_TMR
 
     cd "${APP_DIR}"
 
-    if [ "${IS_UPGRADE_MODE:-0}" -ne 1 ]; then
-        log_info "Загрузка Docker-образов стека с поддержкой зеркал и докачки..."
+    if [ "${DISTRO_FAMILY}" = "alpine" ] || is_native; then
+        log_info "Активация и запуск нативных служб комплекса под управлением OpenRC..."
+        local NATIVE_SVCS=(sing-box adguardhome caddy)
+        [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(vaultwarden)
+        [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(forgejo)
+        [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(samba wsdd)
+        [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(qbittorrent-nox)
+        [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(navidrome)
+        [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(ytdlp-web)
+
+        for svc in "${NATIVE_SVCS[@]}"; do
+            if [ -f "/etc/init.d/${svc}" ]; then
+                rc-update add "${svc}" default >/dev/null 2>&1 || true
+                run_spin "Запуск службы ${svc} (OpenRC)" bash -c "rc-service '${svc}' restart 2>/dev/null || (sleep 1 && rc-service '${svc}' restart) || rc-service '${svc}' start"
+            fi
+        done
+
+        if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]] && command -v forgejo >/dev/null 2>&1; then
+            log_info "Инициализация учетной записи администратора Forgejo (${ADMIN_USER})..."
+            su forgejo -s /bin/sh -c "FORGEJO_WORK_DIR=/var/lib/forgejo forgejo admin user create --config /etc/forgejo/app.ini --admin --username '${ADMIN_USER}' --password '${MASTER_PASS}' --email '${ADMIN_USER}@example.lan' --must-change-password=false" 2>/dev/null || \
+            su forgejo -s /bin/sh -c "FORGEJO_WORK_DIR=/var/lib/forgejo forgejo admin user change-password --config /etc/forgejo/app.ini --username '${ADMIN_USER}' --password '${MASTER_PASS}'" 2>/dev/null || true
+            log_ok "Администратор Forgejo (${ADMIN_USER}) готов к работе"
+        fi
+
+        if [ "$SSL_MODE" = "1" ]; then
+            log_info "Экспорт локального корневого сертификата CA Caddy..."
+            local CADDY_ROOT_CERT="/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt"
+            for _ in {1..15}; do
+                if [ -f "${CADDY_ROOT_CERT}" ]; then
+                    mkdir -p "${SAVE_DIR}/certificates"
+                    cp -f "${CADDY_ROOT_CERT}" "${SAVE_DIR}/certificates/caddy-root.crt"
+                    chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/certificates" 2>/dev/null || true
+                    chmod 644 "${SAVE_DIR}/certificates/caddy-root.crt" 2>/dev/null || true
+                    log_ok "Сертификат CA сохранен: ${SAVE_DIR}/certificates/caddy-root.crt"
+                    break
+                fi
+                sleep 1
+            done
+        fi
+        log_ok "Все нативные службы комплекса успешно инициализированы"
+
+    else
+        log_info "Проверка наличия и загрузка Docker-образов стека..."
         local IMAGES=()
         if dc config --images >/dev/null 2>&1; then
             while IFS= read -r line; do
@@ -4932,7 +5560,6 @@ EOF_NAVI_BKP_TMR
                 fi
             done
 
-            # 2. Прямой pull через префиксы проверенных российских зеркал Docker Hub
             if [ $PULL_DONE -eq 0 ]; then
                 local PREFIX_IMG="${img}"
                 [[ ! "${PREFIX_IMG}" =~ / ]] && PREFIX_IMG="library/${PREFIX_IMG}"
@@ -4948,7 +5575,6 @@ EOF_NAVI_BKP_TMR
                 done
             fi
 
-            # 3. Прямой fallback на независимые реестры (ghcr.io / lscr.io)
             if [ $PULL_DONE -eq 0 ]; then
                 local FALLBACK_IMG=""
                 case "${img}" in
@@ -4974,50 +5600,47 @@ EOF_NAVI_BKP_TMR
                 fi
             fi
         done
-    else
-        log_info "Режим обновления ядра: повторная загрузка образов пропущена (образы сохранены)"
-    fi
 
-    log_info "Запуск контейнеров стека (Docker Compose)..."
-    local UP_OK=0
-    for up_att in 1 2 3 4; do
-        if dc up -d; then
-            UP_OK=1
-            log_ok "Все контейнеры стека успешно запущены"
-            break
-        else
-            log_warn "Попытка запуска ${up_att}/4 завершилась с ошибкой, повторная попытка через 5 сек..."
-            sleep 5
+        log_info "Запуск контейнеров стека (Docker Compose)..."
+        local UP_OK=0
+        for up_att in 1 2 3 4; do
+            if dc up -d; then
+                UP_OK=1
+                log_ok "Все контейнеры стека успешно запущены"
+                break
+            else
+                log_warn "Попытка запуска ${up_att}/4 завершилась с ошибкой, повторная попытка через 5 сек..."
+                sleep 5
+            fi
+        done
+        if [ $UP_OK -eq 0 ]; then
+            log_err "Критическая ошибка запуска контейнеров через Docker Compose!"
+            return 1
         fi
-    done
-    if [ $UP_OK -eq 0 ]; then
-        log_err "Критическая ошибка запуска контейнеров через Docker Compose!"
-        return 1
-    fi
 
-    if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
-        if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
-            log_ok "Режим обновления: существующий администратор Gitea (${ADMIN_USER}) сохранен"
-        else
-            log_info "Автоматическая инициализация администратора Gitea (${ADMIN_USER})..."
-            local GITEA_READY=0
-            for i in {1..40}; do
-                if docker inspect -f '{{.State.Status}}' gitea 2>/dev/null | grep -q "running"; then
-                    if docker exec gitea wget -q -O - http://localhost:3000/api/v1/version >/dev/null 2>&1 || \
-                       docker exec gitea curl -sf http://localhost:3000/api/v1/version >/dev/null 2>&1 || \
-                       [ $i -ge 12 ]; then
-                        
-                        if docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u "${USER_UID}:${USER_GID}" gitea sh -c 'gitea admin user create --config /data/gitea/conf/app.ini --admin --username "$1" --password "$GITEA_ADMIN_PWD" --email "$1@example.lan" --must-change-password=false' _ "${ADMIN_USER}" >/dev/null 2>&1 || \
-                           docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u git gitea sh -c 'gitea admin user create --config /data/gitea/conf/app.ini --admin --username "$1" --password "$GITEA_ADMIN_PWD" --email "$1@example.lan" --must-change-password=false' _ "${ADMIN_USER}" >/dev/null 2>&1; then
-                            log_ok "Администратор Gitea (${ADMIN_USER}) успешно создан с мастер-паролем"
-                            GITEA_READY=1
-                        elif docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u git gitea sh -c 'gitea admin user change-password --config /data/gitea/conf/app.ini --username "$1" --password "$GITEA_ADMIN_PWD"' _ "${ADMIN_USER}" >/dev/null 2>&1; then
-                            log_ok "Пароль администратора Gitea (${ADMIN_USER}) успешно обновлен на мастер-пароль"
-                            GITEA_READY=1
-                        fi
+        if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
+            if [ "${IS_UPGRADE_MODE:-0}" -eq 1 ]; then
+                log_ok "Режим обновления: существующий администратор Gitea (${ADMIN_USER}) сохранен"
+            else
+                log_info "Автоматическая инициализация администратора Gitea (${ADMIN_USER})..."
+                local GITEA_READY=0
+                for i in {1..40}; do
+                    if docker inspect -f '{{.State.Status}}' gitea 2>/dev/null | grep -q "running"; then
+                        if docker exec gitea wget -q -O - http://localhost:3000/api/v1/version >/dev/null 2>&1 || \
+                           docker exec gitea curl -sf http://localhost:3000/api/v1/version >/dev/null 2>&1 || \
+                           [ $i -ge 12 ]; then
+                            
+                            if docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u "${USER_UID}:${USER_GID}" gitea sh -c 'gitea admin user create --config /data/gitea/conf/app.ini --admin --username "$1" --password "$GITEA_ADMIN_PWD" --email "$1@example.lan" --must-change-password=false' _ "${ADMIN_USER}" >/dev/null 2>&1 || \
+                               docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u git gitea sh -c 'gitea admin user create --config /data/gitea/conf/app.ini --admin --username "$1" --password "$GITEA_ADMIN_PWD" --email "$1@example.lan" --must-change-password=false' _ "${ADMIN_USER}" >/dev/null 2>&1; then
+                                log_ok "Администратор Gitea (${ADMIN_USER}) успешно создан с мастер-паролем"
+                                GITEA_READY=1
+                            elif docker exec -i -e GITEA_ADMIN_PWD="${MASTER_PASS}" -u git gitea sh -c 'gitea admin user change-password --config /data/gitea/conf/app.ini --username "$1" --password "$GITEA_ADMIN_PWD"' _ "${ADMIN_USER}" >/dev/null 2>&1; then
+                                log_ok "Пароль администратора Gitea (${ADMIN_USER}) успешно обновлен на мастер-пароль"
+                                GITEA_READY=1
+                            fi
 
-                        if [ "${GITEA_READY}" -eq 1 ]; then
-                            python3 -c "
+                            if [ "${GITEA_READY}" -eq 1 ]; then
+                                python3 -c "
 import sqlite3, glob, sys
 db_paths = glob.glob('${GITEA_DATA_DIR}/**/gitea.db', recursive=True) + glob.glob('${SAVE_DIR}/**/gitea.db', recursive=True)
 for p in set(db_paths):
@@ -5029,35 +5652,36 @@ for p in set(db_paths):
     except Exception:
         pass
 " 2>/dev/null || true
-                            break
+                                break
+                            fi
                         fi
                     fi
-                fi
-                sleep 2
-            done
-            [ $GITEA_READY -eq 0 ] && log_warn "Не удалось инициализировать админа Gitea (контейнер запускается в фоновом режиме)"
-        fi
-    fi
-
-    if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
-        log_ok "Сервис Navidrome готов к работе (порт 4533 / ${MUSIC_DOMAIN})"
-        log_info "Создание учетной записи администратора Navidrome выполняется в веб-интерфейсе при первом открытии: https://${MUSIC_DOMAIN}"
-    fi
-
-    if [ "$SSL_MODE" = "1" ]; then
-        log_info "Экспорт локального корневого сертификата CA Caddy..."
-        local CADDY_ROOT_CERT="${APP_DIR}/caddy/data/caddy/pki/authorities/local/root.crt"
-        for _ in {1..30}; do
-            if [ -f "${CADDY_ROOT_CERT}" ]; then
-                mkdir -p "${SAVE_DIR}/certificates"
-                cp -f "${CADDY_ROOT_CERT}" "${SAVE_DIR}/certificates/caddy-root.crt"
-                chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/certificates" 2>/dev/null || true
-                chmod 644 "${SAVE_DIR}/certificates/caddy-root.crt" 2>/dev/null || true
-                log_ok "Сертификат CA сохранен: ${SAVE_DIR}/certificates/caddy-root.crt"
-                break
+                    sleep 2
+                done
+                [ $GITEA_READY -eq 0 ] && log_warn "Не удалось инициализировать админа Gitea (контейнер запускается в фоновом режиме)"
             fi
-            sleep 1
-        done
+        fi
+
+        if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+            log_ok "Сервис Navidrome готов к работе (порт 4533 / ${MUSIC_DOMAIN})"
+            log_info "Создание учетной записи администратора Navidrome выполняется в веб-интерфейсе при первом открытии: https://${MUSIC_DOMAIN}"
+        fi
+
+        if [ "$SSL_MODE" = "1" ]; then
+            log_info "Экспорт локального корневого сертификата CA Caddy..."
+            local CADDY_ROOT_CERT="${APP_DIR}/caddy/data/caddy/pki/authorities/local/root.crt"
+            for _ in {1..30}; do
+                if [ -f "${CADDY_ROOT_CERT}" ]; then
+                    mkdir -p "${SAVE_DIR}/certificates"
+                    cp -f "${CADDY_ROOT_CERT}" "${SAVE_DIR}/certificates/caddy-root.crt"
+                    chown -R "${USER_UID}:${USER_GID}" "${SAVE_DIR}/certificates" 2>/dev/null || true
+                    chmod 644 "${SAVE_DIR}/certificates/caddy-root.crt" 2>/dev/null || true
+                    log_ok "Сертификат CA сохранен: ${SAVE_DIR}/certificates/caddy-root.crt"
+                    break
+                fi
+                sleep 1
+            done
+        fi
     fi
 
     log_info "Установка консольной утилиты управления комплексом (/usr/local/bin/homelab)..."
@@ -5090,6 +5714,10 @@ TAG_ERR="${CLR_RED}✖${CLR_RESET}"
 TAG_WARN="${CLR_YELLOW}▲${CLR_RESET}"
 TAG_INFO="${CLR_CYAN}✦${CLR_RESET}"
 
+is_native() {
+    [ "${SAVED_INIT_SYSTEM:-${INIT_SYSTEM:-}}" = "openrc" ] || [ -f /sbin/openrc-run ] || ! command -v docker >/dev/null 2>&1
+}
+
 dc_cmd() {
     if [ -x /usr/local/bin/dc ]; then
         /usr/local/bin/dc "$@"
@@ -5111,16 +5739,13 @@ norm_service() {
     case "$s" in
         adguard|adguardhome) echo "adguardhome" ;;
         vault|vaultwarden) echo "vaultwarden" ;;
-        torrent|qbittorrent) echo "qbittorrent" ;;
+        torrent|qbittorrent) echo "qbittorrent-nox" ;;
         music|navidrome) echo "navidrome" ;;
-        tube|video|metube) echo "metube" ;;
-        git|gitea) echo "gitea" ;;
-        proxy|clash|meta|mihomo) echo "mihomo" ;;
+        tube|video|metube) echo "ytdlp-web" ;;
+        git|gitea|forgejo) echo "forgejo" ;;
+        proxy|clash|meta|mihomo|singbox|sing-box) echo "sing-box" ;;
         smb|samba) echo "samba" ;;
         caddy|web|proxy-web) echo "caddy" ;;
-        logs|dozzle) echo "dozzle" ;;
-        autoheal) echo "autoheal" ;;
-        watchtower) echo "watchtower" ;;
         *) echo "$s" ;;
     esac
 }
@@ -5168,64 +5793,83 @@ cmd_status() {
     fi
     echo -e "  ${CLR_WHITE}• Фаервол / NAT:${CLR_RESET}     ${FW_STATUS}"
 
-    if docker inspect metube >/dev/null 2>&1; then
-        local c_file="${target_save}/downloads/.metube/cookies.txt"
-        if [ -s "${c_file}" ]; then
-            local c_sz
-            c_sz=$(ls -lh "${c_file}" 2>/dev/null | awk '{print $5}' || echo "OK")
-            echo -e "  ${CLR_WHITE}• YouTube Cookies:${CLR_RESET}   ${CLR_GREEN}🟢 Загружен (${c_sz})${CLR_RESET}"
-        else
-            echo -e "  ${CLR_WHITE}• YouTube Cookies:${CLR_RESET}   ${CLR_YELLOW}🟡 Не загружен (команда: homelab cookies)${CLR_RESET}"
-        fi
+    if [ "${SAVED_ROUTER_MODE:-1}" = "2" ]; then
+        echo -e "  ${CLR_WHITE}• Топология сети:${CLR_RESET}    ${CLR_GREEN}Домашний маршрутизатор (WAN: ${SAVED_WAN_IFACE:-eth0}, LAN: ${SAVED_LAN_IFACE:-eth1}, MAC: ${SAVED_WAN_MAC:-})${CLR_RESET}"
+    else
+        echo -e "  ${CLR_WHITE}• Топология сети:${CLR_RESET}    ${CLR_GREEN}Прозрачный шлюз (LAN: ${SAVED_PHYS_IFACE:-eth0})${CLR_RESET}"
     fi
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
     echo ""
 
-    echo -e "${CLR_CYAN}${CLR_BOLD}╭── СТАТУС КОНТЕЙНЕРОВ DOCKER ─────────────────────────────────${CLR_RESET}"
-    printf "  %-18s %-12s %-14s %-10s\n" "СЕРВИС" "СТАТУС" "ЗДОРОВЬЕ" "ПАМЯТЬ"
-    echo -e "  ─────────────────────────────────────────────────────────────"
-    
-    local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "metube" "navidrome" "samba" "dozzle" "watchtower" "autoheal")
-    declare -A DOCKER_MEM
-    if command -v docker >/dev/null 2>&1; then
-        while read -r d_name d_mem; do
-            [ -n "$d_name" ] && DOCKER_MEM["$d_name"]="$d_mem"
-        done < <(docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' 2>/dev/null | awk '{print $1, $2}' || true)
-    fi
+    if is_native; then
+        echo -e "${CLR_CYAN}${CLR_BOLD}╭── СТАТУС СЛУЖБ OPENRC (NATIVE BARE-METAL) ──────────────────${CLR_RESET}"
+        printf "  %-18s %-22s %-10s\n" "СЛУЖБА" "СТАТУС" "ОЗУ (RSS)"
+        echo -e "  ─────────────────────────────────────────────────────────────"
+        local NATIVE_SVCS=("sing-box" "adguardhome" "caddy" "vaultwarden" "forgejo" "samba" "wsdd" "qbittorrent-nox" "navidrome" "ytdlp-web")
+        for svc in "${NATIVE_SVCS[@]}"; do
+            if [ -f "/etc/init.d/$svc" ]; then
+                local st_raw
+                st_raw=$(rc-service "$svc" status 2>&1 || true)
+                local st_str="${CLR_RED}Stopped${CLR_RESET}"
+                if echo "$st_raw" | grep -q "started"; then
+                    st_str="${CLR_GREEN}Started (OpenRC)${CLR_RESET}"
+                fi
+                local pat="$svc"
+                [ "$svc" = "samba" ] && pat="smbd"
+                [ "$svc" = "ytdlp-web" ] && pat="ytdlp_web"
+                local mem_str
+                mem_str=$(ps -eo rss,args 2>/dev/null | awk -v p="$pat" 'tolower($0) ~ tolower(p) && $0 !~ /awk/ {sum+=$1} END {if (sum>0) printf "%.1f MB", sum/1024; else print "—"}')
+                printf "  %-18s %-32b %-10s\n" "$svc" "$st_str" "$mem_str"
+            fi
+        done
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
 
-    for c in "${CONTAINERS[@]}"; do
-        if docker inspect "$c" >/dev/null 2>&1; then
-            local state
-            state=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo "stopped")
-            local health
-            health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null || echo "none")
-            local mem="${DOCKER_MEM[$c]:-—}"
-            
-            local state_str="${CLR_GREEN}Running${CLR_RESET}"
-            [ "$state" != "running" ] && state_str="${CLR_RED}${state}${CLR_RESET}"
-            
-            local health_str="${CLR_DIM}—${CLR_RESET}"
-            [ "$health" = "healthy" ] && health_str="${CLR_GREEN}Healthy${CLR_RESET}"
-            [ "$health" = "starting" ] && health_str="${CLR_YELLOW}Starting${CLR_RESET}"
-            [ "$health" = "unhealthy" ] && health_str="${CLR_RED}UNHEALTHY${CLR_RESET}"
-            
-            printf "  %-18s %-22b %-24b %-10s\n" "$c" "$state_str" "$health_str" "${mem}"
+    else
+        echo -e "${CLR_CYAN}${CLR_BOLD}╭── СТАТУС КОНТЕЙНЕРОВ DOCKER ─────────────────────────────────${CLR_RESET}"
+        printf "  %-18s %-12s %-14s %-10s\n" "СЕРВИС" "СТАТУС" "ЗДОРОВЬЕ" "ПАМЯТЬ"
+        echo -e "  ─────────────────────────────────────────────────────────────"
+        
+        local CONTAINERS=("adguardhome" "mihomo" "caddy" "vaultwarden" "gitea" "qbittorrent" "metube" "navidrome" "samba" "dozzle" "watchtower" "autoheal")
+        declare -A DOCKER_MEM
+        if command -v docker >/dev/null 2>&1; then
+            while read -r d_name d_mem; do
+                [ -n "$d_name" ] && DOCKER_MEM["$d_name"]="$d_mem"
+            done < <(docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' 2>/dev/null | awk '{print $1, $2}' || true)
         fi
-    done
-    echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+
+        for c in "${CONTAINERS[@]}"; do
+            if docker inspect "$c" >/dev/null 2>&1; then
+                local state
+                state=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo "stopped")
+                local health
+                health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null || echo "none")
+                local mem="${DOCKER_MEM[$c]:-—}"
+                
+                local state_str="${CLR_GREEN}Running${CLR_RESET}"
+                [ "$state" != "running" ] && state_str="${CLR_RED}${state}${CLR_RESET}"
+                
+                local health_str="${CLR_DIM}—${CLR_RESET}"
+                [ "$health" = "healthy" ] && health_str="${CLR_GREEN}Healthy${CLR_RESET}"
+                [ "$health" = "starting" ] && health_str="${CLR_YELLOW}Starting${CLR_RESET}"
+                [ "$health" = "unhealthy" ] && health_str="${CLR_RED}UNHEALTHY${CLR_RESET}"
+                
+                printf "  %-18s %-22b %-24b %-10s\n" "$c" "$state_str" "$health_str" "${mem}"
+            fi
+        done
+        echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+    fi
 
     echo ""
     echo -e "${CLR_CYAN}${CLR_BOLD}╭── АДРЕСА СЕРВИСОВ И ВЕБ-ПОРТАЛОВ ────────────────────────────${CLR_RESET}"
     local BASE_IP="${SAVED_LOCAL_IP:-${LOCAL_IP:-127.0.0.1}}"
     [ -n "${SAVED_MUSIC_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🎵 Музыка (Navidrome):${CLR_RESET}   https://${SAVED_MUSIC_DOMAIN} (порт 4533)"
-    [ -n "${SAVED_METUBE_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🎬 Загрузчик (MeTube):${CLR_RESET}   https://${SAVED_METUBE_DOMAIN} (порт 8081)"
+    [ -n "${SAVED_METUBE_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🎬 Загрузчик (Медиа):${CLR_RESET}    https://${SAVED_METUBE_DOMAIN} (порт 8081)"
     [ -n "${SAVED_TORRENT_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}📥 Торренты (qBit):${CLR_RESET}      https://${SAVED_TORRENT_DOMAIN} (порт 8080)"
     [ -n "${SAVED_VAULT_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🔑 Пароли (Vaultwarden):${CLR_RESET} https://${SAVED_VAULT_DOMAIN}"
-    [ -n "${SAVED_GITEA_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🐙 Git-сервер (Gitea):${CLR_RESET}   https://${SAVED_GITEA_DOMAIN} (порт 3000)"
+    [ -n "${SAVED_GITEA_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🐙 Git-сервер (Forgejo):${CLR_RESET} https://${SAVED_GITEA_DOMAIN} (порт 3000)"
     [ -n "${SAVED_ADGUARD_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🛡️  DNS (AdGuard Home):${CLR_RESET}   https://${SAVED_ADGUARD_DOMAIN} (порт 8083)"
-    [ -n "${SAVED_PROXY_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🚀 Прокси (Mihomo UI):${CLR_RESET}   https://${SAVED_PROXY_DOMAIN}"
-    [ -n "${SAVED_LOGS_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}📋 Логи (Dozzle):${CLR_RESET}        https://${SAVED_LOGS_DOMAIN}"
-    if docker inspect samba >/dev/null 2>&1; then
+    [ -n "${SAVED_PROXY_DOMAIN:-}" ] && echo -e "  ${CLR_WHITE}🚀 Прокси (sing-box UI):${CLR_RESET} https://${SAVED_PROXY_DOMAIN}"
+    if [ -f /etc/init.d/samba ] || docker inspect samba >/dev/null 2>&1; then
         echo -e "  ${CLR_WHITE}📂 Samba Хранилище:${CLR_RESET}      \\\\${BASE_IP}\\${SAVED_SHARE_NAME:-storage} и \\\\${BASE_IP}\\music"
     fi
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
@@ -5233,6 +5877,21 @@ cmd_status() {
 
 cmd_restart() {
     local target="${1:-}"
+    if is_native; then
+        if [ -n "$target" ]; then
+            target=$(norm_service "$target")
+            echo -e "  ${TAG_INFO} Перезапуск нативной службы OpenRC ${CLR_WHITE}${target}${CLR_RESET}..."
+            rc-service "$target" restart 2>/dev/null || rc-service "${target}-nox" restart 2>/dev/null || true
+            echo -e "  ${TAG_OK} Служба ${target} перезапущена"
+        else
+            echo -e "  ${TAG_INFO} Перезапуск всего комплекса Homelab (OpenRC)..."
+            /usr/local/bin/gateway-watchdog.sh 2>/dev/null || true
+            rc-service homelab restart 2>/dev/null || true
+            echo -e "  ${TAG_OK} Все службы успешно перезапущены"
+        fi
+        return 0
+    fi
+
     if [ -n "$target" ]; then
         target=$(norm_service "$target")
         shift || true
@@ -5249,6 +5908,20 @@ cmd_restart() {
 
 cmd_stop() {
     local target="${1:-}"
+    if is_native; then
+        if [ -n "$target" ]; then
+            target=$(norm_service "$target")
+            echo -e "  ${TAG_INFO} Остановка службы OpenRC ${CLR_WHITE}${target}${CLR_RESET}..."
+            rc-service "$target" stop 2>/dev/null || rc-service "${target}-nox" stop 2>/dev/null || true
+            echo -e "  ${TAG_OK} Служба ${target} остановлена"
+        else
+            echo -e "  ${TAG_INFO} Остановка всех служб Homelab (OpenRC)..."
+            rc-service homelab stop 2>/dev/null || true
+            echo -e "  ${TAG_OK} Все службы остановлены"
+        fi
+        return 0
+    fi
+
     if [ -n "$target" ]; then
         target=$(norm_service "$target")
         shift || true
@@ -5264,6 +5937,20 @@ cmd_stop() {
 
 cmd_start() {
     local target="${1:-}"
+    if is_native; then
+        if [ -n "$target" ]; then
+            target=$(norm_service "$target")
+            echo -e "  ${TAG_INFO} Запуск службы OpenRC ${CLR_WHITE}${target}${CLR_RESET}..."
+            rc-service "$target" start 2>/dev/null || rc-service "${target}-nox" start 2>/dev/null || true
+            echo -e "  ${TAG_OK} Служба ${target} запущена"
+        else
+            echo -e "  ${TAG_INFO} Запуск всех служб Homelab (OpenRC)..."
+            rc-service homelab start 2>/dev/null || true
+            echo -e "  ${TAG_OK} Все службы запущены"
+        fi
+        return 0
+    fi
+
     if [ -n "$target" ]; then
         target=$(norm_service "$target")
         shift || true
@@ -5277,12 +5964,87 @@ cmd_start() {
     fi
 }
 
+cmd_mac() {
+    local iface="${SAVED_WAN_IFACE:-${DEFAULT_IFACE:-eth0}}"
+    local new_mac="${1:-}"
+    if [ -n "$new_mac" ]; then
+        echo -e "  ${TAG_INFO} Клонирование MAC-адреса на интерфейсе ${iface}: ${new_mac}..."
+        ip link set dev "$iface" down 2>/dev/null || true
+        if ip link set dev "$iface" address "$new_mac" 2>/dev/null; then
+            ip link set dev "$iface" up 2>/dev/null || true
+            if [ -f /etc/network/interfaces ]; then
+                sed -i "/hwaddress ether/d" /etc/network/interfaces 2>/dev/null || true
+                sed -i "/iface ${iface} inet/a \    hwaddress ether ${new_mac}" /etc/network/interfaces 2>/dev/null || true
+            fi
+            echo -e "  ${TAG_OK} MAC-адрес интерфейса ${iface} успешно изменен на ${CLR_GREEN}${new_mac}${CLR_RESET}!"
+        else
+            ip link set dev "$iface" up 2>/dev/null || true
+            echo -e "  ${TAG_ERR} Ошибка смены MAC-адреса на ${new_mac}."
+        fi
+    else
+        local cur_mac
+        cur_mac=$(cat "/sys/class/net/${iface}/address" 2>/dev/null || ip link show "$iface" 2>/dev/null | awk '/ether/{print $2}')
+        echo -e "  ${CLR_WHITE}Интерфейс WAN:${CLR_RESET}     ${CLR_YELLOW}${iface}${CLR_RESET}"
+        echo -e "  ${CLR_WHITE}Текущий MAC-адрес:${CLR_RESET} ${CLR_GREEN}${cur_mac}${CLR_RESET}"
+        echo -e "  ${CLR_DIM}Для смены/симуляции MAC выполните: sudo homelab mac AA:BB:CC:DD:EE:FF${CLR_RESET}"
+    fi
+}
+
 cmd_logs() {
     local target="${1:-}"
     if [ "$target" = "dump" ] || [ "$target" = "--dump" ] || [ "$target" = "export" ]; then
         shift || true
         cmd_dump_logs "$@"
         return
+    fi
+    if is_native; then
+        local follow=""
+        local tail_lines=50
+        for arg in "$@"; do
+            case "$arg" in
+                -f|--follow) follow="-f" ;;
+                -n=*|--tail=*) tail_lines="${arg#*=}" ;;
+                -n|--tail) ;;
+                *) [ -z "$target" ] && target="$arg" ;;
+            esac
+        done
+        target=$(norm_service "${target:-all}")
+        case "$target" in
+            sing-box)
+                [ -f /var/log/sing-box.log ] && tail ${follow} -n ${tail_lines} /var/log/sing-box.log || grep -i sing-box /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            adguardhome)
+                [ -f /var/log/adguardhome.log ] && tail ${follow} -n ${tail_lines} /var/log/adguardhome.log || grep -i adguard /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            caddy)
+                [ -f /var/log/caddy.log ] && tail ${follow} -n ${tail_lines} /var/log/caddy.log || grep -i caddy /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            vaultwarden)
+                [ -f /var/log/vaultwarden.log ] && tail ${follow} -n ${tail_lines} /var/log/vaultwarden.log || grep -i vaultwarden /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            forgejo)
+                [ -f /var/log/forgejo/http.log ] && tail ${follow} -n ${tail_lines} /var/log/forgejo/http.log || [ -f /var/lib/forgejo/log/gitea.log ] && tail ${follow} -n ${tail_lines} /var/lib/forgejo/log/gitea.log
+                ;;
+            samba)
+                [ -f /var/log/samba/smbd.log ] && tail ${follow} -n ${tail_lines} /var/log/samba/smbd.log
+                ;;
+            wsdd)
+                [ -f /var/log/wsdd.log ] && tail ${follow} -n ${tail_lines} /var/log/wsdd.log
+                ;;
+            qbittorrent-nox)
+                [ -f /var/log/qbittorrent.log ] && tail ${follow} -n ${tail_lines} /var/log/qbittorrent.log || tail ${follow} -n ${tail_lines} /home/homelab/.local/share/data/qBittorrent/logs/qbittorrent.log 2>/dev/null || true
+                ;;
+            navidrome)
+                [ -f /var/log/navidrome.log ] && tail ${follow} -n ${tail_lines} /var/log/navidrome.log
+                ;;
+            ytdlp-web)
+                [ -f /var/log/ytdlp-web.log ] && tail ${follow} -n ${tail_lines} /var/log/ytdlp-web.log || grep -i ytdlp /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            all|*)
+                tail ${follow} -n ${tail_lines} /var/log/messages 2>/dev/null || true
+                ;;
+        esac
+        return 0
     fi
     if [ -n "$target" ]; then
         shift || true
@@ -5346,22 +6108,40 @@ cmd_doctor() {
             echo -e "  ${TAG_ERR} DNS Резолвер AdGuard Home (порт 53):    ${CLR_RED}[НЕ ОТВЕЧАЕТ]${CLR_RESET}"
         fi
 
-        if python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 1053)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
-            echo -e "  ${TAG_OK} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
-        else
-            echo -e "  ${TAG_WARN} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
-        fi
+        if is_native; then
+            if ip link show tun0 >/dev/null 2>&1; then
+                echo -e "  ${TAG_OK} Сетевой TUN интерфейс sing-box (tun0):  ${CLR_GREEN}[АКТИВЕН И ПОДНЯТ]${CLR_RESET}"
+            else
+                echo -e "  ${TAG_WARN} Сетевой TUN интерфейс sing-box (tun0):  ${CLR_YELLOW}[НЕ СОЗДАН/ОЖИДАНИЕ]${CLR_RESET}"
+            fi
 
-        if python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null; then
-            echo -e "  ${TAG_OK} REST API Mihomo (порт 9090):            ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
-        else
-            echo -e "  ${TAG_WARN} REST API Mihomo (порт 9090):            ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
-        fi
+            if python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null; then
+                echo -e "  ${TAG_OK} Clash API sing-box (порт 9090):         ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+            else
+                echo -e "  ${TAG_WARN} Clash API sing-box (порт 9090):         ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
+            fi
 
-        if ip link show Meta >/dev/null 2>&1; then
-            echo -e "  ${TAG_OK} Сетевой TUN интерфейс ядра (Meta):      ${CLR_GREEN}[АКТИВЕН И ПОДНЯТ]${CLR_RESET}"
+            if [ -f /etc/sing-box/config.json ] && grep -q 'vless' /etc/sing-box/config.json 2>/dev/null; then
+                echo -e "  ${TAG_OK} Прокси-узлы sing-box (VLESS/Reality):    ${CLR_GREEN}[АКТИВНЫ И ЗАГРУЖЕНЫ]${CLR_RESET}"
+            fi
         else
-            echo -e "  ${TAG_WARN} Сетевой TUN интерфейс ядра (Meta):      ${CLR_YELLOW}[НЕ СОЗДАН/ОЖИДАНИЕ]${CLR_RESET}"
+            if python3 -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01', ('127.0.0.1', 1053)); d, _ = s.recvfrom(512); exit(0 if len(d) > 12 else 1)" 2>/dev/null; then
+                echo -e "  ${TAG_OK} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+            else
+                echo -e "  ${TAG_WARN} DNS Ядро Mihomo Fake-IP (порт 1053):    ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
+            fi
+
+            if python3 -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 9090)); s.close()" 2>/dev/null; then
+                echo -e "  ${TAG_OK} REST API Mihomo (порт 9090):            ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
+            else
+                echo -e "  ${TAG_WARN} REST API Mihomo (порт 9090):            ${CLR_YELLOW}[ОЖИДАНИЕ/ОТКЛЮЧЕН]${CLR_RESET}"
+            fi
+
+            if ip link show Meta >/dev/null 2>&1; then
+                echo -e "  ${TAG_OK} Сетевой TUN интерфейс ядра (Meta):      ${CLR_GREEN}[АКТИВЕН И ПОДНЯТ]${CLR_RESET}"
+            else
+                echo -e "  ${TAG_WARN} Сетевой TUN интерфейс ядра (Meta):      ${CLR_YELLOW}[НЕ СОЗДАН/ОЖИДАНИЕ]${CLR_RESET}"
+            fi
         fi
     else
         echo -e "  ${TAG_INFO} Сетевой шлюз (AdGuard + Mihomo):       ${CLR_DIM}[ОТКЛЮЧЕН В КОНФИГУРАЦИИ]${CLR_RESET}"
@@ -5899,6 +6679,7 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}update${CLR_RESET}              Обновление всех Docker-образов стека"
     echo -e "  ${CLR_WHITE}upgrade [--force]${CLR_RESET}   Бесшовный апгрейд ядра комплекса из GitHub (OTA)"
     echo -e "  ${CLR_WHITE}rollback${CLR_RESET}            Откат к предыдущей версии из снимка восстановления"
+    echo -e "  ${CLR_WHITE}mac [новый_mac]${CLR_RESET}     Просмотр или клонирование MAC-адреса WAN"
     echo -e "  ${CLR_WHITE}version${CLR_RESET}             Проверить установленную версию и обновления на GitHub"
     echo -e "  ${CLR_WHITE}unlock${CLR_RESET}              Ручная разблокировка шифрованного диска LUKS"
     echo -e "  ${CLR_WHITE}help${CLR_RESET}                Показать эту справку"
@@ -5911,6 +6692,7 @@ case "${1:-status}" in
     stop) shift; cmd_stop "$@" ;;
     start) shift; cmd_start "$@" ;;
     logs) shift; cmd_logs "$@" ;;
+    mac|spoof-mac|clone-mac) shift; cmd_mac "$@" ;;
     dump|dump-logs|export-logs|collect|report) shift; cmd_dump_logs "$@" ;;
     install-log|deploy-log|inst-log) shift; cmd_install_log "$@" ;;
     backup) cmd_backup ;;
@@ -6005,67 +6787,113 @@ EOF_DIAG
     echo -e "  ${CLR_CYAN}Проверка статуса запущенных сервисов и сетевых портов...${CLR_RESET}"
     echo ""
 
-    if docker info >/dev/null 2>&1; then
-        echo -e "    ${TAG_OK} Docker Daemon:           ${CLR_GREEN}[РАБОТАЕТ]${CLR_RESET}"
-        echo "Docker Daemon: OK" >> "${DIAG_LOG}"
-    else
-        echo -e "    ${TAG_ERR} Docker Daemon:           ${CLR_RED}[НЕ ОТВЕЧАЕТ]${CLR_RESET}"
-        echo "Docker Daemon: FAILED" >> "${DIAG_LOG}"
-        HAS_ISSUES=1
-    fi
+    if is_native; then
+        echo -e "    ${TAG_OK} OpenRC Init System:       ${CLR_GREEN}[АКТИВЕН (Native Bare-Metal)]${CLR_RESET}"
+        echo "Init System: OpenRC (Native Bare-Metal)" >> "${DIAG_LOG}"
 
-    declare -A EXPECTED_SERVICES
-    [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["adguardhome"]="AdGuard Home (DNS 53)"
-    [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["mihomo"]="Mihomo TUN (Ядро маршрутизации)"
-    [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["vaultwarden"]="Vaultwarden (Пароли)"
-    [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["gitea"]="Gitea (Git-сервер)"
-    [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["samba"]="Samba (Сетевой доступ)"
-    [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]    && EXPECTED_SERVICES["qbittorrent"]="qBittorrent (VueTorrent)"
-    [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]  && EXPECTED_SERVICES["metube"]="MeTube (Загрузка медиа)"
-    [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["navidrome"]="Navidrome Hi-Fi (Музыка)"
-    EXPECTED_SERVICES["caddy"]="Caddy Reverse Proxy"
-    EXPECTED_SERVICES["dozzle"]="Dozzle (Web Log Viewer)"
-    EXPECTED_SERVICES["watchtower"]="Watchtower (Автообновления)"
-    EXPECTED_SERVICES["autoheal"]="Autoheal (Самовосстановление)"
+        declare -A NATIVE_SERVICES
+        [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]] && NATIVE_SERVICES["sing-box"]="sing-box TUN (Маршрутизация)"
+        [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]] && NATIVE_SERVICES["adguardhome"]="AdGuard Home (DNS 53)"
+        [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]   && NATIVE_SERVICES["vaultwarden"]="Vaultwarden (Пароли)"
+        [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]   && NATIVE_SERVICES["forgejo"]="Forgejo (Git-сервер)"
+        [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]   && NATIVE_SERVICES["samba"]="Samba (Сетевой доступ)"
+        [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]   && NATIVE_SERVICES["wsdd"]="WSDD (Обнаружение)"
+        [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]    && NATIVE_SERVICES["qbittorrent-nox"]="qBittorrent (WebUI)"
+        [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]  && NATIVE_SERVICES["ytdlp-web"]="MeTube (yt-dlp WebUI)"
+        [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && NATIVE_SERVICES["navidrome"]="Navidrome Hi-Fi"
+        NATIVE_SERVICES["caddy"]="Caddy Reverse Proxy"
 
-    echo "" >> "${DIAG_LOG}"
-    echo "--- СТАТУС КОНТЕЙНЕРОВ DOCKER ---" >> "${DIAG_LOG}"
+        echo "" >> "${DIAG_LOG}"
+        echo "--- СТАТУС СЛУЖБ OPENRC (NATIVE BARE-METAL) ---" >> "${DIAG_LOG}"
 
-    for c_name in "${!EXPECTED_SERVICES[@]}"; do
-        local c_desc="${EXPECTED_SERVICES[$c_name]}"
-        local c_status="not_found"
+        for s_name in "${!NATIVE_SERVICES[@]}"; do
+            local s_desc="${NATIVE_SERVICES[$s_name]}"
+            local s_status="stopped"
 
-        for _ in {1..5}; do
-            c_status=$(docker inspect -f '{{.State.Status}}' "${c_name}" 2>/dev/null || echo "not_found")
-            [ "${c_status}" = "running" ] && break
-            sleep 1
+            for _ in {1..5}; do
+                if rc-service "${s_name}" status >/dev/null 2>&1; then
+                    s_status="running"
+                    break
+                fi
+                sleep 1
+            done
+
+            if [ "${s_status}" = "running" ]; then
+                printf "    ${TAG_OK} %-32s ${CLR_GREEN}[ОНЛАЙН / OpenRC]${CLR_RESET}\n" "${s_desc}"
+                echo "[OK] Service ${s_name} (${s_desc}): RUNNING (OpenRC)" >> "${DIAG_LOG}"
+            else
+                printf "    ${TAG_ERR} %-32s ${CLR_RED}[ОШИБКА: ОСТАНОВЛЕН]${CLR_RESET}\n" "${s_desc}"
+                echo "[FAIL] Service ${s_name} (${s_desc}): STOPPED" >> "${DIAG_LOG}"
+                HAS_ISSUES=1
+
+                echo "--- Логи / статус сервиса ${s_name}: ---" >> "${DIAG_LOG}"
+                rc-service "${s_name}" status >> "${DIAG_LOG}" 2>&1 || true
+                echo "--------------------------------------------------------" >> "${DIAG_LOG}"
+            fi
         done
-
-        local c_health
-        c_health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "${c_name}" 2>/dev/null || true)
-        local health_tag=""
-        if [ "$c_health" = "healthy" ]; then
-            health_tag=" / HEALTHY"
-        elif [ "$c_health" = "starting" ]; then
-            health_tag=" / ЗАПУСК"
-        elif [ "$c_health" = "unhealthy" ]; then
-            health_tag=" / СБОЙ"
-            HAS_ISSUES=1
-        fi
-
-        if [ "${c_status}" = "running" ] && [ "$c_health" != "unhealthy" ]; then
-            printf "    ${TAG_OK} %-32s ${CLR_GREEN}[ОНЛАЙН%s]${CLR_RESET}\n" "${c_desc}" "${health_tag}"
-            echo "[OK] Container ${c_name} (${c_desc}): RUNNING (Health: ${c_health:-none})" >> "${DIAG_LOG}"
+    else
+        if docker info >/dev/null 2>&1; then
+            echo -e "    ${TAG_OK} Docker Daemon:           ${CLR_GREEN}[РАБОТАЕТ]${CLR_RESET}"
+            echo "Docker Daemon: OK" >> "${DIAG_LOG}"
         else
-            printf "    ${TAG_ERR} %-32s ${CLR_RED}[ОШИБКА: %s%s]${CLR_RESET}\n" "${c_desc}" "${c_status}" "${health_tag}"
-            echo "[FAIL] Container ${c_name} (${c_desc}): STATUS=${c_status} (Health: ${c_health:-none})" >> "${DIAG_LOG}"
+            echo -e "    ${TAG_ERR} Docker Daemon:           ${CLR_RED}[НЕ ОТВЕЧАЕТ]${CLR_RESET}"
+            echo "Docker Daemon: FAILED" >> "${DIAG_LOG}"
             HAS_ISSUES=1
-
-            echo "--- Логи контейнера ${c_name} (последние 40 строк): ---" >> "${DIAG_LOG}"
-            docker logs --tail 40 "${c_name}" >> "${DIAG_LOG}" 2>&1 || true
-            echo "--------------------------------------------------------" >> "${DIAG_LOG}"
         fi
-    done
+
+        declare -A EXPECTED_SERVICES
+        [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["adguardhome"]="AdGuard Home (DNS 53)"
+        [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["mihomo"]="Mihomo TUN (Ядро маршрутизации)"
+        [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["vaultwarden"]="Vaultwarden (Пароли)"
+        [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["gitea"]="Gitea (Git-сервер)"
+        [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]]   && EXPECTED_SERVICES["samba"]="Samba (Сетевой доступ)"
+        [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]    && EXPECTED_SERVICES["qbittorrent"]="qBittorrent (VueTorrent)"
+        [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]  && EXPECTED_SERVICES["metube"]="MeTube (Загрузка медиа)"
+        [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && EXPECTED_SERVICES["navidrome"]="Navidrome Hi-Fi (Музыка)"
+        EXPECTED_SERVICES["caddy"]="Caddy Reverse Proxy"
+        EXPECTED_SERVICES["dozzle"]="Dozzle (Web Log Viewer)"
+        EXPECTED_SERVICES["watchtower"]="Watchtower (Автообновления)"
+        EXPECTED_SERVICES["autoheal"]="Autoheal (Самовосстановление)"
+
+        echo "" >> "${DIAG_LOG}"
+        echo "--- СТАТУС КОНТЕЙНЕРОВ DOCKER ---" >> "${DIAG_LOG}"
+
+        for c_name in "${!EXPECTED_SERVICES[@]}"; do
+            local c_desc="${EXPECTED_SERVICES[$c_name]}"
+            local c_status="not_found"
+
+            for _ in {1..5}; do
+                c_status=$(docker inspect -f '{{.State.Status}}' "${c_name}" 2>/dev/null || echo "not_found")
+                [ "${c_status}" = "running" ] && break
+                sleep 1
+            done
+
+            local c_health
+            c_health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "${c_name}" 2>/dev/null || true)
+            local health_tag=""
+            if [ "$c_health" = "healthy" ]; then
+                health_tag=" / HEALTHY"
+            elif [ "$c_health" = "starting" ]; then
+                health_tag=" / ЗАПУСК"
+            elif [ "$c_health" = "unhealthy" ]; then
+                health_tag=" / СБОЙ"
+                HAS_ISSUES=1
+            fi
+
+            if [ "${c_status}" = "running" ] && [ "$c_health" != "unhealthy" ]; then
+                printf "    ${TAG_OK} %-32s ${CLR_GREEN}[ОНЛАЙН%s]${CLR_RESET}\n" "${c_desc}" "${health_tag}"
+                echo "[OK] Container ${c_name} (${c_desc}): RUNNING (Health: ${c_health:-none})" >> "${DIAG_LOG}"
+            else
+                printf "    ${TAG_ERR} %-32s ${CLR_RED}[ОШИБКА: %s%s]${CLR_RESET}\n" "${c_desc}" "${c_status}" "${health_tag}"
+                echo "[FAIL] Container ${c_name} (${c_desc}): STATUS=${c_status} (Health: ${c_health:-none})" >> "${DIAG_LOG}"
+                HAS_ISSUES=1
+
+                echo "--- Логи контейнера ${c_name} (последние 40 строк): ---" >> "${DIAG_LOG}"
+                docker logs --tail 40 "${c_name}" >> "${DIAG_LOG}" 2>&1 || true
+                echo "--------------------------------------------------------" >> "${DIAG_LOG}"
+            fi
+        done
+    fi
 
     echo ""
     echo -e "  ${CLR_CYAN}Проверка сетевых функций шлюза и прав доступа...${CLR_RESET}"
@@ -6088,6 +6916,20 @@ EOF_DIAG
         fi
         echo -e "    ${TAG_OK} Фаервол и NAT:            ${CLR_GREEN}[${FW_STATUS}]${CLR_RESET}"
         echo "Firewall status: ${FW_STATUS}" >> "${DIAG_LOG}"
+
+        if ip link show dev tun0 >/dev/null 2>&1; then
+            echo -e "    ${TAG_OK} TUN Интерфейс (tun0):      ${CLR_GREEN}[АКТИВЕН]${CLR_RESET}"
+            echo "TUN Interface (tun0): ACTIVE" >> "${DIAG_LOG}"
+        else
+            echo -e "    ${TAG_WARN} TUN Интерфейс (tun0):      ${CLR_YELLOW}[ОЖИДАНИЕ ИНИЦИАЛИЗАЦИИ]${CLR_RESET}"
+            echo "TUN Interface (tun0): PENDING" >> "${DIAG_LOG}"
+        fi
+
+        if [ "${ROUTER_MODE:-1}" = "2" ]; then
+            echo -e "    ${TAG_OK} Режим маршрутизатора:     ${CLR_GREEN}[АКТИВЕН (WAN: ${WAN_IFACE}, LAN: ${LAN_IFACE})]${CLR_RESET}"
+            [ -n "${WAN_MAC:-}" ] && echo -e "    ${TAG_OK} Клонированный WAN MAC:      ${CLR_GREEN}[${WAN_MAC}]${CLR_RESET}"
+            echo "Router Mode: 2 (WAN: ${WAN_IFACE}, LAN: ${LAN_IFACE}, MAC: ${WAN_MAC:-default})" >> "${DIAG_LOG}"
+        fi
     fi
 
     local DNS_TEST=0
@@ -6173,9 +7015,24 @@ show_summary_dashboard() {
 
     echo -e "  ${CLR_NEON_PURPLE}╭── СЕТЕВОЙ ШЛЮЗ И МАРШРУТИЗАЦИЯ (RUSSIA PRO 2026) ──────────────────────────╮${CLR_RESET}"
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
+        if [ "${ROUTER_MODE:-1}" = "2" ]; then
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Архитектура сети:${CLR_RESET}            ${CLR_NEON_GREEN}ПОЛНОЦЕННЫЙ ДОМАШНИЙ РОУТЕР (WAN + LAN)${CLR_RESET}"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ WAN (Провайдер):${CLR_RESET}             ${CLR_NEON_CYAN}${WAN_IFACE}${CLR_RESET} $([ -n "${WAN_MAC:-}" ] && echo -e "${CLR_NEON_GOLD}(Клонирован MAC: ${WAN_MAC})${CLR_RESET}")"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ LAN (Локальная сеть):${CLR_RESET}        ${CLR_NEON_CYAN}${LAN_IFACE}${CLR_RESET} (IP: ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET})"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ AdGuard Home DHCP:${CLR_RESET}           ${CLR_NEON_GREEN}АКТИВЕН (Пул: 192.168.1.50 - 192.168.1.250)${CLR_RESET}"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Защита роутеров:${CLR_RESET}             ${CLR_NEON_GREEN}192.168.1.1 (OpenWrt) и 192.168.1.5 (Keenetic) ИСКЛЮЧЕНЫ${CLR_RESET}"
+        else
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Архитектура сети:${CLR_RESET}            ${CLR_NEON_GREEN}ПРОЗРАЧНЫЙ ШЛЮЗ (1 сетевой интерфейс: ${DEFAULT_IFACE})${CLR_RESET}"
+        fi
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Портал навигации по IP:${CLR_RESET}      ${CLR_NEON_GREEN}http://${LOCAL_IP}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ AdGuard Home (DNS & AdBlock):${CLR_RESET}    ${CLR_NEON_CYAN}https://${ADGUARD_DOMAIN}${CLR_RESET}"
-        echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Mihomo Smart Routing UI:${CLR_RESET}         ${CLR_NEON_CYAN}https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET}${CLR_RESET}"
+        if is_native; then
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ sing-box Smart Routing UI:${CLR_RESET}   ${CLR_NEON_CYAN}https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET}${CLR_RESET}"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Ядро маршрутизации:${CLR_RESET}          ${CLR_NEON_GREEN}sing-box TUN (Native Alpine, clash_api :9090)${CLR_RESET}"
+        else
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Mihomo Smart Routing UI:${CLR_RESET}         ${CLR_NEON_CYAN}https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET}${CLR_RESET}"
+            echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Ядро маршрутизации:${CLR_RESET}          ${CLR_NEON_GREEN}Mihomo TUN (Docker container)${CLR_RESET}"
+        fi
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Секрет API панели управления:${CLR_RESET}    ${CLR_NEON_GOLD}${MIHOMO_SECRET}${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Госуслуги, банки и сервисы РФ:${CLR_RESET}   ${CLR_NEON_GREEN}100% ПРЯМОЙ ДОСТУП (DIRECT, без капч и задержек)${CLR_RESET}"
         echo -e "  ${CLR_NEON_PURPLE}│${CLR_RESET}  ${CLR_WHITE}◈ Маршрутизация YouTube & Media:${CLR_RESET}  ${CLR_NEON_GREEN}АКТИВНА (Туннелирование -> AUTO / PROXY)${CLR_RESET}"
@@ -6200,7 +7057,9 @@ show_summary_dashboard() {
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Панель администратора:${CLR_RESET}           ${CLR_NEON_CYAN}https://${VAULT_DOMAIN}/admin${CLR_RESET}"
     fi
     if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Gitea (Git-сервер):${CLR_RESET}              ${CLR_NEON_CYAN}https://${GITEA_DOMAIN}${CLR_RESET} ${CLR_DIM}(SSH порт: 2222)${CLR_RESET}"
+        local GIT_LABEL="Gitea"
+        is_native && GIT_LABEL="Forgejo"
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ ${GIT_LABEL} (Git-сервер):${CLR_RESET}              ${CLR_NEON_CYAN}https://${GITEA_DOMAIN}${CLR_RESET} ${CLR_DIM}(SSH порт: 2222)${CLR_RESET}"
     fi
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ qBittorrent (VueTorrent):${CLR_RESET}        ${CLR_NEON_CYAN}https://${TORRENT_DOMAIN}${CLR_RESET}"
@@ -6213,7 +7072,9 @@ show_summary_dashboard() {
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_DIM}    (Администратор создается в веб-панели при первом входе)${CLR_RESET}"
         echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_DIM}    (Клиенты: Symfonium для Android / Substreamer для iOS / Feishin для ПК)${CLR_RESET}"
     fi
-    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Dozzle (Логи контейнеров):${CLR_RESET}       ${CLR_NEON_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_DIM}(Авторизация: ${ADMIN_USER})${CLR_RESET}"
+    if ! is_native; then
+        echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}✦ Dozzle (Логи контейнеров):${CLR_RESET}       ${CLR_NEON_CYAN}https://${LOGS_DOMAIN}${CLR_RESET} ${CLR_DIM}(Авторизация: ${ADMIN_USER})${CLR_RESET}"
+    fi
     echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 
@@ -6271,26 +7132,43 @@ show_summary_dashboard() {
     echo -e "  ${CLR_NEON_PURPLE}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 
-    echo -e "  ${CLR_NEON_GREEN}╭── НАСТРОЙКА ДОМАШНЕГО РОУТЕРА (1 ДЕЙСТВИЕ ДЛЯ ВСЕЙ СЕТИ) ──────────────────╮${CLR_RESET}"
-    echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}В параметрах DHCP вашего роутера укажите:${CLR_RESET}"
-    echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}• Первичный DNS-сервер:${CLR_RESET}            ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET}"
-    if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
-        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}• Основной шлюз (Gateway):${CLR_RESET}         ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET}"
+    if [ "${ROUTER_MODE:-1}" = "2" ]; then
+        echo -e "  ${CLR_NEON_GREEN}╭── РЕЖИМ МАРШРУТИЗАТОРА (ДОМАШНИЙ РОУТЕР) ─────────────────────────────────╮${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}Кабель провайдера подключен в:${CLR_RESET}   ${CLR_NEON_GREEN}${WAN_IFACE}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}Локальная сеть подключена в:${CLR_RESET}     ${CLR_NEON_GREEN}${LAN_IFACE}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}IP-адрес шлюза (сервера):${CLR_RESET}        ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}AdGuard Home DHCP:${CLR_RESET}               ${CLR_NEON_GREEN}Выдает IP автоматически (192.168.1.50 - .250)${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_DIM}Роутеры OpenWrt (192.168.1.1) и Keenetic (192.168.1.5) защищены от коллизий!${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
+    else
+        echo -e "  ${CLR_NEON_GREEN}╭── НАСТРОЙКА ДОМАШНЕГО РОУТЕРА (1 ДЕЙСТВИЕ ДЛЯ ВСЕЙ СЕТИ) ──────────────────╮${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}В параметрах DHCP вашего роутера укажите:${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}• Первичный DNS-сервер:${CLR_RESET}            ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET}"
+        if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
+            echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_WHITE}• Основной шлюз (Gateway):${CLR_RESET}         ${CLR_NEON_GREEN}${LOCAL_IP}${CLR_RESET}"
+        fi
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_DIM}После этого все смартфоны, ПК и Smart TV в сети сразу получат фильтрацию${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_DIM}рекламы, доступ к локальным *.lan доменам и интеллектуальную маршрутизацию!${CLR_RESET}"
+        echo -e "  ${CLR_NEON_GREEN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     fi
-    echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_DIM}После этого все смартфоны, ПК и Smart TV в сети сразу получат фильтрацию${CLR_RESET}"
-    echo -e "  ${CLR_NEON_GREEN}│${CLR_RESET}  ${CLR_DIM}рекламы, доступ к локальным *.lan доменам и интеллектуальную маршрутизацию!${CLR_RESET}"
-    echo -e "  ${CLR_NEON_GREEN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
     echo ""
 
     echo -e "  ${CLR_NEON_CYAN}╭── ЕДИНАЯ КОНСОЛЬНАЯ УТИЛИТА УПРАВЛЕНИЯ (HOMELAB CLI) ───────────────────────╮${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Статус и дашборд:${CLR_RESET}            ${CLR_NEON_GREEN}homelab status${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Полная самодиагностика:${CLR_RESET}      ${CLR_NEON_GREEN}homelab doctor${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Клонирование / статус MAC:${CLR_RESET}   ${CLR_NEON_GREEN}homelab mac [новый_mac]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журналы сервисов в реалтайме:${CLR_RESET} ${CLR_NEON_GREEN}homelab logs [сервис] -f${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Экспорт всех логов в файл:${CLR_RESET}   ${CLR_NEON_GREEN}homelab dump-logs${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Перезапуск стека/сервиса:${CLR_RESET}    ${CLR_NEON_GREEN}homelab restart [сервис]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Горячий бэкап баз данных:${CLR_RESET}    ${CLR_NEON_GREEN}homelab backup${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Тестовое оповещение в TG:${CLR_RESET}    ${CLR_NEON_GREEN}homelab notify [текст]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Управление cookies YouTube:${CLR_RESET}  ${CLR_NEON_GREEN}homelab cookies [файл]${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журнал развертывания ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab install-log [-f]${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Безопасный апдейт образов:${CLR_RESET}   ${CLR_NEON_GREEN}homelab update${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Бесшовный апгрейд ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab upgrade${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Проверка версии и обновлений:${CLR_RESET} ${CLR_NEON_GREEN}homelab version${CLR_RESET}"
+    echo -e "  ${CLR_NEON_CYAN}╰────────────────────────────────────────────────────────────────────────────╯${CLR_RESET}"
+    echo ""
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Журнал развертывания ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab install-log [-f]${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Безопасный апдейт образов:${CLR_RESET}   ${CLR_NEON_GREEN}homelab update${CLR_RESET}"
     echo -e "  ${CLR_NEON_CYAN}│${CLR_RESET}  ${CLR_WHITE}• Бесшовный апгрейд ядра:${CLR_RESET}   ${CLR_NEON_GREEN}homelab upgrade${CLR_RESET}"
