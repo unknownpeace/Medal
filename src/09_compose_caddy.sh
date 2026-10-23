@@ -419,7 +419,7 @@ EOF_VW
 
         # 4. Forgejo (Git-сервер)
         if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
-            mkdir -p /var/lib/forgejo/data /etc/forgejo /var/log/forgejo
+            mkdir -p /var/lib/forgejo/data/forgejo-repositories /etc/forgejo /var/log/forgejo
             cat << EOF_FORGEJO > /etc/forgejo/app.ini
 APP_NAME = Homelab Git Server
 RUN_USER = forgejo

@@ -117,14 +117,20 @@ if docker inspect -f '{{.State.Status}}' gitea 2>/dev/null | grep -q "running"; 
     BKP_SIZE=$(du -h "${BACKUP_DIR}/${DUMP_NAME}" 2>/dev/null | awk '{print $1}')
     /usr/local/bin/homelab-notify "Резервное копирование" "Успешно создан ночной бэкап Gitea (${BKP_SIZE})" "OK" 2>/dev/null || true
 elif command -v forgejo >/dev/null 2>&1 || [ -f /var/lib/forgejo/data/forgejo.db ]; then
-    su forgejo -s /bin/sh -c "forgejo dump --tempdir /tmp -f '${BACKUP_DIR}/${DUMP_NAME}' --config /etc/forgejo/app.ini" >/dev/null 2>&1 || \
-    su forgejo -s /bin/sh -c "cd /var/lib/forgejo && tar -czf '${BACKUP_DIR}/forgejo_backup_${DATE_TAG}.tar.gz' data" >/dev/null 2>&1 || true
+    mkdir -p /var/lib/forgejo/data/forgejo-repositories
+    chown -R forgejo:www-data /var/lib/forgejo/data/forgejo-repositories 2>/dev/null || true
+    su forgejo -s /bin/sh -c "forgejo dump --tempdir /tmp -f '/tmp/${DUMP_NAME}' --config /etc/forgejo/app.ini" >/dev/null 2>&1 || true
+    if [ -f "/tmp/${DUMP_NAME}" ]; then
+        mv -f "/tmp/${DUMP_NAME}" "${BACKUP_DIR}/${DUMP_NAME}"
+    else
+        (cd /var/lib/forgejo && tar -czf "${BACKUP_DIR}/forgejo_backup_${DATE_TAG}.tar.gz" data /etc/forgejo 2>/dev/null || true)
+    fi
     chown -R "${SAVED_TARGET_USER:-root}:${USER_GID:-0}" "${BACKUP_DIR}" 2>/dev/null || true
     chmod 640 "${BACKUP_DIR}"/* 2>/dev/null || true
     chmod 750 "${BACKUP_DIR}" 2>/dev/null || true
     find "${BACKUP_DIR}" -type f -name "*_backup_*" -mtime +14 -delete 2>/dev/null || true
-    BKP_SIZE=$(du -h "${BACKUP_DIR}"/*"${DATE_TAG}"* 2>/dev/null | head -n1 | awk '{print $1}')
-    /usr/local/bin/homelab-notify "Резервное копирование" "Успешно создан ночной бэкап Forgejo (${BKP_SIZE})" "OK" 2>/dev/null || true
+    BKP_SIZE=$(du -h "${BACKUP_DIR}"/*"${DATE_TAG}"* 2>/dev/null | head -n1 | awk '{print $1}' || echo "N/A")
+    [ -n "${BKP_SIZE}" ] && /usr/local/bin/homelab-notify "Резервное копирование" "Успешно создан ночной бэкап Forgejo (${BKP_SIZE})" "OK" 2>/dev/null || true
 fi
 EOF_GITEA_BKP
         chmod 750 "${APP_DIR}/backup_gitea.sh"
@@ -1675,7 +1681,7 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
     echo -e "  ${CLR_WHITE}notify [текст]${CLR_RESET}      Отправить тестовое оповещение в Telegram"
     echo -e "  ${CLR_WHITE}cookies [файл|--paste|clear]${CLR_RESET} Управление cookies YouTube для MeTube (yt-dlp)"
-    echo -e "  ${CLR_WHITE}update${CLR_RESET}              Обновление всех Docker-образов стека"
+    echo -e "  ${CLR_WHITE}update${CLR_RESET}              Обновление пакетов и сервисов комплекса"
     echo -e "  ${CLR_WHITE}upgrade [--force]${CLR_RESET}   Бесшовный апгрейд ядра комплекса из GitHub (OTA)"
     echo -e "  ${CLR_WHITE}rollback${CLR_RESET}            Откат к предыдущей версии из снимка восстановления"
     echo -e "  ${CLR_WHITE}mac [новый_mac]${CLR_RESET}     Просмотр или клонирование MAC-адреса WAN"
