@@ -186,8 +186,8 @@ Downloads\TempPath=/downloads/temp/
 Queueing\QueueingEnabled=false
 WebUI\Address=0.0.0.0
 WebUI\AlternativeUIEnabled=${ALT_UI_FLAG}
-WebUI\AuthSubnetWhitelist=
-WebUI\AuthSubnetWhitelistEnabled=false
+WebUI\AuthSubnetWhitelist=192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 127.0.0.1/32
+WebUI\AuthSubnetWhitelistEnabled=true
 WebUI\BanDuration=3600
 WebUI\CSRFProtection=false
 WebUI\ClickjackingProtection=true
@@ -354,6 +354,18 @@ code { background: #1e293b; color: var(--accent); padding: 2px 6px; border-radiu
 EOF_FALLBACK_UI
                 log_ok "Встроенный портал управления шлюзом успешно подготовлен"
             fi
+        fi
+
+        cat << 'EOF_MC_CONFIG' > "${APP_DIR}/mihomo/ui/config.js"
+window.__METACUBEXD_CONFIG__ = {
+  defaultBackendURL: window.location.origin,
+  githubToken: '',
+};
+EOF_MC_CONFIG
+
+        if [ -f "${APP_DIR}/mihomo/ui/index.html" ] && ! grep -q 'hostname=' "${APP_DIR}/mihomo/ui/index.html" 2>/dev/null; then
+            local MC_INJECT="<script>(function(){var hash=window.location.hash;if(!hash||hash==='#'||hash==='#/'||hash.indexOf('hostname=')===-1){var h=window.location.hostname||'127.0.0.1';var p=window.location.port||(window.location.protocol==='https:'?'443':'80');var proto=window.location.protocol.replace(':','');window.location.hash='#/?hostname='+encodeURIComponent(h)+'&port='+encodeURIComponent(p)+'&protocol='+encodeURIComponent(proto)+'&secret='+encodeURIComponent('${MIHOMO_SECRET:-}');}})();</script>"
+            sed -i "s|<head>|<head>${MC_INJECT}|" "${APP_DIR}/mihomo/ui/index.html" 2>/dev/null || true
         fi
 
         find "${APP_DIR}/mihomo/ui" -type f \( -name "*.js" -o -name "*.html" -o -name "*.json" \) -exec sed -i \

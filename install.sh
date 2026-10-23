@@ -2963,8 +2963,8 @@ Downloads\TempPath=/downloads/temp/
 Queueing\QueueingEnabled=false
 WebUI\Address=0.0.0.0
 WebUI\AlternativeUIEnabled=${ALT_UI_FLAG}
-WebUI\AuthSubnetWhitelist=
-WebUI\AuthSubnetWhitelistEnabled=false
+WebUI\AuthSubnetWhitelist=192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 127.0.0.1/32
+WebUI\AuthSubnetWhitelistEnabled=true
 WebUI\BanDuration=3600
 WebUI\CSRFProtection=false
 WebUI\ClickjackingProtection=true
@@ -3131,6 +3131,18 @@ code { background: #1e293b; color: var(--accent); padding: 2px 6px; border-radiu
 EOF_FALLBACK_UI
                 log_ok "Встроенный портал управления шлюзом успешно подготовлен"
             fi
+        fi
+
+        cat << 'EOF_MC_CONFIG' > "${APP_DIR}/mihomo/ui/config.js"
+window.__METACUBEXD_CONFIG__ = {
+  defaultBackendURL: window.location.origin,
+  githubToken: '',
+};
+EOF_MC_CONFIG
+
+        if [ -f "${APP_DIR}/mihomo/ui/index.html" ] && ! grep -q 'hostname=' "${APP_DIR}/mihomo/ui/index.html" 2>/dev/null; then
+            local MC_INJECT="<script>(function(){var hash=window.location.hash;if(!hash||hash==='#'||hash==='#/'||hash.indexOf('hostname=')===-1){var h=window.location.hostname||'127.0.0.1';var p=window.location.port||(window.location.protocol==='https:'?'443':'80');var proto=window.location.protocol.replace(':','');window.location.hash='#/?hostname='+encodeURIComponent(h)+'&port='+encodeURIComponent(p)+'&protocol='+encodeURIComponent(proto)+'&secret='+encodeURIComponent('${MIHOMO_SECRET:-}');}})();</script>"
+            sed -i "s|<head>|<head>${MC_INJECT}|" "${APP_DIR}/mihomo/ui/index.html" 2>/dev/null || true
         fi
 
         find "${APP_DIR}/mihomo/ui" -type f \( -name "*.js" -o -name "*.html" -o -name "*.json" \) -exec sed -i \
@@ -3688,7 +3700,19 @@ filtering:
   rewrites_enabled: true
   filters_update_interval: 24
   rewrites:${REWRITE_ENTRIES}
-filters: []
+filters:
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
+    name: "AdGuard DNS filter"
+    id: 1
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt
+    name: "AdGuard Tracking Protection filter"
+    id: 2
+  - enabled: true
+    url: https://raw.githubusercontent.com/dimisa-ru/anti-ad-filters/master/anti-ad.txt
+    name: "Anti-AD (RU / CIS)"
+    id: 3
 whitelist_filters: []
 user_rules:
   # Блокировка канареечных доменов DoH и Apple Private Relay (предотвращение скрытого обхода шлюза)
@@ -3852,10 +3876,6 @@ EOF_AGH
         "action": "sniff"
       },
       {
-        "protocol": "dns",
-        "action": "hijack-dns"
-      },
-      {
         "inbound": [
           "dns-in"
         ],
@@ -3865,7 +3885,7 @@ EOF_AGH
         "port": [
           53
         ],
-        "action": "hijack-dns"
+        "outbound": "direct"
       },
       {
         "network": "udp",
@@ -4293,7 +4313,7 @@ configure_caddy_and_compose() {
     fi
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🔑 Vaultwarden</span><div class=\"links\"><a href=\"http://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${VAULT_DOMAIN}</a><a class=\"alt\" href=\"https://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">HTTPS</a><a class=\"alt\" href=\"http://${LOCAL_IP}:8000\" target=\"_blank\" rel=\"noopener\">IP :8000</a></div></li>"
+    <li><span>🔑 Vaultwarden</span><div class=\"links\"><a href=\"https://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${VAULT_DOMAIN} (HTTPS)</a><a class=\"alt\" href=\"http://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">HTTP</a><a class=\"alt\" href=\"http://${LOCAL_IP}:8000\" target=\"_blank\" rel=\"noopener\">IP :8000</a></div></li>"
     fi
     if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
@@ -4673,8 +4693,8 @@ EOF_FORGEJO
 
         # 5. Navidrome (Hi-Fi Music)
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
-            mkdir -p /var/lib/navidrome "${SAVE_DIR}/music"
-            cat << EOF_NAVI > /etc/navidrome.toml
+            mkdir -p /var/lib/navidrome "${SAVE_DIR}/music" /etc/navidrome
+            cat << EOF_NAVI > /etc/navidrome/navidrome.toml
 Address = "127.0.0.1"
 Port = 4533
 MusicFolder = "${SAVE_DIR}/music"
@@ -4682,7 +4702,12 @@ DataFolder = "/var/lib/navidrome"
 LogLevel = "info"
 ScanSchedule = "1m"
 EOF_NAVI
-            chown -R navidrome:navidrome /var/lib/navidrome "${SAVE_DIR}/music" 2>/dev/null || true
+            ln -sf /etc/navidrome/navidrome.toml /etc/navidrome.toml 2>/dev/null || true
+            cat << 'EOF_NAVI_CONFD' > /etc/conf.d/navidrome
+navidrome_configfile=/etc/navidrome/navidrome.toml
+error_log=/var/log/navidrome.log
+EOF_NAVI_CONFD
+            chown -R navidrome:navidrome /var/lib/navidrome "${SAVE_DIR}/music" /etc/navidrome 2>/dev/null || true
         fi
 
         # 6. qBittorrent
@@ -5707,6 +5732,28 @@ EOF_NAVI_BKP_TMR
             log_ok "Администратор Forgejo (${ADMIN_USER}) готов к работе"
         fi
 
+        if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+            log_info "Инициализация учетной записи администратора Navidrome (${ADMIN_USER})..."
+            for _ in {1..12}; do
+                if curl -s -f http://127.0.0.1:4533/app/ >/dev/null 2>&1; then
+                    break
+                fi
+                sleep 1
+            done
+            python3 -c "
+import urllib.request, json
+try:
+    url = 'http://127.0.0.1:4533/auth/createAdmin'
+    data = json.dumps({'username': '${ADMIN_USER}', 'password': '${MASTER_PASS}'}).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        pass
+except Exception:
+    pass
+" 2>/dev/null || true
+            log_ok "Администратор Navidrome (${ADMIN_USER}) готов к работе"
+        fi
+
         if [ "$SSL_MODE" = "1" ]; then
             log_info "Экспорт локального корневого сертификата CA Caddy..."
             local CADDY_ROOT_CERT="/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt"
@@ -5856,8 +5903,25 @@ for p in set(db_paths):
         fi
 
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
-            log_ok "Сервис Navidrome готов к работе (порт 4533 / ${MUSIC_DOMAIN})"
-            log_info "Создание учетной записи администратора Navidrome выполняется в веб-интерфейсе при первом открытии: https://${MUSIC_DOMAIN}"
+            log_info "Инициализация учетной записи администратора Navidrome (${ADMIN_USER})..."
+            for _ in {1..15}; do
+                if curl -s -f http://127.0.0.1:4533/app/ >/dev/null 2>&1; then
+                    break
+                fi
+                sleep 1
+            done
+            python3 -c "
+import urllib.request, json
+try:
+    url = 'http://127.0.0.1:4533/auth/createAdmin'
+    data = json.dumps({'username': '${ADMIN_USER}', 'password': '${MASTER_PASS}'}).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        pass
+except Exception:
+    pass
+" 2>/dev/null || true
+            log_ok "Сервис Navidrome готов к работе (учетная запись: ${ADMIN_USER})"
         fi
 
         if [ "$SSL_MODE" = "1" ]; then
@@ -6420,6 +6484,24 @@ cmd_doctor() {
     fi
 
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+}
+
+cmd_update_sub() {
+    local url="${1:-${SAVED_SUB_URL:-}}"
+    if [ -z "$url" ] || [ "$url" = "none" ]; then
+        echo -e "  ${TAG_ERR} Укажите URL подписки: homelab update-sub <url>"
+        return 1
+    fi
+    echo -e "  ${TAG_INFO} Загрузка и обновление подписки прокси..."
+    if [ -f "${APP_DIR}/scripts/update_singbox_sub.py" ]; then
+        python3 "${APP_DIR}/scripts/update_singbox_sub.py" "$url"
+        echo -e "  ${TAG_INFO} Перезапуск службы sing-box..."
+        cmd_restart sing-box 2>/dev/null || cmd_restart mihomo 2>/dev/null || true
+        echo -e "  ${TAG_OK} Подписка успешно обновлена и применена!"
+    else
+        echo -e "  ${TAG_ERR} Скрипт обновления подписки не найден (${APP_DIR}/scripts/update_singbox_sub.py)"
+        return 1
+    fi
 }
 
 cmd_update() {
@@ -7198,6 +7280,7 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
     echo -e "  ${CLR_WHITE}notify [текст]${CLR_RESET}      Отправить тестовое оповещение в Telegram"
     echo -e "  ${CLR_WHITE}cookies [файл|--paste|clear]${CLR_RESET} Управление cookies YouTube для MeTube (yt-dlp)"
+    echo -e "  ${CLR_WHITE}update-sub [url]${CLR_RESET}   Обновить подписку узлов sing-box и перезапустить шлюз"
     echo -e "  ${CLR_WHITE}update${CLR_RESET}              Обновление пакетов и сервисов комплекса"
     echo -e "  ${CLR_WHITE}upgrade [--force]${CLR_RESET}   Бесшовный апгрейд ядра комплекса из GitHub (OTA)"
     echo -e "  ${CLR_WHITE}rollback${CLR_RESET}            Откат к предыдущей версии из снимка восстановления"
@@ -7227,6 +7310,7 @@ case "${1:-status}" in
     rollback|revert) cmd_rollback ;;
     version|-v|--version|check-update) cmd_version ;;
     notify|test-notify) shift; cmd_notify "$@" ;;
+    update-sub|sub|sub-update) shift; cmd_update_sub "$@" ;;
     update) cmd_update ;;
     unlock)
         if [ -x /usr/local/bin/homelab-unlock ]; then

@@ -23,7 +23,7 @@ configure_caddy_and_compose() {
     fi
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🔑 Vaultwarden</span><div class=\"links\"><a href=\"http://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${VAULT_DOMAIN}</a><a class=\"alt\" href=\"https://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">HTTPS</a><a class=\"alt\" href=\"http://${LOCAL_IP}:8000\" target=\"_blank\" rel=\"noopener\">IP :8000</a></div></li>"
+    <li><span>🔑 Vaultwarden</span><div class=\"links\"><a href=\"https://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${VAULT_DOMAIN} (HTTPS)</a><a class=\"alt\" href=\"http://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">HTTP</a><a class=\"alt\" href=\"http://${LOCAL_IP}:8000\" target=\"_blank\" rel=\"noopener\">IP :8000</a></div></li>"
     fi
     if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
@@ -403,8 +403,8 @@ EOF_FORGEJO
 
         # 5. Navidrome (Hi-Fi Music)
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
-            mkdir -p /var/lib/navidrome "${SAVE_DIR}/music"
-            cat << EOF_NAVI > /etc/navidrome.toml
+            mkdir -p /var/lib/navidrome "${SAVE_DIR}/music" /etc/navidrome
+            cat << EOF_NAVI > /etc/navidrome/navidrome.toml
 Address = "127.0.0.1"
 Port = 4533
 MusicFolder = "${SAVE_DIR}/music"
@@ -412,7 +412,12 @@ DataFolder = "/var/lib/navidrome"
 LogLevel = "info"
 ScanSchedule = "1m"
 EOF_NAVI
-            chown -R navidrome:navidrome /var/lib/navidrome "${SAVE_DIR}/music" 2>/dev/null || true
+            ln -sf /etc/navidrome/navidrome.toml /etc/navidrome.toml 2>/dev/null || true
+            cat << 'EOF_NAVI_CONFD' > /etc/conf.d/navidrome
+navidrome_configfile=/etc/navidrome/navidrome.toml
+error_log=/var/log/navidrome.log
+EOF_NAVI_CONFD
+            chown -R navidrome:navidrome /var/lib/navidrome "${SAVE_DIR}/music" /etc/navidrome 2>/dev/null || true
         fi
 
         # 6. qBittorrent

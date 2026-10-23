@@ -268,6 +268,28 @@ EOF_NAVI_BKP_TMR
             log_ok "Администратор Forgejo (${ADMIN_USER}) готов к работе"
         fi
 
+        if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
+            log_info "Инициализация учетной записи администратора Navidrome (${ADMIN_USER})..."
+            for _ in {1..12}; do
+                if curl -s -f http://127.0.0.1:4533/app/ >/dev/null 2>&1; then
+                    break
+                fi
+                sleep 1
+            done
+            python3 -c "
+import urllib.request, json
+try:
+    url = 'http://127.0.0.1:4533/auth/createAdmin'
+    data = json.dumps({'username': '${ADMIN_USER}', 'password': '${MASTER_PASS}'}).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        pass
+except Exception:
+    pass
+" 2>/dev/null || true
+            log_ok "Администратор Navidrome (${ADMIN_USER}) готов к работе"
+        fi
+
         if [ "$SSL_MODE" = "1" ]; then
             log_info "Экспорт локального корневого сертификата CA Caddy..."
             local CADDY_ROOT_CERT="/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt"
@@ -417,8 +439,25 @@ for p in set(db_paths):
         fi
 
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
-            log_ok "Сервис Navidrome готов к работе (порт 4533 / ${MUSIC_DOMAIN})"
-            log_info "Создание учетной записи администратора Navidrome выполняется в веб-интерфейсе при первом открытии: https://${MUSIC_DOMAIN}"
+            log_info "Инициализация учетной записи администратора Navidrome (${ADMIN_USER})..."
+            for _ in {1..15}; do
+                if curl -s -f http://127.0.0.1:4533/app/ >/dev/null 2>&1; then
+                    break
+                fi
+                sleep 1
+            done
+            python3 -c "
+import urllib.request, json
+try:
+    url = 'http://127.0.0.1:4533/auth/createAdmin'
+    data = json.dumps({'username': '${ADMIN_USER}', 'password': '${MASTER_PASS}'}).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        pass
+except Exception:
+    pass
+" 2>/dev/null || true
+            log_ok "Сервис Navidrome готов к работе (учетная запись: ${ADMIN_USER})"
         fi
 
         if [ "$SSL_MODE" = "1" ]; then
@@ -981,6 +1020,24 @@ cmd_doctor() {
     fi
 
     echo -e "${CLR_CYAN}╰─────────────────────────────────────────────────────────────${CLR_RESET}"
+}
+
+cmd_update_sub() {
+    local url="${1:-${SAVED_SUB_URL:-}}"
+    if [ -z "$url" ] || [ "$url" = "none" ]; then
+        echo -e "  ${TAG_ERR} Укажите URL подписки: homelab update-sub <url>"
+        return 1
+    fi
+    echo -e "  ${TAG_INFO} Загрузка и обновление подписки прокси..."
+    if [ -f "${APP_DIR}/scripts/update_singbox_sub.py" ]; then
+        python3 "${APP_DIR}/scripts/update_singbox_sub.py" "$url"
+        echo -e "  ${TAG_INFO} Перезапуск службы sing-box..."
+        cmd_restart sing-box 2>/dev/null || cmd_restart mihomo 2>/dev/null || true
+        echo -e "  ${TAG_OK} Подписка успешно обновлена и применена!"
+    else
+        echo -e "  ${TAG_ERR} Скрипт обновления подписки не найден (${APP_DIR}/scripts/update_singbox_sub.py)"
+        return 1
+    fi
 }
 
 cmd_update() {
@@ -1759,6 +1816,7 @@ cmd_help() {
     echo -e "  ${CLR_WHITE}backup${CLR_RESET}              Запуск горячего бэкапа баз данных прямо сейчас"
     echo -e "  ${CLR_WHITE}notify [текст]${CLR_RESET}      Отправить тестовое оповещение в Telegram"
     echo -e "  ${CLR_WHITE}cookies [файл|--paste|clear]${CLR_RESET} Управление cookies YouTube для MeTube (yt-dlp)"
+    echo -e "  ${CLR_WHITE}update-sub [url]${CLR_RESET}   Обновить подписку узлов sing-box и перезапустить шлюз"
     echo -e "  ${CLR_WHITE}update${CLR_RESET}              Обновление пакетов и сервисов комплекса"
     echo -e "  ${CLR_WHITE}upgrade [--force]${CLR_RESET}   Бесшовный апгрейд ядра комплекса из GitHub (OTA)"
     echo -e "  ${CLR_WHITE}rollback${CLR_RESET}            Откат к предыдущей версии из снимка восстановления"
@@ -1788,6 +1846,7 @@ case "${1:-status}" in
     rollback|revert) cmd_rollback ;;
     version|-v|--version|check-update) cmd_version ;;
     notify|test-notify) shift; cmd_notify "$@" ;;
+    update-sub|sub|sub-update) shift; cmd_update_sub "$@" ;;
     update) cmd_update ;;
     unlock)
         if [ -x /usr/local/bin/homelab-unlock ]; then

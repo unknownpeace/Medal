@@ -144,7 +144,19 @@ filtering:
   rewrites_enabled: true
   filters_update_interval: 24
   rewrites:${REWRITE_ENTRIES}
-filters: []
+filters:
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
+    name: "AdGuard DNS filter"
+    id: 1
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt
+    name: "AdGuard Tracking Protection filter"
+    id: 2
+  - enabled: true
+    url: https://raw.githubusercontent.com/dimisa-ru/anti-ad-filters/master/anti-ad.txt
+    name: "Anti-AD (RU / CIS)"
+    id: 3
 whitelist_filters: []
 user_rules:
   # Блокировка канареечных доменов DoH и Apple Private Relay (предотвращение скрытого обхода шлюза)
@@ -308,10 +320,6 @@ EOF_AGH
         "action": "sniff"
       },
       {
-        "protocol": "dns",
-        "action": "hijack-dns"
-      },
-      {
         "inbound": [
           "dns-in"
         ],
@@ -321,7 +329,7 @@ EOF_AGH
         "port": [
           53
         ],
-        "action": "hijack-dns"
+        "outbound": "direct"
       },
       {
         "network": "udp",
