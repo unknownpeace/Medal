@@ -69,6 +69,11 @@ configure_caddy_and_compose() {
     cat <<EOF_CADDY > "${APP_DIR}/caddy/Caddyfile"
 {
     admin off
+    pki {
+        ca local {
+            install_trust false
+        }
+    }
 }
 
 (security_headers) {
@@ -347,6 +352,8 @@ EOF_CADDY
         # 1. Caddy
         mkdir -p /etc/caddy /var/lib/caddy
         cp -f "${APP_DIR}/caddy/Caddyfile" /etc/caddy/Caddyfile 2>/dev/null || true
+        touch /var/log/caddy.log && chown caddy:caddy /var/log/caddy.log 2>/dev/null || true
+        setcap cap_net_bind_service=+ep /usr/sbin/caddy 2>/dev/null || true
         chown -R caddy:caddy /etc/caddy /var/lib/caddy 2>/dev/null || true
         cat << 'EOF_CADDY_CONF' > /etc/conf.d/caddy
 output_log="/var/log/caddy.log"

@@ -84,6 +84,7 @@ EOF_DNS
         log_info "Настройка sysctl: IP-форвардинг, BBR и loose rp_filter для TUN-маршрутизации..."
         cat <<EOF_SYSCTL > /etc/sysctl.d/99-gateway.conf
 net.ipv4.ip_forward = 1
+net.ipv4.ip_unprivileged_port_start = 80
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
@@ -100,7 +101,7 @@ net.ipv4.conf.default.rp_filter = 0
 net.ipv4.conf.${DEFAULT_IFACE}.rp_filter = 0
 EOF_SYSCTL
         sysctl -p /etc/sysctl.d/99-gateway.conf 2>/dev/null || sysctl --system >/dev/null 2>&1 || true
-        sysctl -w net.ipv4.ip_forward=1 \
+        sysctl -w net.ipv4.ip_forward=1 net.ipv4.ip_unprivileged_port_start=80 \
                   net.ipv4.conf.all.send_redirects=0 net.ipv4.conf.default.send_redirects=0 net.ipv4.conf.${DEFAULT_IFACE}.send_redirects=0 \
                   net.ipv4.conf.all.accept_redirects=0 net.ipv4.conf.default.accept_redirects=0 net.ipv4.conf.${DEFAULT_IFACE}.accept_redirects=0 \
                   net.ipv4.conf.all.rp_filter=0 net.ipv4.conf.default.rp_filter=0 net.ipv4.conf.${DEFAULT_IFACE}.rp_filter=0 \

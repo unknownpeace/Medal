@@ -758,7 +758,7 @@ install_pkgs() {
         local ALP_PKGS=(
             bash python3 py3-bcrypt py3-aiohttp iproute2 cryptsetup btrfs-progs ntfs-3g \
             util-linux util-linux-misc lsblk curl openssl ca-certificates jq nftables nftables-openrc apache2-utils \
-            unzip tar sqlite argon2 iputils shadow procps e2fsprogs ffmpeg \
+            unzip tar sqlite argon2 iputils shadow procps e2fsprogs ffmpeg libcap libcap-utils \
             chrony chrony-openrc openrc \
             sing-box sing-box-openrc \
             adguardhome adguardhome-openrc \
@@ -2339,6 +2339,7 @@ EOF_DNS
         log_info "Настройка sysctl: IP-форвардинг, BBR и loose rp_filter для TUN-маршрутизации..."
         cat <<EOF_SYSCTL > /etc/sysctl.d/99-gateway.conf
 net.ipv4.ip_forward = 1
+net.ipv4.ip_unprivileged_port_start = 80
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
@@ -2355,7 +2356,7 @@ net.ipv4.conf.default.rp_filter = 0
 net.ipv4.conf.${DEFAULT_IFACE}.rp_filter = 0
 EOF_SYSCTL
         sysctl -p /etc/sysctl.d/99-gateway.conf 2>/dev/null || sysctl --system >/dev/null 2>&1 || true
-        sysctl -w net.ipv4.ip_forward=1 \
+        sysctl -w net.ipv4.ip_forward=1 net.ipv4.ip_unprivileged_port_start=80 \
                   net.ipv4.conf.all.send_redirects=0 net.ipv4.conf.default.send_redirects=0 net.ipv4.conf.${DEFAULT_IFACE}.send_redirects=0 \
                   net.ipv4.conf.all.accept_redirects=0 net.ipv4.conf.default.accept_redirects=0 net.ipv4.conf.${DEFAULT_IFACE}.accept_redirects=0 \
                   net.ipv4.conf.all.rp_filter=0 net.ipv4.conf.default.rp_filter=0 net.ipv4.conf.${DEFAULT_IFACE}.rp_filter=0 \
@@ -4330,6 +4331,11 @@ configure_caddy_and_compose() {
     cat <<EOF_CADDY > "${APP_DIR}/caddy/Caddyfile"
 {
     admin off
+    pki {
+        ca local {
+            install_trust false
+        }
+    }
 }
 
 (security_headers) {
@@ -4608,6 +4614,8 @@ EOF_CADDY
         # 1. Caddy
         mkdir -p /etc/caddy /var/lib/caddy
         cp -f "${APP_DIR}/caddy/Caddyfile" /etc/caddy/Caddyfile 2>/dev/null || true
+        touch /var/log/caddy.log && chown caddy:caddy /var/log/caddy.log 2>/dev/null || true
+        setcap cap_net_bind_service=+ep /usr/sbin/caddy 2>/dev/null || true
         chown -R caddy:caddy /etc/caddy /var/lib/caddy 2>/dev/null || true
         cat << 'EOF_CADDY_CONF' > /etc/conf.d/caddy
 output_log="/var/log/caddy.log"

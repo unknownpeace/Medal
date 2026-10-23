@@ -25,7 +25,7 @@ install_pkgs() {
         local ALP_PKGS=(
             bash python3 py3-bcrypt py3-aiohttp iproute2 cryptsetup btrfs-progs ntfs-3g \
             util-linux util-linux-misc lsblk curl openssl ca-certificates jq nftables nftables-openrc apache2-utils \
-            unzip tar sqlite argon2 iputils shadow procps e2fsprogs ffmpeg \
+            unzip tar sqlite argon2 iputils shadow procps e2fsprogs ffmpeg libcap libcap-utils \
             chrony chrony-openrc openrc \
             sing-box sing-box-openrc \
             adguardhome adguardhome-openrc \
