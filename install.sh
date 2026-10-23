@@ -2561,6 +2561,7 @@ table inet homelab {
     chain forward {
         type filter hook forward priority -10; policy accept;
         tcp flags syn tcp option maxseg size set rt mtu
+        ip daddr { 1.1.1.1, 1.0.0.1, 8.8.8.8, 8.8.4.4, 9.9.9.9, 149.112.112.112, 94.140.14.14, 94.140.15.15, 77.88.8.8, 77.88.8.1 } tcp dport 443 reject with tcp reset
         accept
     }
 
@@ -2569,12 +2570,13 @@ table inet homelab {
         iifname "$IFACE" tcp dport 53 redirect to :53
         iifname "$IFACE" udp dport 53 redirect to :53
         iifname "$IFACE" tcp dport 853 reject with tcp reset
+        iifname "$IFACE" udp dport 853 reject
     }
 
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         oifname "$IFACE" masquerade
-        oifname "Meta" masquerade
+        oifname "tun0" masquerade
     }
 
     chain input {
@@ -4440,7 +4442,8 @@ configure_caddy_and_compose() {
     }
 }
 
-http://${LOCAL_IP}, http://homelab.lan, http://homelab.local {
+http://${LOCAL_IP}, https://${LOCAL_IP}, http://homelab.lan, https://homelab.lan, http://homelab.local, https://homelab.local {
+    tls internal
     @cert path /caddy-root.crt /root.crt
     handle @cert {
         root * ${CADDY_CERT_DIR}
@@ -4846,6 +4849,11 @@ def run_download(url, fmt):
         pass
 
 class DownloaderHandler(BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+
     def do_GET(self):
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -4874,11 +4882,13 @@ if __name__ == "__main__":
 EOF_YTDL_PY
             chmod 755 "${APP_DIR}/scripts/ytdlp_web.py"
 
+            touch /var/log/ytdlp-web.log && chown "${TARGET_USER:-neko}:${TARGET_USER:-neko}" /var/log/ytdlp-web.log 2>/dev/null || true
             cat << EOF_YTDL_INIT > /etc/init.d/ytdlp-web
 #!/sbin/openrc-run
 name="ytdlp-web"
 description="yt-dlp Web Media Downloader"
 supervisor="supervise-daemon"
+command_user="${TARGET_USER:-neko}:${TARGET_USER:-neko}"
 command="/usr/bin/python3"
 command_args="${APP_DIR}/scripts/ytdlp_web.py"
 output_log="/var/log/ytdlp-web.log"
@@ -4917,6 +4927,11 @@ def load_env():
     return env
 
 class PortalHandler(BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+
     def do_GET(self):
         env = load_env()
         parsed_url = urlparse(self.path)
