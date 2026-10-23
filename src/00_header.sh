@@ -433,7 +433,7 @@ SHARE_NAME="storage"
 SAVE_DIR="/opt/homelab/save"
 SAVE_FSTYPE="ext4"
 
-SUB_URL="none"
+SUB_URL="https://sub.accessbyme.com/sub/52d6b91f62f84bd59b26e88bb280c76c?fmt=best"
 ADMIN_USER="admin"
 ADMIN_USER_SAFE="admin"
 MASTER_PASS=""

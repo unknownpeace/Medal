@@ -405,7 +405,7 @@ EOF_FORGEJO
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             mkdir -p /var/lib/navidrome "${SAVE_DIR}/music" /etc/navidrome
             cat << EOF_NAVI > /etc/navidrome/navidrome.toml
-Address = "127.0.0.1"
+Address = "0.0.0.0"
 Port = 4533
 MusicFolder = "${SAVE_DIR}/music"
 DataFolder = "/var/lib/navidrome"

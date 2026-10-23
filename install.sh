@@ -433,7 +433,7 @@ SHARE_NAME="storage"
 SAVE_DIR="/opt/homelab/save"
 SAVE_FSTYPE="ext4"
 
-SUB_URL="none"
+SUB_URL="https://sub.accessbyme.com/sub/52d6b91f62f84bd59b26e88bb280c76c?fmt=best"
 ADMIN_USER="admin"
 ADMIN_USER_SAFE="admin"
 MASTER_PASS=""
@@ -4695,7 +4695,7 @@ EOF_FORGEJO
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             mkdir -p /var/lib/navidrome "${SAVE_DIR}/music" /etc/navidrome
             cat << EOF_NAVI > /etc/navidrome/navidrome.toml
-Address = "127.0.0.1"
+Address = "0.0.0.0"
 Port = 4533
 MusicFolder = "${SAVE_DIR}/music"
 DataFolder = "/var/lib/navidrome"
@@ -5752,6 +5752,26 @@ except Exception:
     pass
 " 2>/dev/null || true
             log_ok "Администратор Navidrome (${ADMIN_USER}) готов к работе"
+        fi
+
+        if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
+            log_info "Проверка и активация списков фильтрации рекламы AdGuard Home..."
+            python3 -c "
+import urllib.request, json, base64
+auth = base64.b64encode(b'${ADMIN_USER}:${MASTER_PASS}').decode()
+def add_flt(name, url):
+    try:
+        p = json.dumps({'name': name, 'url': url, 'whitelist': False}).encode()
+        req = urllib.request.Request('http://127.0.0.1:8083/control/filtering/add_url', data=p, headers={'Authorization': f'Basic {auth}', 'Content-Type': 'application/json'})
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
+
+add_flt('AdGuard DNS filter', 'https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt')
+add_flt('AdGuard Tracking Protection filter', 'https://adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt')
+add_flt('Anti-AD (RU / CIS)', 'https://raw.githubusercontent.com/dimisa-ru/anti-ad-filters/master/anti-ad.txt')
+" 2>/dev/null || true
+            log_ok "Фильтры рекламы AdGuard Home успешно подключены"
         fi
 
         if [ "$SSL_MODE" = "1" ]; then
