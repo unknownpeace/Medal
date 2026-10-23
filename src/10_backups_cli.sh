@@ -20,6 +20,7 @@ SAVE_DIR="${SAVED_SAVE_DIR:-/opt/homelab/save}"
 BACKUP_DIR="${SAVE_DIR}/backups/vaultwarden"
 DB_SRC="${SAVED_VAULT_DATA_DIR:-/opt/homelab/vaultwarden}/db.sqlite3"
 [ ! -f "${DB_SRC}" ] && DB_SRC="${SAVE_DIR}/services/vaultwarden/db.sqlite3"
+[ ! -f "${DB_SRC}" ] && DB_SRC="/var/lib/vaultwarden/db.sqlite3"
 DATA_DIR=$(dirname "${DB_SRC}")
 DATE_TAG=$(date +"%Y%m%d_%H%M%S")
 TEMP_DIR=$(mktemp -d)
@@ -115,6 +116,15 @@ if docker inspect -f '{{.State.Status}}' gitea 2>/dev/null | grep -q "running"; 
     find "${BACKUP_DIR}" -type f -name "gitea_backup_*.zip" -mtime +14 -delete 2>/dev/null || true
     BKP_SIZE=$(du -h "${BACKUP_DIR}/${DUMP_NAME}" 2>/dev/null | awk '{print $1}')
     /usr/local/bin/homelab-notify "Резервное копирование" "Успешно создан ночной бэкап Gitea (${BKP_SIZE})" "OK" 2>/dev/null || true
+elif command -v forgejo >/dev/null 2>&1 || [ -f /var/lib/forgejo/data/forgejo.db ]; then
+    su forgejo -s /bin/sh -c "forgejo dump --tempdir /tmp -f '${BACKUP_DIR}/${DUMP_NAME}' --config /etc/forgejo/app.ini" >/dev/null 2>&1 || \
+    su forgejo -s /bin/sh -c "cd /var/lib/forgejo && tar -czf '${BACKUP_DIR}/forgejo_backup_${DATE_TAG}.tar.gz' data" >/dev/null 2>&1 || true
+    chown -R "${SAVED_TARGET_USER:-root}:${USER_GID:-0}" "${BACKUP_DIR}" 2>/dev/null || true
+    chmod 640 "${BACKUP_DIR}"/* 2>/dev/null || true
+    chmod 750 "${BACKUP_DIR}" 2>/dev/null || true
+    find "${BACKUP_DIR}" -type f -name "*_backup_*" -mtime +14 -delete 2>/dev/null || true
+    BKP_SIZE=$(du -h "${BACKUP_DIR}"/*"${DATE_TAG}"* 2>/dev/null | head -n1 | awk '{print $1}')
+    /usr/local/bin/homelab-notify "Резервное копирование" "Успешно создан ночной бэкап Forgejo (${BKP_SIZE})" "OK" 2>/dev/null || true
 fi
 EOF_GITEA_BKP
         chmod 750 "${APP_DIR}/backup_gitea.sh"
@@ -167,6 +177,8 @@ fi
 SAVE_DIR="${SAVED_SAVE_DIR:-/opt/homelab/save}"
 BACKUP_DIR="${SAVE_DIR}/backups/navidrome"
 DB_SRC="/opt/homelab/configs/navidrome/navidrome.db"
+[ ! -f "${DB_SRC}" ] && DB_SRC="${SAVE_DIR}/services/navidrome/navidrome.db"
+[ ! -f "${DB_SRC}" ] && DB_SRC="/var/lib/navidrome/navidrome.db"
 DATE_TAG=$(date +"%Y%m%d_%H%M%S")
 DUMP_NAME="navidrome_backup_${DATE_TAG}.sql.gz"
 
@@ -713,6 +725,9 @@ cmd_mac() {
                 sed -i "/hwaddress ether/d" /etc/network/interfaces 2>/dev/null || true
                 sed -i "/iface ${iface} inet/a \    hwaddress ether ${new_mac}" /etc/network/interfaces 2>/dev/null || true
             fi
+            if command -v nmcli >/dev/null 2>&1; then
+                nmcli con modify "$iface" 802-3-ethernet.cloned-mac-address "$new_mac" 2>/dev/null || true
+            fi
             echo -e "  ${TAG_OK} MAC-адрес интерфейса ${iface} успешно изменен на ${CLR_GREEN}${new_mac}${CLR_RESET}!"
         else
             ip link set dev "$iface" up 2>/dev/null || true
@@ -811,9 +826,13 @@ cmd_backup() {
     fi
     echo ""
     echo -e "  ${CLR_CYAN}Файлы бэкапов в хранилище (${SAVED_SAVE_DIR:-/opt/homelab/save}/backups):${CLR_RESET}"
-    find "${SAVED_SAVE_DIR:-/opt/homelab/save}/backups" -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.db.gz" -o -name "*.sql.gz" \) 2>/dev/null | while read -r f; do
+    local found=0
+    while read -r f; do
+        [ -n "$f" ] || continue
+        found=1
         printf "    ${CLR_GREEN}•${CLR_RESET} %-45s ${CLR_YELLOW}[%s]${CLR_RESET}\n" "$(basename "$f")" "$(du -h "$f" 2>/dev/null | awk '{print $1}')"
-    done
+    done < <(find "${SAVED_SAVE_DIR:-/opt/homelab/save}/backups" -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.db.gz" -o -name "*.sql.gz" \) 2>/dev/null | sort || true)
+    [ $found -eq 0 ] && echo -e "    ${CLR_DIM}(Файлы резервных копий пока отсутствуют)${CLR_RESET}"
 }
 
 cmd_doctor() {
@@ -896,8 +915,9 @@ cmd_doctor() {
         echo -e "  ${TAG_ERR} Каталог данных хранилища:               ${CLR_RED}[ОШИБКА ПРАВ ДОСТУПА]${CLR_RESET}"
     fi
 
+    local chost="${SAVED_LOCAL_IP:-${LOCAL_IP:-127.0.0.1}}"
     if command -v curl >/dev/null 2>&1; then
-        if curl -sk -m 2 http://127.0.0.1:80/ >/dev/null 2>&1 || curl -sk -m 2 https://127.0.0.1:443/ >/dev/null 2>&1; then
+        if curl -sk -m 2 "http://${chost}:80/" >/dev/null 2>&1 || curl -sk -m 2 -H "Host: ${chost}" http://127.0.0.1:80/ >/dev/null 2>&1 || curl -sk -m 2 https://127.0.0.1:443/ >/dev/null 2>&1; then
             echo -e "  ${TAG_OK} Caddy Reverse Proxy (HTTP 80/443):      ${CLR_GREEN}[ОТВЕЧАЕТ]${CLR_RESET}"
         else
             echo -e "  ${TAG_WARN} Caddy Reverse Proxy (HTTP 80/443):      ${CLR_YELLOW}[ОЖИДАНИЕ ТРАФИКА]${CLR_RESET}"
@@ -917,8 +937,8 @@ cmd_doctor() {
             echo -e "  ${TAG_WARN} Оптимизация MTU (TCP MSS Clamping):      ${CLR_YELLOW}[НЕ НАСТРОЕНА]${CLR_RESET}"
         fi
 
-        if [ -f /opt/homelab/mihomo/config.yaml ] && grep -q 'my-sub' /opt/homelab/mihomo/config.yaml 2>/dev/null; then
-            echo -e "  ${TAG_OK} Прокси-подписка (VLESS/Trojan/SS):        ${CLR_GREEN}[АКТИВНА (my-sub -> AUTO/PROXY)]${CLR_RESET}"
+        if ([ -f /opt/homelab/mihomo/config.yaml ] && grep -q 'my-sub' /opt/homelab/mihomo/config.yaml 2>/dev/null) || ([ -f /etc/sing-box/config.json ] && grep -q 'PROXY' /etc/sing-box/config.json 2>/dev/null); then
+            echo -e "  ${TAG_OK} Прокси-подписка (VLESS/Reality/SS):       ${CLR_GREEN}[АКТИВНА (AUTO / PROXY)]${CLR_RESET}"
         fi
 
         if grep -E -q 'priority.*- ?10|hook forward' <<< "$nft_rules"; then
@@ -948,6 +968,21 @@ cmd_doctor() {
 }
 
 cmd_update() {
+    if is_native; then
+        echo -e "  ${TAG_INFO} Обновление нативных пакетов и сервисов комплекса..."
+        if command -v apk >/dev/null 2>&1; then
+            apk update && apk upgrade
+        elif command -v apt-get >/dev/null 2>&1; then
+            apt-get update && apt-get upgrade -y
+        elif command -v pacman >/dev/null 2>&1; then
+            pacman -Syu --noconfirm
+        fi
+        echo -e "  ${TAG_INFO} Перезапуск сервисов..."
+        cmd_restart
+        echo -e "  ${TAG_OK} Пакеты и сервисы Homelab успешно обновлены!"
+        return 0
+    fi
+
     echo -e "  ${TAG_INFO} Проверка и загрузка свежих версий Docker-образов..."
     if ! (cd "$APP_DIR" && dc_cmd pull); then
         echo -e "  ${TAG_WARN} Штатный dc pull завершился со сбоем. Загрузка через российские зеркала и fallback..."
@@ -1683,8 +1718,9 @@ EOF_HOMELAB_CLI
     chmod 755 "${CLI_TMP}"
     mv -f "${CLI_TMP}" /usr/local/bin/homelab
 
-    local MIHOMO_TMP="/usr/local/bin/mihomo.tmp.$$"
-    cat << 'EOF_MIHOMO_BIN' > "${MIHOMO_TMP}"
+    if ! is_native; then
+        local MIHOMO_TMP="/usr/local/bin/mihomo.tmp.$$"
+        cat << 'EOF_MIHOMO_BIN' > "${MIHOMO_TMP}"
 #!/usr/bin/env bash
 if [ $# -eq 0 ]; then
     echo -e "\033[1;36m✦ Mihomo (Clash Meta) запущен в контейнере Docker.\033[0m"
@@ -1696,11 +1732,11 @@ else
     exec docker exec -it mihomo "$@"
 fi
 EOF_MIHOMO_BIN
-    chmod 755 "${MIHOMO_TMP}" 2>/dev/null || true
-    mv -f "${MIHOMO_TMP}" /usr/local/bin/mihomo 2>/dev/null || true
+        chmod 755 "${MIHOMO_TMP}" 2>/dev/null || true
+        mv -f "${MIHOMO_TMP}" /usr/local/bin/mihomo 2>/dev/null || true
 
-    local ADGUARD_TMP="/usr/local/bin/adguard.tmp.$$"
-    cat << 'EOF_ADGUARD_BIN' > "${ADGUARD_TMP}"
+        local ADGUARD_TMP="/usr/local/bin/adguard.tmp.$$"
+        cat << 'EOF_ADGUARD_BIN' > "${ADGUARD_TMP}"
 #!/usr/bin/env bash
 if [ $# -eq 0 ]; then
     echo -e "\033[1;36m✦ AdGuard Home запущен в контейнере Docker.\033[0m"
@@ -1712,9 +1748,12 @@ else
     exec docker exec -it adguardhome "$@"
 fi
 EOF_ADGUARD_BIN
-    chmod 755 "${ADGUARD_TMP}" 2>/dev/null || true
-    mv -f "${ADGUARD_TMP}" /usr/local/bin/adguard 2>/dev/null || true
-    ln -sf /usr/local/bin/adguard /usr/local/bin/adguardhome 2>/dev/null || true
+        chmod 755 "${ADGUARD_TMP}" 2>/dev/null || true
+        mv -f "${ADGUARD_TMP}" /usr/local/bin/adguard 2>/dev/null || true
+        ln -sf /usr/local/bin/adguard /usr/local/bin/adguardhome 2>/dev/null || true
+    else
+        rm -f /usr/local/bin/adguard /usr/local/bin/adguardhome /usr/local/bin/mihomo 2>/dev/null || true
+    fi
 
     log_ok "Сервисы комплекса успешно запущены и готовы к работе"
     log_ok "Службы автозапуска и горячего резервного копирования активированы"

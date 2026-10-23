@@ -41,8 +41,10 @@ configure_caddy_and_compose() {
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>🎵 Navidrome Music</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:4533\" target=\"_blank\" rel=\"noopener\">IP :4533</a><a class=\"alt\" href=\"https://${MUSIC_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${MUSIC_DOMAIN}</a></div></li>"
     fi
-    IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
+    if ! is_native; then
+        IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
     <li><span>📋 Dozzle Web Logs</span><div class=\"links\"><a href=\"https://${LOGS_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${LOGS_DOMAIN}</a></div></li>"
+    fi
 
     local VAULT_UPSTREAM="127.0.0.1:8000"
     local GITEA_UPSTREAM="127.0.0.1:3000"

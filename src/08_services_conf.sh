@@ -45,12 +45,15 @@ configure_gateway_services() {
         local AGH_CONF="${APP_DIR}/adguard/conf/AdGuardHome.yaml"
         local IP_OCTET
         IP_OCTET=$(echo "${LOCAL_IP}" | awk -F. '{print $4}')
-        local AGH_RANGE_START="192.168.1.50"
-        local AGH_RANGE_END="192.168.1.250"
+        local IP_PREFIX
+        IP_PREFIX=$(echo "${LOCAL_IP}" | awk -F. '{print $1"."$2"."$3}')
+        [ -z "${IP_PREFIX}" ] && IP_PREFIX="192.168.1"
+        local AGH_RANGE_START="${IP_PREFIX}.50"
+        local AGH_RANGE_END="${IP_PREFIX}.250"
         if [ -n "${IP_OCTET}" ] && [ "${IP_OCTET}" -ge 50 ] && [ "${IP_OCTET}" -le 149 ]; then
-            AGH_RANGE_START="192.168.1.$(( IP_OCTET + 1 ))"
+            AGH_RANGE_START="${IP_PREFIX}.$(( IP_OCTET + 1 ))"
         elif [ -n "${IP_OCTET}" ] && [ "${IP_OCTET}" -ge 150 ] && [ "${IP_OCTET}" -le 250 ]; then
-            AGH_RANGE_END="192.168.1.$(( IP_OCTET - 1 ))"
+            AGH_RANGE_END="${IP_PREFIX}.$(( IP_OCTET - 1 ))"
         fi
         local AGH_DHCP_ENABLED="false"
         [ "${ROUTER_MODE:-1}" = "2" ] && AGH_DHCP_ENABLED="true"
@@ -209,10 +212,10 @@ dhcp:
     options: []
     static_leases:
       - mac: "00:00:00:00:00:01"
-        ip: "192.168.1.1"
+        ip: "${IP_PREFIX}.1"
         hostname: "OpenWrt-Router"
       - mac: "00:00:00:00:00:05"
-        ip: "192.168.1.5"
+        ip: "${IP_PREFIX}.5"
         hostname: "Keenetic-Router"
   dhcpv6:
     enabled: false

@@ -42,6 +42,7 @@ save_configuration() {
         printf "SAVED_VAULT_DOMAIN=%q\n" "${VAULT_DOMAIN}"
         printf "SAVED_GITEA_DOMAIN=%q\n" "${GITEA_DOMAIN}"
         printf "SAVED_ADGUARD_DOMAIN=%q\n" "${ADGUARD_DOMAIN}"
+        printf "SAVED_TORRENT_DOMAIN=%q\n" "${TORRENT_DOMAIN}"
         printf "TORRENT_DOMAIN=%q\n" "${TORRENT_DOMAIN}"
         printf "SAVED_PROXY_DOMAIN=%q\n" "${PROXY_DOMAIN}"
         printf "SAVED_VAULT_DATA_DIR=%q\n" "${VAULT_DATA_DIR}"
