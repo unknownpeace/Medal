@@ -746,6 +746,10 @@ install_pkgs() {
                 awk '{print} /\/main$/ {sub(/\/main$/, "/community"); print}' /etc/apk/repositories > /etc/apk/repositories.tmp 2>/dev/null && \
                 mv /etc/apk/repositories.tmp /etc/apk/repositories 2>/dev/null || true
             fi
+            # Ускорение и обход блокировок Fastly CDN в РФ через официальное зеркало Yandex
+            if curl -fsSL -m 3 https://mirror.yandex.ru/mirrors/alpine/ >/dev/null 2>&1; then
+                sed -i 's|https\?://dl-cdn.alpinelinux.org/alpine|https://mirror.yandex.ru/mirrors/alpine|g' /etc/apk/repositories 2>/dev/null || true
+            fi
         fi
         run_spin "Обновление индексов пакетов APK" bash -c "apk update || apk update || true"
 
@@ -759,7 +763,7 @@ install_pkgs() {
             bash python3 py3-bcrypt py3-aiohttp iproute2 cryptsetup btrfs-progs ntfs-3g \
             util-linux util-linux-misc lsblk curl openssl ca-certificates jq nftables nftables-openrc apache2-utils \
             unzip tar sqlite argon2 iputils shadow procps e2fsprogs ffmpeg libcap libcap-utils \
-            chrony chrony-openrc openrc \
+            chrony chrony-openrc openrc dbus dbus-openrc avahi avahi-openrc \
             sing-box sing-box-openrc \
             adguardhome adguardhome-openrc \
             caddy caddy-openrc \
@@ -4284,32 +4288,32 @@ configure_caddy_and_compose() {
     local IP_PORTAL_ITEMS=""
     if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🛡️ AdGuard Home</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:8083\" target=\"_blank\" rel=\"noopener\">IP :8083</a><a class=\"alt\" href=\"https://${ADGUARD_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${ADGUARD_DOMAIN}</a></div></li>
-    <li><span>🚀 sing-box Gateway UI</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:9090/ui/#/?hostname=${LOCAL_IP}&port=9090&protocol=http&secret=${MIHOMO_SECRET_VAL}\" target=\"_blank\" rel=\"noopener\">IP :9090 [Вход]</a><a class=\"alt\" href=\"https://${PROXY_DOMAIN}/#/?hostname=${PROXY_DOMAIN}&port=443&protocol=https&secret=${MIHOMO_SECRET_VAL}\" target=\"_blank\" rel=\"noopener\">${PROXY_DOMAIN}</a></div></li>"
+    <li><span>🛡️ AdGuard Home</span><div class=\"links\"><a href=\"http://${ADGUARD_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${ADGUARD_DOMAIN}</a><a class=\"alt\" href=\"http://${LOCAL_IP}:8083\" target=\"_blank\" rel=\"noopener\">IP :8083</a></div></li>
+    <li><span>🚀 sing-box Gateway UI</span><div class=\"links\"><a href=\"http://${PROXY_DOMAIN}/#/?hostname=${LOCAL_IP}&port=9090&protocol=http&secret=${MIHOMO_SECRET_VAL}\" target=\"_blank\" rel=\"noopener\">${PROXY_DOMAIN} [Вход]</a><a class=\"alt\" href=\"http://${LOCAL_IP}:9090/ui/#/?hostname=${LOCAL_IP}&port=9090&protocol=http&secret=${MIHOMO_SECRET_VAL}\" target=\"_blank\" rel=\"noopener\">IP :9090</a></div></li>"
     fi
     if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🔑 Vaultwarden</span><div class=\"links\"><a href=\"https://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${VAULT_DOMAIN}</a><a class=\"alt\" href=\"http://${LOCAL_IP}:8000\" target=\"_blank\" rel=\"noopener\">IP :8000</a></div></li>"
+    <li><span>🔑 Vaultwarden</span><div class=\"links\"><a href=\"http://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${VAULT_DOMAIN}</a><a class=\"alt\" href=\"https://${VAULT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">HTTPS</a><a class=\"alt\" href=\"http://${LOCAL_IP}:8000\" target=\"_blank\" rel=\"noopener\">IP :8000</a></div></li>"
     fi
     if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🐙 Forgejo Git Server</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:3000\" target=\"_blank\" rel=\"noopener\">IP :3000</a><a class=\"alt\" href=\"https://${GITEA_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${GITEA_DOMAIN}</a></div></li>"
+    <li><span>🐙 Forgejo Git Server</span><div class=\"links\"><a href=\"http://${GITEA_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${GITEA_DOMAIN}</a><a class=\"alt\" href=\"http://${LOCAL_IP}:3000\" target=\"_blank\" rel=\"noopener\">IP :3000</a></div></li>"
     fi
     if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>📥 qBittorrent</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:8080\" target=\"_blank\" rel=\"noopener\">IP :8080</a><a class=\"alt\" href=\"https://${TORRENT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${TORRENT_DOMAIN}</a></div></li>"
+    <li><span>📥 qBittorrent</span><div class=\"links\"><a href=\"http://${TORRENT_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${TORRENT_DOMAIN}</a><a class=\"alt\" href=\"http://${LOCAL_IP}:8080\" target=\"_blank\" rel=\"noopener\">IP :8080</a></div></li>"
     fi
     if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>📥 MeTube (Загрузка видео)</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:8081\" target=\"_blank\" rel=\"noopener\">IP :8081</a><a class=\"alt\" href=\"https://${METUBE_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${METUBE_DOMAIN}</a></div></li>"
+    <li><span>📥 MeTube (Загрузка видео)</span><div class=\"links\"><a href=\"http://${METUBE_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${METUBE_DOMAIN}</a><a class=\"alt\" href=\"http://${LOCAL_IP}:8081\" target=\"_blank\" rel=\"noopener\">IP :8081</a></div></li>"
     fi
     if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>🎵 Navidrome Music</span><div class=\"links\"><a href=\"http://${LOCAL_IP}:4533\" target=\"_blank\" rel=\"noopener\">IP :4533</a><a class=\"alt\" href=\"https://${MUSIC_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${MUSIC_DOMAIN}</a></div></li>"
+    <li><span>🎵 Navidrome Music</span><div class=\"links\"><a href=\"http://${MUSIC_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${MUSIC_DOMAIN}</a><a class=\"alt\" href=\"http://${LOCAL_IP}:4533\" target=\"_blank\" rel=\"noopener\">IP :4533</a></div></li>"
     fi
     if ! is_native; then
         IP_PORTAL_ITEMS="${IP_PORTAL_ITEMS}
-    <li><span>📋 Dozzle Web Logs</span><div class=\"links\"><a href=\"https://${LOGS_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${LOGS_DOMAIN}</a></div></li>"
+    <li><span>📋 Dozzle Web Logs</span><div class=\"links\"><a href=\"http://${LOGS_DOMAIN}\" target=\"_blank\" rel=\"noopener\">${LOGS_DOMAIN}</a></div></li>"
     fi
 
     local VAULT_UPSTREAM="127.0.0.1:8000"
@@ -4337,11 +4341,7 @@ configure_caddy_and_compose() {
     cat <<EOF_CADDY > "${APP_DIR}/caddy/Caddyfile"
 {
     admin off
-    pki {
-        ca local {
-            install_trust false
-        }
-    }
+    auto_https disable_redirects
 }
 
 (security_headers) {
@@ -4360,7 +4360,7 @@ configure_caddy_and_compose() {
     }
 }
 
-http://${LOCAL_IP} {
+http://${LOCAL_IP}, http://homelab.lan, http://homelab.local {
     @cert path /caddy-root.crt /root.crt
     handle @cert {
         root * ${CADDY_CERT_DIR}
@@ -4369,48 +4369,7 @@ http://${LOCAL_IP} {
     }
 
     handle {
-        header Content-Type "text/html; charset=utf-8"
-        respond <<EOF_HTML
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Homelab Appliance &amp; Gateway</title>
-<style>
-body { background: #080d1a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; box-sizing: border-box; }
-.card { background: #0f172a; border: 1px solid #1e293b; border-radius: 16px; padding: 32px; max-width: 600px; width: 100%; box-shadow: 0 20px 45px rgba(0,0,0,0.7); }
-h1 { color: #38bdf8; font-size: 24px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
-.badge { background: #065f46; color: #6ee7b7; font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: bold; }
-p { color: #94a3b8; font-size: 14px; line-height: 1.6; margin: 8px 0 16px; }
-.list { list-style: none; padding: 0; margin: 16px 0; }
-.list li { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #131e36; border-radius: 8px; border: 1px solid #1e293b; font-size: 14px; gap: 8px; }
-.links { display: flex; gap: 6px; flex-wrap: wrap; }
-.list a { color: #38bdf8; text-decoration: none; font-weight: 600; font-family: monospace; font-size: 13px; background: rgba(56, 189, 248, 0.1); padding: 4px 8px; border-radius: 4px; transition: all 0.2s; white-space: nowrap; }
-.list a:hover { background: rgba(56, 189, 248, 0.25); text-decoration: underline; }
-.list a.alt { background: rgba(148, 163, 184, 0.12); color: #94a3b8; }
-.list a.alt:hover { background: rgba(148, 163, 184, 0.25); color: #f8fafc; text-decoration: underline; }
-.btn-cert { display: block; text-align: center; background: #0284c7; color: #fff; text-decoration: none; font-weight: 600; font-size: 13px; padding: 10px 16px; border-radius: 8px; margin: 18px 0 10px; transition: background 0.2s; }
-.btn-cert:hover { background: #0369a1; }
-.tip { background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; padding: 12px; font-size: 13px; color: #cbd5e1; border-radius: 4px; margin-top: 14px; line-height: 1.5; }
-code { background: #1e293b; color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
-</style>
-</head>
-<body>
-<div class="card">
-  <h1>⚡ Homelab Appliance <span class="badge">ONLINE</span></h1>
-  <p>Сервер успешно развернут. Для доступа к защищенным веб-сервисам перейдите по ссылкам:</p>
-  <ul class="list">
-${IP_PORTAL_ITEMS}
-  </ul>
-  <a class="btn-cert" href="/caddy-root.crt" download>📥 Скачать Root CA Сертификат (caddy-root.crt)</a>
-  <div class="tip">
-    💡 <b>Настройка роутера:</b> Укажите в DHCP вашего роутера <code>DNS: ${LOCAL_IP}</code> и <code>Gateway: ${LOCAL_IP}</code>, чтобы все устройства домашней сети автоматически переходили по доменам <code>*.lan</code> и получили чистый интернет без рекламы и блокировок.
-  </div>
-</div>
-</body>
-</html>
-EOF_HTML 200
+        reverse_proxy 127.0.0.1:8082
     }
 }
 EOF_CADDY
@@ -4514,7 +4473,7 @@ EOF_CADDY
     else
         if [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
-${VAULT_DOMAIN} {
+http://${VAULT_DOMAIN}, https://${VAULT_DOMAIN}, http://vault.local, https://vault.local {
     tls internal
     import security_headers
     encode zstd gzip
@@ -4525,7 +4484,7 @@ EOF_CADDY
 
         if [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
-${GITEA_DOMAIN} {
+http://${GITEA_DOMAIN}, https://${GITEA_DOMAIN}, http://git.local, https://git.local {
     tls internal
     import security_headers
     encode zstd gzip
@@ -4536,7 +4495,7 @@ EOF_CADDY
 
         if [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
-${TORRENT_DOMAIN} {
+http://${TORRENT_DOMAIN}, https://${TORRENT_DOMAIN}, http://torrent.local, https://torrent.local {
     tls internal
     import security_headers
     encode zstd gzip
@@ -4547,7 +4506,7 @@ EOF_CADDY
 
         if [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
-${METUBE_DOMAIN}, tube.lan {
+http://${METUBE_DOMAIN}, http://tube.lan, http://metube.local, http://tube.local, https://${METUBE_DOMAIN}, https://tube.lan, https://metube.local, https://tube.local {
     tls internal
     import security_headers
     encode zstd gzip
@@ -4558,7 +4517,7 @@ EOF_CADDY
 
         if [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
-${MUSIC_DOMAIN} {
+http://${MUSIC_DOMAIN}, https://${MUSIC_DOMAIN}, http://music.local, https://music.local {
     tls internal
     import security_headers
     encode zstd gzip
@@ -4569,14 +4528,14 @@ EOF_CADDY
 
         if [[ "${ENABLE_GATEWAY}" =~ ^[Yy]$ ]]; then
             cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
-${ADGUARD_DOMAIN} {
+http://${ADGUARD_DOMAIN}, https://${ADGUARD_DOMAIN}, http://adguard.local, https://adguard.local {
     tls internal
     import security_headers
     encode zstd gzip
     reverse_proxy ${AGH_UPSTREAM}
 }
 
-${PROXY_DOMAIN} {
+http://${PROXY_DOMAIN}, https://${PROXY_DOMAIN}, http://proxy.local, https://proxy.local {
     tls internal
     import security_headers
     encode zstd gzip
@@ -4602,7 +4561,7 @@ EOF_CADDY
         fi
 
         cat <<EOF_CADDY >> "${APP_DIR}/caddy/Caddyfile"
-${LOGS_DOMAIN} {
+http://${LOGS_DOMAIN}, https://${LOGS_DOMAIN}, http://logs.local, https://logs.local {
     tls internal
     import security_headers
     encode zstd gzip
@@ -4849,7 +4808,184 @@ EOF_YTDL_INIT
             chmod 755 /etc/init.d/ytdlp-web
         fi
 
-        # 8. Master OpenRC meta-service
+        # 8. Web Management Portal & Mode Switcher Daemon (homelab-portal on 127.0.0.1:8082)
+        cat << 'EOF_PORTAL_PY' > "${APP_DIR}/scripts/portal_web.py"
+#!/usr/bin/env python3
+import os, sys, subprocess, json, re, time
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import parse_qs, urlparse
+
+ENV_FILE = "/opt/homelab/.env"
+
+def load_env():
+    env = {}
+    if os.path.exists(ENV_FILE):
+        try:
+            with open(ENV_FILE, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        env[k.strip()] = v.strip().strip("'\"")
+        except Exception:
+            pass
+    return env
+
+class PortalHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        env = load_env()
+        parsed_url = urlparse(self.path)
+        qs = parse_qs(parsed_url.query)
+        switched = qs.get("switched", [""])[0]
+
+        local_ip = env.get("SAVED_LOCAL_IP", env.get("LOCAL_IP", "127.0.0.1"))
+        router_mode = env.get("SAVED_ROUTER_MODE", env.get("ROUTER_MODE", "1"))
+        secret = env.get("SAVED_MIHOMO_SECRET", env.get("MIHOMO_SECRET", ""))
+        admin_user = env.get("SAVED_ADMIN_USER", "admin")
+        share_name = env.get("SAVED_SHARE_NAME", "storage")
+
+        if router_mode == "2":
+            mode_badge = '<span class="badge badge-router">⚡ РЕЖИМ: ДОМАШНИЙ РОУТЕР (WAN + LAN)</span>'
+            mode_desc = f'<b>Сервер заменяет домашний роутер.</b> DHCP-сервер в AdGuard Home <b>ВКЛЮЧЕН</b> (пул .50-.250). WAN: <code>{env.get("SAVED_WAN_IFACE","eth0")}</code>, LAN: <code>{env.get("SAVED_LAN_IFACE","wlan0")}</code>. Keenetic (192.168.1.5) защищен.'
+            switch_btn = '<form method="POST" action="/api/mode"><input type="hidden" name="mode" value="1"><button type="submit" class="btn-mode btn-mode-gw">🔄 Переключить в режим &quot;Прозрачный шлюз&quot; (DHCP в Keenetic)</button></form>'
+        else:
+            mode_badge = '<span class="badge badge-gw">⚡ РЕЖИМ: ПРОЗРАЧНЫЙ ШЛЮЗ (GATEWAY)</span>'
+            mode_desc = f'<b>Сервер работает в паре с основным роутером.</b> DHCP-сервер в AdGuard Home <b>ОТКЛЮЧЕН</b> (работает DHCP Keenetic на 192.168.1.5). LAN адаптер: <code>{env.get("SAVED_PHYS_IFACE","eth0")}</code>.'
+            switch_btn = '<form method="POST" action="/api/mode"><input type="hidden" name="mode" value="2"><button type="submit" class="btn-mode btn-mode-router">🔄 Переключить в режим &quot;Домашний роутер&quot; (WAN + LAN)</button></form>'
+
+        flash_msg = ""
+        if switched:
+            flash_msg = f'<div class="flash">✔ Режим сети успешно изменен на {"Домашний роутер" if switched == "2" else "Прозрачный шлюз"}! DHCP и правила фаервола синхронизированы.</div>'
+
+        html = f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Homelab Appliance &amp; Gateway</title>
+<style>
+body {{ background: #080d1a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }}
+.card {{ background: #0f172a; border: 1px solid #1e293b; border-radius: 16px; padding: 28px; max-width: 620px; width: 100%; box-shadow: 0 20px 45px rgba(0,0,0,0.7); }}
+h1 {{ color: #38bdf8; font-size: 24px; margin: 0 0 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }}
+.badge {{ font-size: 11px; padding: 4px 10px; border-radius: 6px; font-weight: bold; letter-spacing: 0.5px; }}
+.badge-online {{ background: #065f46; color: #6ee7b7; }}
+.badge-gw {{ background: #1e3a8a; color: #93c5fd; }}
+.badge-router {{ background: #854d0e; color: #fde047; }}
+.mode-box {{ background: #131e36; border: 1px solid #1e293b; border-radius: 10px; padding: 14px 16px; margin: 16px 0; }}
+.mode-box p {{ color: #cbd5e1; font-size: 13px; line-height: 1.5; margin: 8px 0 12px; }}
+.btn-mode {{ width: 100%; padding: 10px 14px; border: none; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; transition: background 0.2s; }}
+.btn-mode-gw {{ background: #0284c7; color: #fff; }}
+.btn-mode-gw:hover {{ background: #0369a1; }}
+.btn-mode-router {{ background: #d97706; color: #fff; }}
+.btn-mode-router:hover {{ background: #b45309; }}
+.flash {{ background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #34d399; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }}
+.list {{ list-style: none; padding: 0; margin: 16px 0; }}
+.list li {{ margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #131e36; border-radius: 8px; border: 1px solid #1e293b; font-size: 14px; gap: 8px; }}
+.links {{ display: flex; gap: 6px; flex-wrap: wrap; }}
+.list a {{ color: #38bdf8; text-decoration: none; font-weight: 600; font-family: monospace; font-size: 13px; background: rgba(56, 189, 248, 0.1); padding: 4px 8px; border-radius: 4px; transition: all 0.2s; white-space: nowrap; }}
+.list a:hover {{ background: rgba(56, 189, 248, 0.25); text-decoration: underline; }}
+.list a.alt {{ background: rgba(148, 163, 184, 0.12); color: #94a3b8; }}
+.list a.alt:hover {{ background: rgba(148, 163, 184, 0.25); color: #f8fafc; text-decoration: underline; }}
+.btn-cert {{ display: block; text-align: center; background: #0284c7; color: #fff; text-decoration: none; font-weight: 600; font-size: 13px; padding: 10px 16px; border-radius: 8px; margin: 14px 0 10px; transition: background 0.2s; }}
+.btn-cert:hover {{ background: #0369a1; }}
+.tip {{ background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; padding: 12px; font-size: 13px; color: #cbd5e1; border-radius: 4px; margin-top: 14px; line-height: 1.5; }}
+code {{ background: #1e293b; color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-size: 12px; }}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1><span>⚡ Homelab Appliance</span> <span class="badge badge-online">ONLINE</span></h1>
+  {flash_msg}
+  <div class="mode-box">
+    <div>{mode_badge}</div>
+    <p>{mode_desc}</p>
+    {switch_btn}
+  </div>
+  <ul class="list">
+    <li><span>🛡️ AdGuard Home</span><div class="links"><a href="http://adguard.lan" target="_blank" rel="noopener">adguard.lan</a><a class="alt" href="http://adguard.local" target="_blank" rel="noopener">.local</a><a class="alt" href="http://{local_ip}:8083" target="_blank" rel="noopener">IP :8083</a></div></li>
+    <li><span>🚀 sing-box UI</span><div class="links"><a href="http://proxy.lan/#/?hostname={local_ip}&port=9090&protocol=http&secret={secret}" target="_blank" rel="noopener">proxy.lan [Вход]</a><a class="alt" href="http://{local_ip}:9090/ui/#/?hostname={local_ip}&port=9090&protocol=http&secret={secret}" target="_blank" rel="noopener">IP :9090</a></div></li>
+    <li><span>🔑 Vaultwarden</span><div class="links"><a href="http://vault.lan" target="_blank" rel="noopener">vault.lan</a><a class="alt" href="https://vault.lan" target="_blank" rel="noopener">HTTPS</a><a class="alt" href="http://{local_ip}:8000" target="_blank" rel="noopener">IP :8000</a></div></li>
+    <li><span>🐙 Forgejo Git Server</span><div class="links"><a href="http://git.lan" target="_blank" rel="noopener">git.lan</a><a class="alt" href="http://git.local" target="_blank" rel="noopener">.local</a><a class="alt" href="http://{local_ip}:3000" target="_blank" rel="noopener">IP :3000</a></div></li>
+    <li><span>📥 qBittorrent</span><div class="links"><a href="http://torrent.lan" target="_blank" rel="noopener">torrent.lan</a><a class="alt" href="http://torrent.local" target="_blank" rel="noopener">.local</a><a class="alt" href="http://{local_ip}:8080" target="_blank" rel="noopener">IP :8080</a></div></li>
+    <li><span>🎬 MeTube (Загрузка видео)</span><div class="links"><a href="http://metube.lan" target="_blank" rel="noopener">metube.lan</a><a class="alt" href="http://metube.local" target="_blank" rel="noopener">.local</a><a class="alt" href="http://{local_ip}:8081" target="_blank" rel="noopener">IP :8081</a></div></li>
+    <li><span>🎵 Navidrome Music</span><div class="links"><a href="http://music.lan" target="_blank" rel="noopener">music.lan</a><a class="alt" href="http://music.local" target="_blank" rel="noopener">.local</a><a class="alt" href="http://{local_ip}:4533" target="_blank" rel="noopener">IP :4533</a></div></li>
+    <li><span>📂 Samba Хранилище</span><div class="links"><a class="alt" href="file:///{local_ip}/{share_name}">\\\\{local_ip}\\{share_name}</a><a class="alt" href="file:///{local_ip}/music">\\\\{local_ip}\\music</a></div></li>
+  </ul>
+  <a class="btn-cert" href="/caddy-root.crt" download>📥 Скачать Root CA Сертификат (caddy-root.crt)</a>
+  <div class="tip">
+    💡 <b>Настройка роутера Keenetic:</b> В меню роутера укажите <code>DNS: {local_ip}</code> и <code>Шлюз: {local_ip}</code>, чтобы все устройства домашней сети автоматически переходили по доменам <code>*.lan</code> и получили чистый интернет без рекламы и блокировок.<br><br>
+    ⚡ <b>Команда Windows PowerShell для мгновенного доверия SSL:</b><br>
+    <code>irm http://{local_ip}/caddy-root.crt -OutFile $env:TEMP\\ca.crt; certutil -user -addstore -f Root $env:TEMP\\ca.crt</code>
+  </div>
+</div>
+</body>
+</html>"""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(html.encode("utf-8"))
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length).decode("utf-8", errors="ignore")
+        data = parse_qs(body)
+        mode = data.get("mode", ["1"])[0].strip()
+        if mode in ("1", "2"):
+            subprocess.run(["/usr/local/bin/homelab", "mode", mode], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.send_response(303)
+            self.send_header("Location", f"/?switched={mode}")
+            self.end_headers()
+        else:
+            self.send_response(400)
+            self.end_headers()
+
+if __name__ == "__main__":
+    server = HTTPServer(("0.0.0.0", 8082), PortalHandler)
+    server.serve_forever()
+EOF_PORTAL_PY
+        chmod 755 "${APP_DIR}/scripts/portal_web.py"
+
+        cat << EOF_PORTAL_INIT > /etc/init.d/homelab-portal
+#!/sbin/openrc-run
+name="homelab-portal"
+description="Homelab Web Management Portal"
+supervisor="supervise-daemon"
+command="/usr/bin/python3"
+command_args="${APP_DIR}/scripts/portal_web.py"
+output_log="/var/log/homelab-portal.log"
+error_log="/var/log/homelab-portal.log"
+respawn_delay=2
+respawn_max=5
+
+depend() {
+    need net
+    before caddy
+    after network
+}
+EOF_PORTAL_INIT
+        chmod 755 /etc/init.d/homelab-portal
+
+        # 9. mDNS Zeroconf Avahi Hosts
+        if [ -d /etc/avahi ]; then
+            cat << EOF_AVAHI > /etc/avahi/hosts
+${LOCAL_IP} homelab.local
+${LOCAL_IP} adguard.local
+${LOCAL_IP} proxy.local
+${LOCAL_IP} vault.local
+${LOCAL_IP} git.local
+${LOCAL_IP} torrent.local
+${LOCAL_IP} metube.local
+${LOCAL_IP} tube.local
+${LOCAL_IP} music.local
+${LOCAL_IP} logs.local
+EOF_AVAHI
+            rc-update add dbus default >/dev/null 2>&1 || true
+            rc-service dbus status >/dev/null 2>&1 || rc-service dbus start >/dev/null 2>&1 || true
+            rc-update add avahi-daemon default >/dev/null 2>&1 || true
+            rc-service avahi-daemon status >/dev/null 2>&1 || rc-service avahi-daemon restart >/dev/null 2>&1 || true
+        fi
+
+        # 10. Master OpenRC meta-service
         cat << 'EOF_HOMELAB_RC' > /etc/init.d/homelab
 #!/sbin/openrc-run
 description="Homelab Native Bare-Metal Appliance"
@@ -4861,7 +4997,7 @@ depend() {
 
 start() {
     ebegin "Starting Homelab Appliance Services"
-    for svc in sing-box adguardhome caddy vaultwarden forgejo samba wsdd qbittorrent-nox navidrome ytdlp-web; do
+    for svc in sing-box adguardhome homelab-portal caddy vaultwarden forgejo samba wsdd qbittorrent-nox navidrome ytdlp-web avahi-daemon; do
         if [ -f "/etc/init.d/$svc" ]; then
             rc-service "$svc" status >/dev/null 2>&1 || rc-service "$svc" start >/dev/null 2>&1 || true
         fi
@@ -4872,7 +5008,7 @@ start() {
 
 stop() {
     ebegin "Stopping Homelab Appliance Services"
-    for svc in ytdlp-web navidrome qbittorrent-nox wsdd samba forgejo vaultwarden caddy adguardhome sing-box; do
+    for svc in ytdlp-web navidrome qbittorrent-nox wsdd samba forgejo vaultwarden caddy homelab-portal adguardhome sing-box avahi-daemon; do
         if [ -f "/etc/init.d/$svc" ]; then
             rc-service "$svc" stop >/dev/null 2>&1 || true
         fi
@@ -4882,7 +5018,7 @@ stop() {
 
 restart() {
     ebegin "Restarting Homelab Appliance Services"
-    for svc in sing-box adguardhome caddy vaultwarden forgejo samba wsdd qbittorrent-nox navidrome ytdlp-web; do
+    for svc in sing-box adguardhome homelab-portal caddy vaultwarden forgejo samba wsdd qbittorrent-nox navidrome ytdlp-web avahi-daemon; do
         if [ -f "/etc/init.d/$svc" ]; then
             rc-service "$svc" restart >/dev/null 2>&1 || true
         fi
@@ -4893,6 +5029,7 @@ restart() {
 EOF_HOMELAB_RC
         chmod 755 /etc/init.d/homelab
         rc-update add homelab default >/dev/null 2>&1 || true
+        rc-update add homelab-portal default >/dev/null 2>&1 || true
 
         log_ok "Нативные конфигурации OpenRC и Caddyfile успешно подготовлены"
         return 0
@@ -5547,13 +5684,14 @@ EOF_NAVI_BKP_TMR
 
     if [ "${DISTRO_FAMILY}" = "alpine" ] || is_native; then
         log_info "Активация и запуск нативных служб комплекса под управлением OpenRC..."
-        local NATIVE_SVCS=(sing-box adguardhome caddy)
+        local NATIVE_SVCS=(sing-box adguardhome homelab-portal caddy)
         [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(vaultwarden)
         [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(forgejo)
         [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(samba wsdd)
         [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(qbittorrent-nox)
         [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(navidrome)
         [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(ytdlp-web)
+        [ -f /etc/init.d/avahi-daemon ] && NATIVE_SVCS+=(avahi-daemon)
 
         for svc in "${NATIVE_SVCS[@]}"; do
             if [ -f "/etc/init.d/${svc}" ]; then
@@ -5799,6 +5937,8 @@ norm_service() {
         tube|video|metube) echo "ytdlp-web" ;;
         git|gitea|forgejo) echo "forgejo" ;;
         proxy|clash|meta|mihomo|singbox|sing-box) echo "sing-box" ;;
+        portal|homelab-portal) echo "homelab-portal" ;;
+        avahi|avahi-daemon) echo "avahi-daemon" ;;
         smb|samba) echo "samba" ;;
         caddy|web|proxy-web) echo "caddy" ;;
         *) echo "$s" ;;
@@ -5862,7 +6002,7 @@ cmd_status() {
         echo -e "${CLR_CYAN}${CLR_BOLD}╭── СТАТУС СЛУЖБ OPENRC (NATIVE BARE-METAL) ──────────────────${CLR_RESET}"
         printf "  %-18s %-22s %-10s\n" "СЛУЖБА" "СТАТУС" "ОЗУ (RSS)"
         echo -e "  ─────────────────────────────────────────────────────────────"
-        local NATIVE_SVCS=("sing-box" "adguardhome" "caddy" "vaultwarden" "forgejo" "samba" "wsdd" "qbittorrent-nox" "navidrome" "ytdlp-web")
+        local NATIVE_SVCS=("sing-box" "adguardhome" "caddy" "homelab-portal" "avahi-daemon" "vaultwarden" "forgejo" "samba" "wsdd" "qbittorrent-nox" "navidrome" "ytdlp-web")
         for svc in "${NATIVE_SVCS[@]}"; do
             if [ -f "/etc/init.d/$svc" ]; then
                 local st_raw
@@ -5874,6 +6014,7 @@ cmd_status() {
                 local pat="$svc"
                 [ "$svc" = "samba" ] && pat="smbd"
                 [ "$svc" = "ytdlp-web" ] && pat="ytdlp_web"
+                [ "$svc" = "homelab-portal" ] && pat="portal_web"
                 local mem_str
                 mem_str=$(ps -eo rss,args 2>/dev/null | awk -v p="$pat" 'tolower($0) ~ tolower(p) && $0 !~ /awk/ {sum+=$1} END {if (sum>0) printf "%.1f MB", sum/1024; else print "—"}')
                 printf "  %-18s %-32b %-10s\n" "$svc" "$st_str" "$mem_str"
@@ -6078,6 +6219,12 @@ cmd_logs() {
                 ;;
             caddy)
                 [ -f /var/log/caddy.log ] && tail ${follow} -n ${tail_lines} /var/log/caddy.log || grep -i caddy /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            homelab-portal|portal)
+                [ -f /var/log/homelab-portal.log ] && tail ${follow} -n ${tail_lines} /var/log/homelab-portal.log || grep -i portal /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            avahi|avahi-daemon)
+                grep -i avahi /var/log/messages 2>/dev/null | tail -n ${tail_lines}
                 ;;
             vaultwarden)
                 [ -f /var/log/vaultwarden.log ] && tail ${follow} -n ${tail_lines} /var/log/vaultwarden.log || grep -i vaultwarden /var/log/messages 2>/dev/null | tail -n ${tail_lines}
@@ -6624,6 +6771,7 @@ cmd_dump_logs() {
             local NATIVE_LOGS=(
                 "sing-box:/var/log/sing-box.log"
                 "adguardhome:/var/log/adguardhome.log"
+                "homelab-portal:/var/log/homelab-portal.log"
                 "caddy:/var/log/caddy.log"
                 "vaultwarden:/var/log/vaultwarden.log"
                 "navidrome:/var/log/navidrome.log"

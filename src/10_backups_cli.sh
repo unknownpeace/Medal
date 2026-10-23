@@ -245,13 +245,14 @@ EOF_NAVI_BKP_TMR
 
     if [ "${DISTRO_FAMILY}" = "alpine" ] || is_native; then
         log_info "Активация и запуск нативных служб комплекса под управлением OpenRC..."
-        local NATIVE_SVCS=(sing-box adguardhome caddy)
+        local NATIVE_SVCS=(sing-box adguardhome homelab-portal caddy)
         [[ "${ENABLE_VAULT}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(vaultwarden)
         [[ "${ENABLE_GITEA}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(forgejo)
         [[ "${ENABLE_SAMBA}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(samba wsdd)
         [[ "${ENABLE_QBIT}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(qbittorrent-nox)
         [[ "${ENABLE_NAVIDROME}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(navidrome)
         [[ "${ENABLE_METUBE}" =~ ^[Yy]$ ]] && NATIVE_SVCS+=(ytdlp-web)
+        [ -f /etc/init.d/avahi-daemon ] && NATIVE_SVCS+=(avahi-daemon)
 
         for svc in "${NATIVE_SVCS[@]}"; do
             if [ -f "/etc/init.d/${svc}" ]; then
@@ -497,6 +498,8 @@ norm_service() {
         tube|video|metube) echo "ytdlp-web" ;;
         git|gitea|forgejo) echo "forgejo" ;;
         proxy|clash|meta|mihomo|singbox|sing-box) echo "sing-box" ;;
+        portal|homelab-portal) echo "homelab-portal" ;;
+        avahi|avahi-daemon) echo "avahi-daemon" ;;
         smb|samba) echo "samba" ;;
         caddy|web|proxy-web) echo "caddy" ;;
         *) echo "$s" ;;
@@ -560,7 +563,7 @@ cmd_status() {
         echo -e "${CLR_CYAN}${CLR_BOLD}╭── СТАТУС СЛУЖБ OPENRC (NATIVE BARE-METAL) ──────────────────${CLR_RESET}"
         printf "  %-18s %-22s %-10s\n" "СЛУЖБА" "СТАТУС" "ОЗУ (RSS)"
         echo -e "  ─────────────────────────────────────────────────────────────"
-        local NATIVE_SVCS=("sing-box" "adguardhome" "caddy" "vaultwarden" "forgejo" "samba" "wsdd" "qbittorrent-nox" "navidrome" "ytdlp-web")
+        local NATIVE_SVCS=("sing-box" "adguardhome" "caddy" "homelab-portal" "avahi-daemon" "vaultwarden" "forgejo" "samba" "wsdd" "qbittorrent-nox" "navidrome" "ytdlp-web")
         for svc in "${NATIVE_SVCS[@]}"; do
             if [ -f "/etc/init.d/$svc" ]; then
                 local st_raw
@@ -572,6 +575,7 @@ cmd_status() {
                 local pat="$svc"
                 [ "$svc" = "samba" ] && pat="smbd"
                 [ "$svc" = "ytdlp-web" ] && pat="ytdlp_web"
+                [ "$svc" = "homelab-portal" ] && pat="portal_web"
                 local mem_str
                 mem_str=$(ps -eo rss,args 2>/dev/null | awk -v p="$pat" 'tolower($0) ~ tolower(p) && $0 !~ /awk/ {sum+=$1} END {if (sum>0) printf "%.1f MB", sum/1024; else print "—"}')
                 printf "  %-18s %-32b %-10s\n" "$svc" "$st_str" "$mem_str"
@@ -776,6 +780,12 @@ cmd_logs() {
                 ;;
             caddy)
                 [ -f /var/log/caddy.log ] && tail ${follow} -n ${tail_lines} /var/log/caddy.log || grep -i caddy /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            homelab-portal|portal)
+                [ -f /var/log/homelab-portal.log ] && tail ${follow} -n ${tail_lines} /var/log/homelab-portal.log || grep -i portal /var/log/messages 2>/dev/null | tail -n ${tail_lines}
+                ;;
+            avahi|avahi-daemon)
+                grep -i avahi /var/log/messages 2>/dev/null | tail -n ${tail_lines}
                 ;;
             vaultwarden)
                 [ -f /var/log/vaultwarden.log ] && tail ${follow} -n ${tail_lines} /var/log/vaultwarden.log || grep -i vaultwarden /var/log/messages 2>/dev/null | tail -n ${tail_lines}
@@ -1322,6 +1332,7 @@ cmd_dump_logs() {
             local NATIVE_LOGS=(
                 "sing-box:/var/log/sing-box.log"
                 "adguardhome:/var/log/adguardhome.log"
+                "homelab-portal:/var/log/homelab-portal.log"
                 "caddy:/var/log/caddy.log"
                 "vaultwarden:/var/log/vaultwarden.log"
                 "navidrome:/var/log/navidrome.log"

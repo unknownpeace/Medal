@@ -13,6 +13,10 @@ install_pkgs() {
                 awk '{print} /\/main$/ {sub(/\/main$/, "/community"); print}' /etc/apk/repositories > /etc/apk/repositories.tmp 2>/dev/null && \
                 mv /etc/apk/repositories.tmp /etc/apk/repositories 2>/dev/null || true
             fi
+            # Ускорение и обход блокировок Fastly CDN в РФ через официальное зеркало Yandex
+            if curl -fsSL -m 3 https://mirror.yandex.ru/mirrors/alpine/ >/dev/null 2>&1; then
+                sed -i 's|https\?://dl-cdn.alpinelinux.org/alpine|https://mirror.yandex.ru/mirrors/alpine|g' /etc/apk/repositories 2>/dev/null || true
+            fi
         fi
         run_spin "Обновление индексов пакетов APK" bash -c "apk update || apk update || true"
 
@@ -26,7 +30,7 @@ install_pkgs() {
             bash python3 py3-bcrypt py3-aiohttp iproute2 cryptsetup btrfs-progs ntfs-3g \
             util-linux util-linux-misc lsblk curl openssl ca-certificates jq nftables nftables-openrc apache2-utils \
             unzip tar sqlite argon2 iputils shadow procps e2fsprogs ffmpeg libcap libcap-utils \
-            chrony chrony-openrc openrc \
+            chrony chrony-openrc openrc dbus dbus-openrc avahi avahi-openrc \
             sing-box sing-box-openrc \
             adguardhome adguardhome-openrc \
             caddy caddy-openrc \
