@@ -137,6 +137,9 @@ querylog:
   interval: 24h
   size_memory: 1000
   anonymize_client_ip: false
+  ignored:
+    - "*.in-addr.arpa"
+    - "*.ip6.arpa"
 stats:
   enabled: true
   interval: 24h
@@ -163,8 +166,8 @@ filters:
     name: "AdGuard Tracking Protection filter"
     id: 2
   - enabled: true
-    url: https://raw.githubusercontent.com/AdguardTeam/FiltersRegistry/master/filters/filter_1_Russian/filter.txt
-    name: "AdGuard Russian filter"
+    url: https://filters.adtidy.org/extension/ublock/filters/1_optimized.txt
+    name: "AdGuard Russian filter (DNS)"
     id: 3
   - enabled: true
     url: https://easylist-downloads.adblockplus.org/ruadlist.txt
@@ -172,6 +175,38 @@ filters:
     id: 4
 whitelist_filters: []
 user_rules:
+  # Блокировка российских рекламных сетей (Adfox, Yandex Direct, MyTarget, Mail.ru)
+  - '||adfox.ru^'
+  - '||banners.adfox.ru^'
+  - '||ads.adfox.ru^'
+  - '||content.adfox.ru^'
+  - '||yabs.yandex.ru^'
+  - '||direct.yandex.ru^'
+  - '||target.my.com^'
+  - '||m.ad.mail.ru^'
+  - '||r.mail.ru^'
+  - '||top-fwz1.mail.ru^'
+  - '||counter.yadro.ru^'
+  - '||ssp.rambler.ru^'
+  - '||begun.ru^'
+  - '||hybrid.ai^'
+  - '||buzzoola.com^'
+  - '||bidvol.com^'
+  - '||otm-r.com^'
+  - '||relap.io^'
+  # Блокировка мобильных рекламных SDK (игры и мобильные приложения)
+  - '||ads.tiktok.com^'
+  - '||bigossp.com^'
+  - '||ironsrc.com^'
+  - '||inmobi.com^'
+  - '||mintegral.com^'
+  - '||vungle.com^'
+  - '||applovin.com^'
+  - '||applvn.com^'
+  - '||unityads.unity3d.com^'
+  - '||supersonicads.com^'
+  - '||chartboost.com^'
+  - '||admob.com^'
   # Блокировка канареечных доменов DoH и Apple Private Relay (предотвращение скрытого обхода шлюза)
   - '||use-application-dns.net^'
   - '||mask.icloud.com^'

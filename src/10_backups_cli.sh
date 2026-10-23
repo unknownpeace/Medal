@@ -1606,6 +1606,7 @@ table inet homelab {
     chain forward {
         type filter hook forward priority -10; policy accept;
         tcp flags syn tcp option maxseg size set rt mtu
+        ip daddr { 1.1.1.1, 1.0.0.1, 8.8.8.8, 8.8.4.4, 9.9.9.9, 149.112.112.112, 94.140.14.14, 94.140.15.15, 77.88.8.8, 77.88.8.1 } tcp dport 443 reject with tcp reset
         accept
     }
 
@@ -1614,6 +1615,7 @@ table inet homelab {
         iifname "${def_iface}" tcp dport 53 redirect to :53
         iifname "${def_iface}" udp dport 53 redirect to :53
         iifname "${def_iface}" tcp dport 853 reject with tcp reset
+        iifname "${def_iface}" udp dport 853 reject
     }
 
     chain postrouting {
@@ -1693,6 +1695,7 @@ table inet homelab {
     chain forward {
         type filter hook forward priority -10; policy accept;
         tcp flags syn tcp option maxseg size set rt mtu
+        ip daddr { 1.1.1.1, 1.0.0.1, 8.8.8.8, 8.8.4.4, 9.9.9.9, 149.112.112.112, 94.140.14.14, 94.140.15.15, 77.88.8.8, 77.88.8.1 } tcp dport 443 reject with tcp reset
         iifname "${lan_if}" oifname "${wan_if}" accept
         iifname "${lan_if}" oifname "tun0" accept
         ct state { established, related } accept
@@ -1703,6 +1706,7 @@ table inet homelab {
         iifname "${lan_if}" tcp dport 53 redirect to :53
         iifname "${lan_if}" udp dport 53 redirect to :53
         iifname "${lan_if}" tcp dport 853 reject with tcp reset
+        iifname "${lan_if}" udp dport 853 reject
     }
 
     chain postrouting {
